@@ -834,13 +834,15 @@ void create_datatype(void* vblock, int did, int lid, DIY_Datatype *dtype) {
   struct map_block_t face_map[] = {
 
     {DIY_INT,    OFST, 2,
-	offsetof(struct vface_t, cells)               },
+     offsetof(struct vface_t, cells)               },
     {DIY_INT,    OFST, 1,
-	offsetof(struct vface_t, num_verts)           },
+     offsetof(struct vface_t, num_verts)           },
     {DIY_INT,    OFST, MAX_FACE_VERTS,
-	offsetof(struct vface_t, verts)               },
+     offsetof(struct vface_t, verts)               },
+    {DIY_FLOAT,  OFST, 1,
+     offsetof(struct vface_t, area)                },
   };
-  DIY_Create_struct_datatype(0, 3, face_map, &ftype);
+  DIY_Create_struct_datatype(0, 4, face_map, &ftype);
 
   struct vblock_t *v = (struct vblock_t *)vblock;
   struct map_block_t map[] = {

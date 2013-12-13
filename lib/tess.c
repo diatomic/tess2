@@ -277,13 +277,6 @@ void voronoi(int nblocks, float **particles, int *num_particles,
   orig_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
 	     particles, gids, nids, dirs, times);
 
-#ifdef TIMING
-  /* no barrier here; want min and max time */
-  times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
-  MPI_Barrier(comm);
-  times[HULL_TIME] = MPI_Wtime();
-#endif
-
   /* cleanup */
   for (i = 0; i < nblocks; i++) {
     free(gids[i]);
@@ -292,12 +285,26 @@ void voronoi(int nblocks, float **particles, int *num_particles,
   free(gids);
   free(nids);
 
+#ifdef TIMING
+  /* no barrier here; want min and max time */
+  times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
+  MPI_Barrier(comm);
+#endif
+
+#ifdef TIMING
+  MPI_Barrier(comm);
+  times[VOL_TIME] = MPI_Wtime();
+#endif
+
   /* create convex hulls for completed cells */
-  cell_hulls(nblocks, vblocks, dim, times);
+  cell_hulls(nblocks, vblocks, dim);
+
+  /* compute volume and surface area manually (not using convex hulls) */
+  cell_vols(nblocks, vblocks, particles);
 
 #ifdef TIMING
   /* no barrier here; want min and max time */
-  times[HULL_TIME] = MPI_Wtime() - times[HULL_TIME];
+  times[VOL_TIME] = MPI_Wtime() - times[VOL_TIME];
 #endif
 
   /* prepare for output */
@@ -534,15 +541,180 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 }
 /*--------------------------------------------------------------------------*/
 /*
+  computes volume and surface area for completed cells
+
+  nblocks: number of blocks
+  vblocks: pointer to array of vblocks
+  particles: particles in each block, particles[block_num][particle] include
+   particles received from neighbors
+
+*/
+void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles) {
+
+  int b, j, f;
+
+  /* compute areas of all faces */
+  face_areas(nblocks, vblocks);
+
+  /* for all blocks */
+  for (b = 0; b < nblocks; b++) {
+
+    vblocks[b].new_areas = (float *)malloc(vblocks[b].num_complete_cells *
+					   sizeof(float));
+    vblocks[b].new_vols = (float *)malloc(vblocks[b].num_complete_cells *
+					   sizeof(float));
+
+    /* for all complete cells */
+    for (j = 0; j < vblocks[b].num_complete_cells; j++) {
+
+      int cell = vblocks[b].complete_cells[j]; /* current cell */
+      int num_faces; /* number of faces in the current cell */
+      vblocks[b].new_areas[j] = 0.0;
+      vblocks[b].new_vols[j] = 0.0;
+
+      if (cell < vblocks[b].num_orig_particles - 1)
+	num_faces = vblocks[b].cell_faces_start[cell + 1] -
+	  vblocks[b].cell_faces_start[cell];
+      else
+	num_faces = vblocks[b].new_tot_num_cell_faces -
+	  vblocks[b].cell_faces_start[cell];
+
+      /* debug */
+/*       fprintf(stderr, "num_orig_particles = %d\n",  */
+/* 	      vblocks[b].num_orig_particles); */
+
+      /* for all faces */
+      for (f = 0; f < num_faces; f++) {
+
+	/* current face */
+	int fid = vblocks[b].cell_faces[vblocks[b].cell_faces_start[cell] + f];
+
+	/* input particles of cells sharing the face */
+	float p0[3], p1[3]; 
+	int p; /* index of particle (could be neighbor's) */
+
+	/* debug */
+/* 	fprintf(stderr, "f = %d fid = %d p0 = %d p1 = %d\n", */
+/* 		f, fid, vblocks[b].faces[fid].cells[0],  */
+/* 		vblocks[b].faces[fid].cells[1]); */
+
+	p = vblocks[b].faces[fid].cells[0];
+	p0[0] = particles[b][3 * p];
+	p0[1] = particles[b][3 * p + 1];
+	p0[2] = particles[b][3 * p + 2];
+	p = vblocks[b].faces[fid].cells[1];
+	p1[0] = particles[b][3 * p];
+	p1[1] = particles[b][3 * p + 1];
+	p1[2] = particles[b][3 * p + 2];
+
+	/* height of pyramid from site to face = 
+	   distance between sites sharing the face / 2 */
+	float height = sqrt((p0[0] - p1[0]) * (p0[0] - p1[0]) +
+			    (p0[1] - p1[1]) * (p0[1] - p1[1]) +
+			    (p0[2] - p1[2]) * (p0[2] - p1[2])) / 2.0;
+
+	/* add the volume of the pyramid formed by site and current face
+	   to the volume of the cell and add the face area to the surface
+	   area of the cell */
+	vblocks[b].new_vols[j] += vblocks[b].faces[fid].area * height / 3.0;
+	vblocks[b].new_areas[j] += vblocks[b].faces[fid].area;
+
+      } /* for all faces */
+
+      /* debug, assert that the two methods of computing area and volume agree */
+/*       if (fabs(vblocks[b].areas[j] - vblocks[b].new_areas[j]) > 1.0e-5 || */
+/* 	  fabs(vblocks[b].vols[j] - vblocks[b].new_vols[j]) > 1.0e-5) */
+/* 	fprintf(stderr, "comlete cell %d new_area %.3f (old-new diff %.3e) " */
+/* 		"new_vol %.3f (old-new diff %.3e)\n", */
+/* 		j, vblocks[b].new_areas[j], */
+/* 		vblocks[b].areas[j] - vblocks[b].new_areas[j], */
+/* 		vblocks[b].new_vols[j], */
+/* 		vblocks[b].vols[j] - vblocks[b].new_vols[j]); */
+
+    } /* for all complete cells */
+
+  } /* for all blocks */
+
+}
+/*--------------------------------------------------------------------------*/
+/*
+  computes areas of all faces
+
+  nblocks: number of blocks
+  vblocks: pointer to array of vblocks
+
+*/
+void face_areas(int nblocks, struct vblock_t *vblocks) {
+
+  int b, f, v;
+
+  /* for all blocks */
+  for (b = 0; b < nblocks; b++) {
+
+    /* for all faces */
+    for (f = 0; f < vblocks[b].num_faces; f++) {
+
+      vblocks[b].faces[f].area = 0.0;
+
+      /* all triangles fan out from same vertex */
+      int v0 = vblocks[b].faces[f].verts[0];
+
+      /* for all vertices in a face */
+      for (v = 2; v <vblocks[b].faces[f].num_verts; v++) {
+
+	/* remaining 2 vertices of one triangle in the polygon */
+	int v1 = vblocks[b].faces[f].verts[v - 1];
+	int v2 = vblocks[b].faces[f].verts[v];
+
+	/* debug */
+/* 	fprintf(stderr, "face %d num_verts %d verts [%d %d %d]\n", */
+/* 		f, vblocks[b].faces[f].num_verts, v0, v1, v2); */
+
+	/* vectors for two sides of triangle v1v1 and v0v2 */
+	float s1[3], s2[3]; 
+	s1[0] = vblocks[b].verts[3 * v1] - 
+	  vblocks[b].verts[3 * v0];
+	s1[1] = vblocks[b].verts[3 * v1 + 1] - 
+	  vblocks[b].verts[3 * v0 + 1];
+	s1[2] = vblocks[b].verts[3 * v1 + 2] - 
+	  vblocks[b].verts[3 * v0 + 2];
+	s2[0] = vblocks[b].verts[3 * v2] - 
+	  vblocks[b].verts[3 * v0];
+	s2[1] = vblocks[b].verts[3 * v2 + 1] - 
+	  vblocks[b].verts[3 * v0 + 1];
+	s2[2] = vblocks[b].verts[3 * v2 + 2] - 
+	  vblocks[b].verts[3 * v0 + 2];
+
+	/* cross product of s1 and s2 */
+	float c[3];
+	c[0] = s1[1] * s2[2] - s1[2] * s2[1];
+	c[1] = s1[2] * s2[0] - s1[0] * s2[2];
+	c[2] = s1[0] * s2[1] - s1[1] * s2[0];
+
+	/* area of triangle is |c| / 2 */
+	float a = sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]) / 2.0;
+	vblocks[b].faces[f].area += a;
+
+      } /* for all vertices */
+
+      /* debug */
+/*       fprintf(stderr, "face %d has area %.3f\n", f, vblocks[b].faces[f].area); */
+
+    } /* for all faces */
+
+  } /* for all blocks */
+
+}
+/*--------------------------------------------------------------------------*/
+/*
   creates convex hulls for completed cells
 
   nblocks: number of blocks
   vblocks: pointer to array of vblocks
   dim: number of dimensions (eg. 3)
-  times: timing info
 
 */
-void cell_hulls(int nblocks, struct vblock_t *vblocks, int dim, double *times) {
+void cell_hulls(int nblocks, struct vblock_t *vblocks, int dim) {
 
   boolT ismalloc = False;    /* True if qhull should free points in
 				qh_freeqhull() or reallocation */
@@ -605,7 +777,7 @@ void cell_hulls(int nblocks, struct vblock_t *vblocks, int dim, double *times) {
 	  vblocks[i].temp_complete_cells[j];
 	vblocks[i].num_complete_cells++;
 	convex_to_voronoi(&cblock, &vblocks[i], vmap, 
-			  vblocks[i].num_complete_cells - 1, times);
+			  vblocks[i].num_complete_cells - 1);
       }
 
       /* debug */
@@ -967,8 +1139,8 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
   /* timing range */
   stats.min_cell_time = times[CELL_TIME];
   stats.max_cell_time = times[CELL_TIME];
-  stats.min_hull_time = times[HULL_TIME];
-  stats.max_hull_time = times[HULL_TIME];
+  stats.min_vol_time = times[VOL_TIME];
+  stats.max_vol_time = times[VOL_TIME];
 
   /* --- first pass: find average number of vertices per cell and 
      volume range --- */
@@ -1091,8 +1263,8 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
     fprintf(stderr, "particle exchange time = %.3lf s\n", times[EXCH_TIME]);
     fprintf(stderr, "[min, max] voronoi / delaunay time = [%.3lf, %.3lf] s\n",
 	    stats.min_cell_time, stats.max_cell_time);
-    fprintf(stderr, "[min, max] convex hull time = [%.3lf, %.3lf] s\n",
-	    stats.min_hull_time, stats.max_hull_time);
+    fprintf(stderr, "[min, max] cell volume / area time = [%.3lf, %.3lf] s\n",
+	    stats.min_vol_time, stats.max_vol_time);
     fprintf(stderr, "output time = %.3lf s\n", times[OUT_TIME]);
     fprintf(stderr, "-----\n");
     fprintf(stderr, "total tets found = %d\n", stats.tot_tets);
@@ -1190,9 +1362,9 @@ void aggregate_stats(int nblocks, struct vblock_t *vblocks,
       { DIY_FLOAT, OFST, 1, 
 	offsetof(struct stats_t, max_cell_time)  },
       { DIY_FLOAT, OFST, 1, 
-	offsetof(struct stats_t, min_hull_time)  },
+	offsetof(struct stats_t, min_vol_time)  },
       { DIY_FLOAT, OFST, 1, 
-	offsetof(struct stats_t, max_hull_time)  },
+	offsetof(struct stats_t, max_vol_time)  },
       { DIY_INT,   OFST, 1, 
 	offsetof(struct stats_t, num_vol_bins)   },
       { DIY_INT,   OFST, 1, 
@@ -1233,8 +1405,8 @@ void aggregate_stats(int nblocks, struct vblock_t *vblocks,
     glo_stats.avg_cell_dense = loc_stats->avg_cell_dense;
     glo_stats.min_cell_time  = loc_stats->min_cell_time;
     glo_stats.max_cell_time  = loc_stats->max_cell_time;
-    glo_stats.min_hull_time  = loc_stats->min_hull_time;
-    glo_stats.max_hull_time  = loc_stats->max_hull_time;
+    glo_stats.min_vol_time  = loc_stats->min_vol_time;
+    glo_stats.max_vol_time  = loc_stats->max_vol_time;
     glo_stats.num_vol_bins   = 50;
     glo_stats.num_dense_bins = 100;
 
@@ -1306,8 +1478,8 @@ void aggregate_stats(int nblocks, struct vblock_t *vblocks,
     loc_stats->avg_cell_dense = fin_stats.avg_cell_dense;
     loc_stats->min_cell_time  = fin_stats.min_cell_time;
     loc_stats->max_cell_time  = fin_stats.max_cell_time;
-    loc_stats->min_hull_time  = fin_stats.min_hull_time;
-    loc_stats->max_hull_time  = fin_stats.max_hull_time;
+    loc_stats->min_vol_time  = fin_stats.min_vol_time;
+    loc_stats->max_vol_time  = fin_stats.max_vol_time;
     loc_stats->num_vol_bins   = fin_stats.num_vol_bins;
     loc_stats->num_dense_bins   = fin_stats.num_dense_bins;
     for (i = 0; i < MAX_HIST_BINS; i++) {
@@ -1392,10 +1564,10 @@ void average(void *in, void *inout, int *len, MPI_Datatype *type) {
     stats2->min_cell_time = stats1->min_cell_time;
   if (stats1->max_cell_time > stats2->max_cell_time)
     stats2->max_cell_time = stats1->max_cell_time;
-  if (stats1->min_hull_time < stats2->min_hull_time)
-    stats2->min_hull_time = stats1->min_hull_time;
-  if (stats1->max_hull_time > stats2->max_hull_time)
-    stats2->max_hull_time = stats1->max_hull_time;
+  if (stats1->min_vol_time < stats2->min_vol_time)
+    stats2->min_vol_time = stats1->min_vol_time;
+  if (stats1->max_vol_time > stats2->max_vol_time)
+    stats2->max_vol_time = stats1->max_vol_time;
 
   /* ought to do a cross-validation to find correct number of bins
      for now just pick a number */
@@ -1437,8 +1609,8 @@ void histogram(void *in, void *inout, int *len, MPI_Datatype *type) {
   stats2->avg_cell_dense = stats1->avg_cell_dense;
   stats2->min_cell_time  = stats1->min_cell_time;
   stats2->max_cell_time  = stats1->max_cell_time;
-  stats2->min_hull_time  = stats1->min_hull_time;
-  stats2->max_hull_time  = stats1->max_hull_time;
+  stats2->min_vol_time  = stats1->min_vol_time;
+  stats2->max_vol_time  = stats1->max_vol_time;
   stats2->num_vol_bins   = stats1->num_vol_bins;
   stats2->num_dense_bins = stats1->num_dense_bins;
   for (i = 0; i < stats2->num_vol_bins; i++)
@@ -1550,6 +1722,8 @@ void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs) {
     (*vblocks)[i].is_complete = NULL;
     (*vblocks)[i].areas = NULL;
     (*vblocks)[i].vols = NULL;
+    (*vblocks)[i].new_areas = NULL;
+    (*vblocks)[i].new_vols = NULL;
     (*vblocks)[i].tot_num_cell_faces = 0;
     (*vblocks)[i].tot_num_face_verts = 0;
     (*vblocks)[i].num_cell_faces = NULL;
@@ -1616,6 +1790,10 @@ void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
       free(vblocks[i].areas);
     if (vblocks[i].vols)
       free(vblocks[i].vols);
+    if (vblocks[i].new_areas)
+      free(vblocks[i].new_areas);
+    if (vblocks[i].new_vols)
+      free(vblocks[i].new_vols);
     if (vblocks[i].num_cell_faces)
       free(vblocks[i].num_cell_faces);
     if (vblocks[i].num_face_verts)
@@ -2333,6 +2511,7 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
 		vblock->faces[num_faces].cells[1] = qh_pointid(vertex->point);
 		int num_verts = 0;
 		FOREACHfacet_(centers) {
+		  assert(num_verts < MAX_FACE_VERTS);
 		  vblock->faces[num_faces].verts[num_verts++] = facet->visitid;
 		}
 		num_faces++;
@@ -2646,18 +2825,15 @@ int gen_convex_output(facetT *facetlist, struct cblock_t *cblock) {
   vblock: pointer to one voronoi block, allocated by caller
   vmap: map of convex hull vertex ids back to original voronoi ids
   cell: index of current cell
-  times: timing info
 
   side effects: allocates complete_cells, areas, vols, num_cell_faces
   data structures inside of vblock, caller's responsibility to free
 */
 void convex_to_voronoi(struct cblock_t *cblock, struct vblock_t *vblock,
-		       int *vmap, int cell, double *times) {
+		       int *vmap, int cell) {
 
   int j, k;
   int chunk_size = 1024; /* dynamic memory allocation amount */
-
-  times = times; /* quiet compiler warning in case times is not used */
 
   /* copy */
   (vblock->areas)[cell] = cblock->area;

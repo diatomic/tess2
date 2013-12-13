@@ -28,13 +28,13 @@
 #define NEW_TOT_NUM_CELL_FACES 9
 
 #define MAX_HIST_BINS 256 /* maximum number of bins in cell volume histogram */
-#define MAX_FACE_VERTS 16 /* maximum number of vertices per face */
+#define MAX_FACE_VERTS 24 /* maximum number of vertices per face */
 
 /* timing info */
 #define MAX_TIMES 8 /* max number of timing components */
 #define EXCH_TIME 0 /* particle exchange */
 #define CELL_TIME 1 /* voronoi / delaunay computation */
-#define HULL_TIME 2 /* convex hulls from voronoi cells */
+#define VOL_TIME 2 /* volumes and areas of voronoi cells */
 #define OUT_TIME  3 /* file output */
 #define LOCAL_TIME  4 /* local voronoi / delaunay computation */
 
@@ -64,6 +64,7 @@ struct vface_t {
   int cells[2]; /* up to two voronoi cells, or -1 if no nneighbo cell */
   int num_verts; /* number of vertices in the face */
   int verts[MAX_FACE_VERTS]; /* vertex indices for the face */
+  float area; /* area of face */
 };
 
 /* voronoi and delaunay tessellation for one DIY block */
@@ -95,6 +96,8 @@ struct vblock_t {
   unsigned char *is_complete; /* each cell's completion status 0 or 1 */
   float *areas; /* surface areas of complete cells */
   float *vols; /* volumes of complete cells */
+  float *new_areas; /* new version of surface areas of complete cells */
+  float *new_vols; /* new version of volumes of complete cells */
   int tot_num_cell_faces; /* total number of faces in complete cells */
   int *num_cell_faces; /* number of faces in complete cells, in order of
 			  complete cells */
@@ -170,8 +173,8 @@ struct stats_t {
   float avg_cell_dense; /* average cell density */
   float min_cell_time; /* minimum voronoi cell time */
   float max_cell_time; /* maximum voronoi cell time */
-  float min_hull_time; /* minimum convex hull time */
-  float max_hull_time; /* maximum convex hull time */
+  float min_vol_time; /* minimum convex hull time */
+  float max_vol_time; /* maximum convex hull time */
   int num_vol_bins; /* number of bins in cell volume histogram */
   int num_dense_bins; /* number of bins in cell density histogram */
   int vol_hist[MAX_HIST_BINS]; /* cell volume histogram */
