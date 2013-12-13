@@ -64,7 +64,6 @@ struct vface_t {
   int cells[2]; /* up to two voronoi cells, or -1 if no nneighbo cell */
   int num_verts; /* number of vertices in the face */
   int verts[MAX_FACE_VERTS]; /* vertex indices for the face */
-  float area; /* area of face */
 };
 
 /* voronoi and delaunay tessellation for one DIY block */
@@ -96,6 +95,7 @@ struct vblock_t {
   unsigned char *is_complete; /* each cell's completion status 0 or 1 */
   float *areas; /* surface areas of complete cells */
   float *vols; /* volumes of complete cells */
+  float *face_areas; /* area of each face in faces array */
   float *new_areas; /* new version of surface areas of complete cells */
   float *new_vols; /* new version of volumes of complete cells */
   int tot_num_cell_faces; /* total number of faces in complete cells */

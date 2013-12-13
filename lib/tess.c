@@ -616,8 +616,8 @@ void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles) {
 	/* add the volume of the pyramid formed by site and current face
 	   to the volume of the cell and add the face area to the surface
 	   area of the cell */
-	vblocks[b].new_vols[j] += vblocks[b].faces[fid].area * height / 3.0;
-	vblocks[b].new_areas[j] += vblocks[b].faces[fid].area;
+	vblocks[b].new_vols[j] += vblocks[b].face_areas[fid] * height / 3.0;
+	vblocks[b].new_areas[j] += vblocks[b].face_areas[fid];
 
       } /* for all faces */
 
@@ -651,10 +651,13 @@ void face_areas(int nblocks, struct vblock_t *vblocks) {
   /* for all blocks */
   for (b = 0; b < nblocks; b++) {
 
+    vblocks[b].face_areas = (float *)malloc(vblocks[b].num_faces *
+					    sizeof(float));
+
     /* for all faces */
     for (f = 0; f < vblocks[b].num_faces; f++) {
 
-      vblocks[b].faces[f].area = 0.0;
+      vblocks[b].face_areas[f] = 0.0;
 
       /* all triangles fan out from same vertex */
       int v0 = vblocks[b].faces[f].verts[0];
@@ -693,7 +696,7 @@ void face_areas(int nblocks, struct vblock_t *vblocks) {
 
 	/* area of triangle is |c| / 2 */
 	float a = sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]) / 2.0;
-	vblocks[b].faces[f].area += a;
+	vblocks[b].face_areas[f] += a;
 
       } /* for all vertices */
 
@@ -1722,6 +1725,7 @@ void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs) {
     (*vblocks)[i].is_complete = NULL;
     (*vblocks)[i].areas = NULL;
     (*vblocks)[i].vols = NULL;
+    (*vblocks)[i].face_areas = NULL;
     (*vblocks)[i].new_areas = NULL;
     (*vblocks)[i].new_vols = NULL;
     (*vblocks)[i].tot_num_cell_faces = 0;
@@ -1790,6 +1794,8 @@ void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
       free(vblocks[i].areas);
     if (vblocks[i].vols)
       free(vblocks[i].vols);
+    if (vblocks[i].face_areas)
+      free(vblocks[i].face_areas);
     if (vblocks[i].new_areas)
       free(vblocks[i].new_areas);
     if (vblocks[i].new_vols)
@@ -2027,6 +2033,19 @@ void cell_faces(struct vblock_t *vblock) {
 /*       int start = vblock->cell_faces_start[i]; */
 /*       fprintf(stderr, "%d ", vblock->cell_faces[start + j]); */
 /*     } */
+/*     fprintf(stderr, "\n"); */
+/*   } */
+
+  /* debug: print the faces and face vertices */
+/*   int j; */
+/*   fprintf(stderr, "\n%d total unique faces\n", vblock->num_faces); */
+/*   for (i = 0; i < vblock->num_faces; i++) { */
+/*     fprintf(stderr, "face %d lies between cells %d %d and has %d verts: ", */
+/* 	    i, */
+/* 	    vblock->faces[i].cells[0], vblock->faces[i].cells[1], */
+/* 	    vblock->faces[i].num_verts); */
+/*     for (j = 0; j < vblock->faces[i].num_verts; j++) */
+/*       fprintf(stderr, "%d ", vblock->faces[i].verts[j]); */
 /*     fprintf(stderr, "\n"); */
 /*   } */
 
@@ -2552,7 +2571,7 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
 /*   int j; */
 /*   fprintf(stderr, "\n%d total unique faces\n", vblock->num_faces); */
 /*   for (i = 0; i < vblock->num_faces; i++) { */
-/*     fprintf(stderr, "face %d lies between cells %d %d and has %d verts: ",  */
+/*     fprintf(stderr, "face %d lies between cells %d %d and has %d verts: ", */
 /* 	    i, */
 /* 	    vblock->faces[i].cells[0], vblock->faces[i].cells[1], */
 /* 	    vblock->faces[i].num_verts); */

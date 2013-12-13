@@ -462,7 +462,7 @@ void display() {
 
       else { // ! color_density
 
-	GLfloat mat[] = {0.4, 0.4, 0.9, 1.0};
+	GLfloat mat[] = {0.65, 0.65, 0.85, 1.0};
 	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, mat);
 	n = 0;
 
@@ -660,7 +660,7 @@ void draw_tets() {
     glDisable(GL_COLOR_MATERIAL);
     glEnable(GL_LIGHT0);
     glEnable(GL_LIGHTING);
-    GLfloat amb_mat[] = {0.4, 0.4, 0.9, 1.0};
+    GLfloat amb_mat[] = {0.65, 0.65, 0.85, 1.0};
     GLfloat spec_mat[] = {1.0, 1.0, 1.0, 1.0};
     GLfloat shine[] = {64}; // 0 - 128, 0 = shiny, 128 = dull
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, spec_mat);
@@ -1387,11 +1387,11 @@ void PrepRenderingData() {
 void PrepCellRendering(int &num_vis_cells) {
 
   num_vis_cells = 0; // numbe of visible cells
-  int n, m;
+//   int n, m;
 
   for (int i = 0; i < nblocks; i++) { // blocks
 
-    // --- old version of cell faces
+    // --- old version of cell faces DEPRECATED
 
 //     n = 0; // index into num_face_verts
 //     m = 0; // index into face_verts
@@ -1460,9 +1460,18 @@ void PrepCellRendering(int &num_vis_cells) {
 
 //     } // cells
 
-    // ---- end of old version of cell faces
 
-    // ---- new version of cell faces
+    // debug: print the faces and face vertices
+//     fprintf(stderr, "\n%d total unique faces\n", vblocks[i]->num_faces);
+//     for (int k = 0; k < vblocks[i]->num_faces; k++) {
+//       fprintf(stderr, "face %d lies between cells %d %d and has %d verts: ",
+// 	      k,
+// 	      vblocks[i]->faces[k].cells[0], vblocks[i]->faces[k].cells[1],
+// 	      vblocks[i]->faces[k].num_verts);
+//       for (int j = 0; j < vblocks[i]->faces[k].num_verts; j++)
+// 	fprintf(stderr, "%d ", vblocks[i]->faces[k].verts[j]);
+//       fprintf(stderr, "\n");
+//     }
 
     for (int j = 0; j < vblocks[i]->num_complete_cells; j++) { // cells
 
@@ -1494,11 +1503,6 @@ void PrepCellRendering(int &num_vis_cells) {
 	  if (vblocks[i]->vols[j] > max_vol_act)
 	    max_vol_act = vblocks[i]->vols[j];
 	}
-
-	// debug
-// 	fprintf(stderr, "cell = %d num_faces = %d start = %d "
-// 		"num_verts[face %d] = %d\n",
-// 		cell, num_faces, start, face, num_verts);
 
 	int v0; // starting vertex of this face in verts list
 
@@ -1544,8 +1548,6 @@ void PrepCellRendering(int &num_vis_cells) {
 
     } // cells
 
-    // ---- end of new version of cell faces
-
   } // blocks
 
 }
@@ -1572,11 +1574,6 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets) {
       int s2 = vblocks[i]->loc_tets[4 * j + 2];
       int s3 = vblocks[i]->loc_tets[4 * j + 3];
 
-      // debug
-//       int sort[] = {s0, s1, s2, s3};; // sorted version
-//       qsort(sort, 4, sizeof(int), &compare);
-//       fprintf(stderr, "%d %d %d %d\n", sort[0], sort[1], sort[2], sort[3]);
-
       // coordinates for tet vertices
       vec3d p0, p1, p2, p3;
       p0.x = vblocks[i]->sites[3 * s0];
@@ -1597,16 +1594,6 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets) {
       tet_verts.push_back(p1);
       tet_verts.push_back(p2);
       tet_verts.push_back(p3);
-
-      // debug
-//       fprintf(stderr, "site %d [%.3f %.3f %.3f] "
-// 	      "site %d [%.3f %.3f %.3f] "
-// 	      "site %d [%.3f %.3f %.3f] "
-// 	      "site %d [%.3f %.3f %.3f]\n", 
-// 	      vblocks[i]->tets[4 * j], p0.x, p0.y, p0.z,
-// 	      vblocks[i]->tets[4 * j + 1], p1.x, p1.y, p1.z,
-// 	      vblocks[i]->tets[4 * j + 2], p2.x, p2.y, p2.z,
-// 	      vblocks[i]->tets[4 * j + 3], p3.x, p3.y, p3.z);
 
       num_loc_tets++;
 
