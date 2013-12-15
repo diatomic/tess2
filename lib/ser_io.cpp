@@ -190,13 +190,14 @@ void SER_IO::ReadBlock(FILE *fd, vblock_t* &v, int64_t ofst) {
   v->num_verts = hdr[NUM_VERTS];
   v->tot_num_cell_verts = hdr[TOT_NUM_CELL_VERTS];
   v->num_complete_cells = hdr[NUM_COMPLETE_CELLS];
-  v->tot_num_cell_faces = hdr[TOT_NUM_CELL_FACES];
-  v->tot_num_face_verts = hdr[TOT_NUM_FACE_VERTS];
+  // DEPRECATED
+//   v->tot_num_cell_faces = hdr[TOT_NUM_CELL_FACES];
+//   v->tot_num_face_verts = hdr[TOT_NUM_FACE_VERTS];
   v->num_orig_particles = hdr[NUM_ORIG_PARTICLES];
   v->num_loc_tets = hdr[NUM_LOC_TETS];
   v->num_rem_tets = hdr[NUM_REM_TETS];
   v->num_faces = hdr[NUM_FACES];
-  v->new_tot_num_cell_faces = hdr[NEW_TOT_NUM_CELL_FACES];
+  v->tot_num_cell_faces = hdr[TOT_NUM_CELL_FACES];
 
   // debug
 //   fprintf(stderr, "num_verts = %d num_complete_cells = %d "
@@ -218,12 +219,14 @@ void SER_IO::ReadBlock(FILE *fd, vblock_t* &v, int64_t ofst) {
     v->complete_cells = new int[v->num_complete_cells];
     v->areas = new float[v->num_complete_cells];
     v->vols = new float[v->num_complete_cells];
-    v->num_cell_faces = new int[v->num_complete_cells];
+  // DEPRECATED
+//     v->num_cell_faces = new int[v->num_complete_cells];
   }
-  if (v->tot_num_cell_faces > 0)
-    v->num_face_verts = new int[v->tot_num_cell_faces];
-  if (v->tot_num_face_verts > 0)
-    v->face_verts = new int[v->tot_num_face_verts];
+  // DEPRECATED
+//   if (v->tot_num_cell_faces > 0)
+//     v->num_face_verts = new int[v->tot_num_cell_faces];
+//   if (v->tot_num_face_verts > 0)
+//     v->face_verts = new int[v->tot_num_face_verts];
   if (v->num_loc_tets > 0)
     v->loc_tets = new int[4 * v->num_loc_tets];
   if (v->num_rem_tets > 0) {
@@ -233,8 +236,8 @@ void SER_IO::ReadBlock(FILE *fd, vblock_t* &v, int64_t ofst) {
   }
   if (v->num_faces)
     v->faces = new struct vface_t[v->num_faces];
-  if (v->new_tot_num_cell_faces)
-    v->cell_faces = new int[v->new_tot_num_cell_faces];
+  if (v->tot_num_cell_faces)
+    v->cell_faces = new int[v->tot_num_cell_faces];
 
   fread(v->mins, sizeof(float), 3, fd);
   fread(v->save_verts, sizeof(float), 3 * v->num_verts, fd);
@@ -242,16 +245,17 @@ void SER_IO::ReadBlock(FILE *fd, vblock_t* &v, int64_t ofst) {
   fread(v->complete_cells, sizeof(int), v->num_complete_cells, fd);
   fread(v->areas, sizeof(float), v->num_complete_cells, fd);
   fread(v->vols, sizeof(float), v->num_complete_cells, fd);
-  fread(v->num_cell_faces, sizeof(int), v->num_complete_cells, fd);
-  fread(v->num_face_verts, sizeof(int), v->tot_num_cell_faces, fd);
-  fread(v->face_verts, sizeof(int), v->tot_num_face_verts, fd);
+  // DEPRECATED
+//   fread(v->num_cell_faces, sizeof(int), v->num_complete_cells, fd);
+//   fread(v->num_face_verts, sizeof(int), v->tot_num_cell_faces, fd);
+//   fread(v->face_verts, sizeof(int), v->tot_num_face_verts, fd);
   fread(v->loc_tets, sizeof(int), 4 * v->num_loc_tets, fd);
   fread(v->rem_tet_gids, sizeof(int), 4 * v->num_rem_tets, fd);
   fread(v->rem_tet_nids, sizeof(int), 4 * v->num_rem_tets, fd);
   fread(v->rem_tet_wrap_dirs, sizeof(unsigned char), 4 * v->num_rem_tets, fd);
   fread(v->faces, sizeof(struct vface_t), v->num_faces, fd);
   fread(v->cell_faces_start, sizeof(int), v->num_orig_particles, fd);
-  fread(v->cell_faces, sizeof(int), v->new_tot_num_cell_faces, fd);
+  fread(v->cell_faces, sizeof(int), v->tot_num_cell_faces, fd);
   fread(v->maxs, sizeof(float), 3, fd);
 
   if (swap_bytes) {
@@ -261,9 +265,10 @@ void SER_IO::ReadBlock(FILE *fd, vblock_t* &v, int64_t ofst) {
     Swap((char *)v->complete_cells, v->num_complete_cells, sizeof(int));
     Swap((char *)v->areas, v->num_complete_cells, sizeof(float));
     Swap((char *)v->vols, v->num_complete_cells, sizeof(float));
-    Swap((char *)v->num_cell_faces, v->num_complete_cells, sizeof(int));
-    Swap((char *)v->num_face_verts, v->tot_num_cell_faces, sizeof(int));
-    Swap((char *)v->face_verts, v->tot_num_face_verts, sizeof(int));
+  // DEPRECATED
+//     Swap((char *)v->num_cell_faces, v->num_complete_cells, sizeof(int));
+//     Swap((char *)v->num_face_verts, v->tot_num_cell_faces, sizeof(int));
+//     Swap((char *)v->face_verts, v->tot_num_face_verts, sizeof(int));
     Swap((char *)v->loc_tets, 4 * v->num_loc_tets, sizeof(int));
     Swap((char *)v->rem_tet_gids, 4 * v->num_rem_tets, sizeof(int));
     Swap((char *)v->rem_tet_nids, 4 * v->num_rem_tets, sizeof(int));
@@ -278,7 +283,7 @@ void SER_IO::ReadBlock(FILE *fd, vblock_t* &v, int64_t ofst) {
     }
 
     Swap((char *)v->cell_faces_start, v->num_orig_particles, sizeof(int));
-    Swap((char *)v->cell_faces, v->new_tot_num_cell_faces, sizeof(int));
+    Swap((char *)v->cell_faces, v->tot_num_cell_faces, sizeof(int));
     Swap((char *)v->maxs, 3, sizeof(float));
   }
 
@@ -306,13 +311,14 @@ void SER_IO::CopyBlock(unsigned char *in_buf, vblock_t* &v) {
   v->num_verts = hdr[NUM_VERTS];
   v->tot_num_cell_verts = hdr[TOT_NUM_CELL_VERTS];
   v->num_complete_cells = hdr[NUM_COMPLETE_CELLS];
-  v->tot_num_cell_faces = hdr[TOT_NUM_CELL_FACES];
-  v->tot_num_face_verts = hdr[TOT_NUM_FACE_VERTS];
+  // DEPRECATED
+//   v->tot_num_cell_faces = hdr[TOT_NUM_CELL_FACES];
+//   v->tot_num_face_verts = hdr[TOT_NUM_FACE_VERTS];
   v->num_orig_particles = hdr[NUM_ORIG_PARTICLES];
   v->num_loc_tets = hdr[NUM_LOC_TETS];
   v->num_rem_tets = hdr[NUM_REM_TETS];
   v->num_faces = hdr[NUM_FACES];
-  v->new_tot_num_cell_faces = hdr[NEW_TOT_NUM_CELL_FACES];
+  v->tot_num_cell_faces = hdr[TOT_NUM_CELL_FACES];
 
   if (v->num_verts > 0)
     v->save_verts = new float[3 * v->num_verts];
@@ -327,12 +333,13 @@ void SER_IO::CopyBlock(unsigned char *in_buf, vblock_t* &v) {
     v->complete_cells = new int[v->num_complete_cells];
     v->areas = new float[v->num_complete_cells];
     v->vols = new float[v->num_complete_cells];
-    v->num_cell_faces = new int[v->num_complete_cells];
+  // DEPRECATED
+//     v->num_cell_faces = new int[v->num_complete_cells];
   }
-  if (v->tot_num_cell_faces > 0)
-    v->num_face_verts = new int[v->tot_num_cell_faces];
-  if (v->tot_num_face_verts > 0)
-    v->face_verts = new int[v->tot_num_face_verts];
+//   if (v->tot_num_cell_faces > 0)
+//     v->num_face_verts = new int[v->tot_num_cell_faces];
+//   if (v->tot_num_face_verts > 0)
+//     v->face_verts = new int[v->tot_num_face_verts];
   if (v->num_loc_tets > 0)
     v->loc_tets = new int[4 * v->num_loc_tets];
   if (v->num_rem_tets > 0) {
@@ -342,8 +349,8 @@ void SER_IO::CopyBlock(unsigned char *in_buf, vblock_t* &v) {
   }
   if (v->num_faces)
     v->faces = new struct vface_t[v->num_faces];
-  if (v->new_tot_num_cell_faces)
-    v->cell_faces = new int[v->new_tot_num_cell_faces];
+  if (v->tot_num_cell_faces)
+    v->cell_faces = new int[v->tot_num_cell_faces];
 
   memcpy(&v->mins, in_buf + ofst, 3 * sizeof(float));
   ofst += (3 * sizeof(float));
@@ -364,16 +371,17 @@ void SER_IO::CopyBlock(unsigned char *in_buf, vblock_t* &v) {
   memcpy(v->vols, in_buf + ofst, v->num_complete_cells * sizeof(float));
   ofst += (v->num_complete_cells * sizeof(float));
 
-  memcpy(v->num_cell_faces, in_buf + ofst, 
-	 v->num_complete_cells * sizeof(int));
-  ofst += (v->num_complete_cells * sizeof(int));
+  // DEPRECATED
+//   memcpy(v->num_cell_faces, in_buf + ofst, 
+// 	 v->num_complete_cells * sizeof(int));
+//   ofst += (v->num_complete_cells * sizeof(int));
 
-  memcpy(v->num_face_verts, in_buf + ofst, 
-	 v->tot_num_cell_faces * sizeof(int));
-  ofst += (v->tot_num_cell_faces * sizeof(int));
+//   memcpy(v->num_face_verts, in_buf + ofst, 
+// 	 v->tot_num_cell_faces * sizeof(int));
+//   ofst += (v->tot_num_cell_faces * sizeof(int));
 
-  memcpy(v->face_verts, in_buf + ofst, v->tot_num_face_verts * sizeof(int));
-  ofst += (v->tot_num_face_verts * sizeof(int));
+//   memcpy(v->face_verts, in_buf + ofst, v->tot_num_face_verts * sizeof(int));
+//   ofst += (v->tot_num_face_verts * sizeof(int));
 
   memcpy(v->loc_tets, in_buf + ofst, 4 * v->num_loc_tets * sizeof(int));
   ofst += (4 * v->num_loc_tets * sizeof(int));
@@ -394,8 +402,8 @@ void SER_IO::CopyBlock(unsigned char *in_buf, vblock_t* &v) {
 	 v->num_orig_particles * sizeof(int));
   ofst += (v->num_orig_particles * sizeof(int));
   memcpy(v->cell_faces, in_buf + ofst, 
-	 v->new_tot_num_cell_faces * sizeof(int));
-  ofst += (v->new_tot_num_cell_faces * sizeof(int));
+	 v->tot_num_cell_faces * sizeof(int));
+  ofst += (v->tot_num_cell_faces * sizeof(int));
   memcpy(&v->maxs, in_buf + ofst, 3 * sizeof(float));
   ofst += (3 * sizeof(float));
 
@@ -406,9 +414,10 @@ void SER_IO::CopyBlock(unsigned char *in_buf, vblock_t* &v) {
     Swap((char *)v->complete_cells, v->num_complete_cells, sizeof(int));
     Swap((char *)v->areas, v->num_complete_cells, sizeof(float));
     Swap((char *)v->vols, v->num_complete_cells, sizeof(float));
-    Swap((char *)v->num_cell_faces, v->num_complete_cells, sizeof(int));
-    Swap((char *)v->num_face_verts, v->tot_num_cell_faces, sizeof(int));
-    Swap((char *)v->face_verts, v->tot_num_face_verts, sizeof(int));
+  // DEPRECATED
+//     Swap((char *)v->num_cell_faces, v->num_complete_cells, sizeof(int));
+//     Swap((char *)v->num_face_verts, v->tot_num_cell_faces, sizeof(int));
+//     Swap((char *)v->face_verts, v->tot_num_face_verts, sizeof(int));
     Swap((char *)v->loc_tets, 4 * v->num_loc_tets, sizeof(int));
     Swap((char *)v->rem_tet_gids, 4 * v->num_rem_tets, sizeof(int));
     Swap((char *)v->rem_tet_nids, 4 * v->num_rem_tets, sizeof(int));
@@ -423,7 +432,7 @@ void SER_IO::CopyBlock(unsigned char *in_buf, vblock_t* &v) {
     }
 
     Swap((char *)v->cell_faces_start, v->num_orig_particles, sizeof(int));
-    Swap((char *)v->cell_faces, v->new_tot_num_cell_faces, sizeof(int));
+    Swap((char *)v->cell_faces, v->tot_num_cell_faces, sizeof(int));
     Swap((char *)v->maxs, 3, sizeof(float));
   }
 

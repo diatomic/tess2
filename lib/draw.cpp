@@ -172,7 +172,7 @@ void Normal(vec3d *verts, vec3d &normal);
 void NewellNormal(vec3d *verts, int num_verts, vec3d &normal);
 void filter_volume(float min_vol, float max_vol);
 void clip_cells(float z_clip);
-void CellBounds(vblock_t *vblock, int cell, int face, int vert,
+void CellBounds(vblock_t *vblock, int cell,
 		float *cell_min, float *cell_max, float *centroid);
 void PrepRenderingData();
 void PrepSiteRendering(int &num_sites);
@@ -1021,17 +1021,32 @@ void filter_volume(float min_vol, float max_vol) {
 
     for (int j = 0; j < vblocks[i]->num_complete_cells; j++) { // cells
 
-      for (int k = 0; k < vblocks[i]->num_cell_faces[j]; k++) { // faces
+      int cell = vblocks[i]->complete_cells[j]; // current cell
+      int num_faces; // number of face in the current cell
+      int num_verts; // number of vertices in the current face
+
+      if (cell < vblocks[i]->num_orig_particles - 1)
+	num_faces = vblocks[i]->cell_faces_start[cell + 1] -
+	  vblocks[i]->cell_faces_start[cell];
+      else
+	num_faces = vblocks[i]->tot_num_cell_faces -
+	  vblocks[i]->cell_faces_start[cell];
+
+      for (int k = 0; k < num_faces; k++) { // faces
+
+	int start = vblocks[i]->cell_faces_start[cell];
+	int face = vblocks[i]->cell_faces[start + k];
+	num_verts = vblocks[i]->faces[face].num_verts;
 
 	if (vblocks[i]->vols[j] >= min_vol &&
 	    (max_vol <= 0.0 || vblocks[i]->vols[j] <= max_vol)) {
-	  num_face_verts.push_back(vblocks[i]->num_face_verts[n]);
+	  num_face_verts.push_back(num_verts);
 	  face_vols.push_back(vblocks[i]->vols[j]);
 	}
 
-	for (int l = 0; l < vblocks[i]->num_face_verts[n]; l++) { // vertices
+	for (int l = 0; l < num_verts; l++) { // vertices
 
-	  int v = vblocks[i]->face_verts[m];
+	  int v = vblocks[i]->faces[face].verts[l];
 	  vec3d s;
 	  s.x = vblocks[i]->save_verts[3 * v];
 	  s.y = vblocks[i]->save_verts[3 * v + 1];
@@ -1064,8 +1079,6 @@ void filter_volume(float min_vol, float max_vol) {
 //
 void clip_cells(float z_clip) {
 
-  int face = 0; // faces counter
-  int vert = 0; // face vertices counter
   float cell_min[3], cell_max[3], cell_centroid[3]; // cell bounds
 
   sites.clear();
@@ -1077,8 +1090,7 @@ void clip_cells(float z_clip) {
     for (int cell = 0; cell < vblocks[block]->num_complete_cells; cell++) {
 
       // cell bounds
-      CellBounds(vblocks[block], cell, face, vert, cell_min, cell_max,
-		 cell_centroid);
+      CellBounds(vblocks[block], cell, cell_min, cell_max, cell_centroid);
 
       if (cell_min[2] < z_clip) {
 	vec3d s;
@@ -1089,12 +1101,13 @@ void clip_cells(float z_clip) {
 	sites.push_back(s);
       }
 
-      // increment face and vert to point to start of next cell
-      for (int i = 0; i < vblocks[block]->num_cell_faces[cell]; i++) {
-	for (int j = 0; j < vblocks[block]->num_face_verts[face]; j++)
-	  vert++;
-	face++;
-      }
+      // DEPRECATED
+//       // increment face and vert to point to start of next cell
+//       for (int i = 0; i < vblocks[block]->num_cell_faces[cell]; i++) {
+// 	for (int j = 0; j < vblocks[block]->num_face_verts[face]; j++)
+// 	  vert++;
+// 	face++;
+//       }
 
     } // cells
 
@@ -1107,12 +1120,10 @@ void clip_cells(float z_clip) {
 //
 // vblock: one voronoi block
 // cell: current cell counter
-// face: current face counter
-// vert: current vertex counter
 // cell_min, cell_max: cell bounds (output)
 // centroid: centroid, mean of all vertices (output)
 //
-void CellBounds(vblock_t *vblock, int cell, int face, int vert,
+void CellBounds(vblock_t *vblock, int cell,
 		float *cell_min, float *cell_max, float *centroid) {
 
   centroid[0] = 0.0;
@@ -1120,12 +1131,26 @@ void CellBounds(vblock_t *vblock, int cell, int face, int vert,
   centroid[2] = 0.0;
   int tot_verts = 0;
 
+  int num_faces; // number of face in the current cell
+  int num_verts; // number of vertices in the current face
+
+  if (cell < vblock->num_orig_particles - 1)
+    num_faces = vblock->cell_faces_start[cell + 1] -
+      vblock->cell_faces_start[cell];
+  else
+    num_faces = vblock->tot_num_cell_faces -
+      vblock->cell_faces_start[cell];
+
   // get cell bounds
-  for (int k = 0; k < vblock->num_cell_faces[cell]; k++) { // faces
+  for (int k = 0; k < num_faces; k++) { // faces
 
-    for (int l = 0; l < vblock->num_face_verts[face]; l++) { // vertices
+    int start = vblock->cell_faces_start[cell];
+    int face = vblock->cell_faces[start + k];
+    num_verts = vblock->faces[face].num_verts;
 
-      int v = vblock->face_verts[vert];
+    for (int l = 0; l < num_verts; l++) { // vertices
+
+      int v = vblock->faces[face].verts[l];
 	  
       if (k == 0 && l == 0 || vblock->save_verts[3 * v] < cell_min[0])
 	cell_min[0] = vblock->save_verts[3 * v];
@@ -1145,12 +1170,9 @@ void CellBounds(vblock_t *vblock, int cell, int face, int vert,
 	cell_max[2] = vblock->save_verts[3 * v + 2];
       centroid[2] += vblock->save_verts[3 * v + 2];
 
-      vert++;
       tot_verts++;
 
     } // vertices
-
-    face++;
 
   } // faces
 
@@ -1483,7 +1505,7 @@ void PrepCellRendering(int &num_vis_cells) {
 	num_faces = vblocks[i]->cell_faces_start[cell + 1] -
 	  vblocks[i]->cell_faces_start[cell];
       else
-	num_faces = vblocks[i]->new_tot_num_cell_faces -
+	num_faces = vblocks[i]->tot_num_cell_faces -
 	  vblocks[i]->cell_faces_start[cell];
 
       for (int k = 0; k < num_faces; k++) { // faces

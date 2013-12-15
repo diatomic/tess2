@@ -32,34 +32,28 @@
  *              num_g_verts;
  *              num_g_complete_cells;
  *              tot_num_g_cell_faces;
- *              tot_num_g_face_verts;
  *              num_g_orig_particles;
  *              num_g_neighbors;
  *              num_g_loc_tets;
  *              V0V1V2V3 = 4;
  *              num_g_rem_tets;
  *              num_g_faces;
- *              new_tot_num_g_cell_faces;
  *              vface_t = 3 + MAX_VERTS;
  *      variables:
  *              int num_verts(num_g_blocks) ;
  *              int num_complete_cells(num_g_blocks) ;
  *              int tot_num_cell_faces(num_g_blocks) ;
- *              int tot_num_face_verts(num_g_blocks) ;
  *              int num_orig_particles(num_g_blocks) ;
  *              int num_loc_tets(num_g_blocks) ;
  *              int num_rem_tets(num_g_blocks) ;
  *              int num_faces(num_g_blocks) ;
- *              int new_num_cell_faces(num_g_blocks) ;
  *              int64 block_off_num_verts(num_g_blocks) ;
  *              int64 block_off_num_complete_cells(num_g_blocks) ;
  *              int64 block_off_tot_num_cell_faces(num_g_blocks) ;
- *              int64 block_off_tot_num_face_verts(num_g_blocks) ;
  *              int64 block_off_num_orig_particles(num_g_blocks) ;
  *              int64 block_off_num_loc_tets(num_g_blocks) ;
  *              int64 block_off_num_rem_tets(num_g_blocks) ;
  *              int64 block_off_num_faces(num_g_blocks) ;
- *              int64 block_off_new_num_cell_faces(num_g_blocks) ;
  *              float mins(tot_blocks, XYZ) ;
  *              float maxs(tot_blocks, XYZ) ;
  *              float save_verts(num_g_verts, XYZ) ;
@@ -68,8 +62,6 @@
  *              float areas(num_g_complete_cells) ;
  *              float vols(num_g_complete_cells) ;
  *              int num_cell_faces(num_g_complete_cells) ;
- *              int num_face_verts(tot_num_g_cell_faces) ;
- *              int face_verts(tot_num_g_face_verts) ;
  *              int num_neighbors(num_g_blocks) ;
  *              int neighbors(num_g_neighbors) ;
  *              int neigh_procs(num_g_neighbors) ;
@@ -143,13 +135,13 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
     proc_quants[NUM_VERTICES] += vblocks[b].num_verts;
     proc_quants[NUM_COMP_CELLS] += vblocks[b].num_complete_cells;
     proc_quants[NUM_CELL_FACES] += vblocks[b].tot_num_cell_faces;
-    proc_quants[NUM_FACE_VERTS] += vblocks[b].tot_num_face_verts;
+/*     proc_quants[NUM_FACE_VERTS] += vblocks[b].tot_num_face_verts; */
     proc_quants[NUM_ORIG_PARTS] += vblocks[b].num_orig_particles;
     proc_quants[NUM_NEIGHBORS] += DIY_Num_neighbors(0, b);
     proc_quants[NUM_LOC_TETRAS] += vblocks[b].num_loc_tets;
     proc_quants[NUM_REM_TETRAS] += vblocks[b].num_rem_tets;
     proc_quants[NUM_UNIQUE_FACES] += vblocks[b].num_faces;
-    proc_quants[NEW_NUM_CELL_FACES] += vblocks[b].new_tot_num_cell_faces;
+/*     proc_quants[NEW_NUM_CELL_FACES] += vblocks[b].new_tot_num_cell_faces; */
   }
   proc_quants[NUM_BLOCKS] = nblocks;
 
@@ -174,8 +166,9 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 		      &dimids[3]); ERR;
   err = ncmpi_def_dim(ncid, "tot_num_g_cell_faces", tot_quants[NUM_CELL_FACES],
 		      &dimids[4]); ERR;
-  err = ncmpi_def_dim(ncid, "tot_num_g_face_verts", tot_quants[NUM_FACE_VERTS], 
-		      &dimids[5]); ERR;
+/* DEPRECATED */
+/*   err = ncmpi_def_dim(ncid, "tot_num_g_face_verts", tot_quants[NUM_FACE_VERTS],  */
+/* 		      &dimids[5]); ERR; */
   err = ncmpi_def_dim(ncid, "num_g_orig_particles", tot_quants[NUM_ORIG_PARTS], 
 		      &dimids[6]); ERR;
   err = ncmpi_def_dim(ncid, "num_g_neighbors", tot_quants[NUM_NEIGHBORS],
@@ -188,8 +181,9 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
   err = ncmpi_def_dim(ncid, "num_g_faces", tot_quants[NUM_UNIQUE_FACES],
 		      &dimids[11]); ERR;
   err = ncmpi_def_dim(ncid, "vface_t", 3 + MAX_FACE_VERTS, &dimids[13]); ERR;
-  err = ncmpi_def_dim(ncid, "new_tot_num_g_cell_faces",
-		      tot_quants[NEW_NUM_CELL_FACES], &dimids[12]); ERR;
+/* DEPRECATED */
+/*   err = ncmpi_def_dim(ncid, "new_tot_num_g_cell_faces", */
+/* 		      tot_quants[NEW_NUM_CELL_FACES], &dimids[12]); ERR; */
 
   /* --- define variables --- */
 
@@ -200,8 +194,9 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 		      &varids[1]); ERR;
   err = ncmpi_def_var(ncid, "tot_num_cell_faces", NC_INT, 1, &dimids[0], 
 		      &varids[2]); ERR;
-  err = ncmpi_def_var(ncid, "tot_num_face_verts", NC_INT, 1, &dimids[0], 
-		      &varids[3]); ERR;
+  /* DEPRECATED */
+/*   err = ncmpi_def_var(ncid, "tot_num_face_verts", NC_INT, 1, &dimids[0],  */
+/* 		      &varids[3]); ERR; */
   err = ncmpi_def_var(ncid, "num_orig_particles", NC_INT, 1, &dimids[0], 
 		      &varids[4]); ERR;
   err = ncmpi_def_var(ncid, "num_loc_tets", NC_INT, 1, &dimids[0], 
@@ -210,8 +205,8 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 		      &varids[28]); ERR;
   err = ncmpi_def_var(ncid, "num_faces", NC_INT, 1, &dimids[0],
 		      &varids[33]); ERR;
-  err = ncmpi_def_var(ncid, "new_num_cell_faces", NC_INT, 1, &dimids[0],
-		      &varids[34]); ERR;
+/*   err = ncmpi_def_var(ncid, "new_num_cell_faces", NC_INT, 1, &dimids[0], */
+/* 		      &varids[34]); ERR; */
 
   /* block offsets */
   err = ncmpi_def_var(ncid, "block_off_num_verts", NC_INT64, 1, &dimids[0], 
@@ -220,8 +215,9 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 		      &dimids[0], &varids[6]); ERR;
   err = ncmpi_def_var(ncid, "block_off_tot_num_cell_faces", NC_INT64, 1, 
 		      &dimids[0], &varids[7]); ERR;
-  err = ncmpi_def_var(ncid, "block_off_tot_num_face_verts", NC_INT64, 1, 
-		      &dimids[0], &varids[8]); ERR;
+  /* DEPRECATED */
+/*   err = ncmpi_def_var(ncid, "block_off_tot_num_face_verts", NC_INT64, 1,  */
+/* 		      &dimids[0], &varids[8]); ERR; */
   err = ncmpi_def_var(ncid, "block_off_num_orig_particles", NC_INT64, 1, 
 		      &dimids[0], &varids[9]); ERR;
   err = ncmpi_def_var(ncid, "block_off_num_loc_tets", NC_INT64, 1, 
@@ -230,8 +226,8 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 		      &dimids[0], &varids[29]); ERR;
   err = ncmpi_def_var(ncid, "block_off_num_faces", NC_INT64, 1,
 		      &dimids[0], &varids[35]); ERR;
-  err = ncmpi_def_var(ncid, "block_off_new_num_cell_faces", NC_INT64, 1,
-		      &dimids[0], &varids[36]); ERR;
+/*   err = ncmpi_def_var(ncid, "block_off_new_num_cell_faces", NC_INT64, 1, */
+/* 		      &dimids[0], &varids[36]); ERR; */
 
   /* other data */
   dimids_2D[0] = dimids[0];
@@ -253,10 +249,11 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
   err = ncmpi_def_var(ncid, "vols", NC_FLOAT, 1, &dimids[3], &varids[17]); ERR;
   err = ncmpi_def_var(ncid, "num_cell_faces", NC_INT, 1, &dimids[3], 
 		      &varids[18]); ERR;
-  err = ncmpi_def_var(ncid, "num_face_verts", NC_INT, 1, &dimids[4], 
-		      &varids[19]); ERR;
-  err = ncmpi_def_var(ncid, "face_verts", NC_INT, 1, &dimids[5], 
-		      &varids[20]); ERR;
+  /* DEPRECATED */
+/*   err = ncmpi_def_var(ncid, "num_face_verts", NC_INT, 1, &dimids[4],  */
+/* 		      &varids[19]); ERR; */
+/*   err = ncmpi_def_var(ncid, "face_verts", NC_INT, 1, &dimids[5],  */
+/* 		      &varids[20]); ERR; */
   err = ncmpi_def_var(ncid, "num_neighbors", NC_INT, 1, &dimids[0], 
 		      &varids[24]); ERR;
   err = ncmpi_def_var(ncid, "neighbors", NC_INT, 1, &dimids[7], 
@@ -282,7 +279,7 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 		      &varids[37]); ERR;
   err = ncmpi_def_var(ncid, "cell_faces_start", NC_INT, 1, &dimids[6], 
 		      &varids[38]); ERR;
-  err = ncmpi_def_var(ncid, "cell_faces", NC_INT, 1, &dimids[12], 
+  err = ncmpi_def_var(ncid, "cell_faces", NC_INT, 1, &dimids[4], 
 		      &varids[39]); ERR;
 
   /* exit define mode */
@@ -304,8 +301,9 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 				 &v->num_complete_cells); ERR;
     err = ncmpi_put_vara_int_all(ncid, varids[2], start, count, 
 				 &v->tot_num_cell_faces); ERR;
-    err = ncmpi_put_vara_int_all(ncid, varids[3], start, count, 
-				 &v->tot_num_face_verts); ERR;
+/* DEPRECATED */
+/*     err = ncmpi_put_vara_int_all(ncid, varids[3], start, count,  */
+/* 				 &v->tot_num_face_verts); ERR; */
     err = ncmpi_put_vara_int_all(ncid, varids[4], start, count, 
 				 &v->num_orig_particles); ERR;
     err = ncmpi_put_vara_int_all(ncid, varids[25], start, count, 
@@ -314,8 +312,9 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 				 &v->num_rem_tets); ERR;
     err = ncmpi_put_vara_int_all(ncid, varids[33], start, count,
 				 &v->num_faces); ERR;
-    err = ncmpi_put_vara_int_all(ncid, varids[34], start, count,
-				 &v->new_tot_num_cell_faces); ERR;
+/* DEPRECATED */
+/*     err = ncmpi_put_vara_int_all(ncid, varids[34], start, count, */
+/* 				 &v->new_tot_num_cell_faces); ERR; */
 
     /* block offsets */
     err = ncmpi_put_vara_longlong_all(ncid, varids[5], start, count, 
@@ -324,8 +323,9 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 				      &block_ofsts[NUM_COMP_CELLS]); ERR;
     err = ncmpi_put_vara_longlong_all(ncid, varids[7], start, count, 
 				      &block_ofsts[NUM_CELL_FACES]); ERR;
-    err = ncmpi_put_vara_longlong_all(ncid, varids[8], start, count, 
-				      &block_ofsts[NUM_FACE_VERTS]); ERR;
+/* DEPRECATED */
+/*     err = ncmpi_put_vara_longlong_all(ncid, varids[8], start, count,  */
+/* 				      &block_ofsts[NUM_FACE_VERTS]); ERR; */
     err = ncmpi_put_vara_longlong_all(ncid, varids[9], start, count, 
 				      &block_ofsts[NUM_ORIG_PARTS]); ERR;
     err = ncmpi_put_vara_longlong_all(ncid, varids[26], start, count, 
@@ -334,8 +334,9 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 				      &block_ofsts[NUM_REM_TETRAS]); ERR;
     err = ncmpi_put_vara_longlong_all(ncid, varids[35], start, count,
 				      &block_ofsts[NUM_UNIQUE_FACES]); ERR;
-    err = ncmpi_put_vara_longlong_all(ncid, varids[36], start, count,
-				      &block_ofsts[NEW_NUM_CELL_FACES]); ERR;
+/* DEPRECATED */
+/*     err = ncmpi_put_vara_longlong_all(ncid, varids[36], start, count, */
+/* 				      &block_ofsts[NEW_NUM_CELL_FACES]); ERR; */
 
     /* block bounds */
     start[0] = block_ofsts[NUM_BLOCKS];
@@ -381,23 +382,26 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
     err = ncmpi_put_vara_float_all(ncid, varids[17], start, count, 
 				   v->vols); ERR;
 
+/* DEPRECATED */
     /* num_cell_faces */
-    start[0] = block_ofsts[NUM_COMP_CELLS];
-    count[0] = v->num_complete_cells;
-    err = ncmpi_put_vara_int_all(ncid, varids[18], start, count, 
-				 v->num_cell_faces); ERR;
+/*     start[0] = block_ofsts[NUM_COMP_CELLS]; */
+/*     count[0] = v->num_complete_cells; */
+/*     err = ncmpi_put_vara_int_all(ncid, varids[18], start, count,  */
+/* 				 v->num_cell_faces); ERR; */
 
+/* DEPRECATED */
     /* num_face_verts */
-    start[0] = block_ofsts[NUM_CELL_FACES];
-    count[0] = v->tot_num_cell_faces;
-    err = ncmpi_put_vara_int_all(ncid, varids[19], start, count, 
-				 v->num_face_verts); ERR;
+/*     start[0] = block_ofsts[NUM_CELL_FACES]; */
+/*     count[0] = v->tot_num_cell_faces; */
+/*     err = ncmpi_put_vara_int_all(ncid, varids[19], start, count,  */
+/* 				 v->num_face_verts); ERR; */
 
+/* DEPRECATED */
     /* face verts */
-    start[0] = block_ofsts[NUM_FACE_VERTS];
-    count[0] = v->tot_num_face_verts;
-    err = ncmpi_put_vara_int_all(ncid, varids[20], start, count, 
-				 v->face_verts); ERR;
+/*     start[0] = block_ofsts[NUM_FACE_VERTS]; */
+/*     count[0] = v->tot_num_face_verts; */
+/*     err = ncmpi_put_vara_int_all(ncid, varids[20], start, count,  */
+/* 				 v->face_verts); ERR; */
 
     /* num_neighbors, neighbors, neigh_procs */
     int num_neighbors = DIY_Num_neighbors(0, b);
@@ -451,8 +455,8 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
     count[0] = v->num_orig_particles;
     err = ncmpi_put_vara_int_all(ncid, varids[38], start, count,
 				 v->cell_faces_start); ERR;
-    start[0] = block_ofsts[NEW_NUM_CELL_FACES];
-    count[0] = v->new_tot_num_cell_faces;
+    start[0] = block_ofsts[NUM_CELL_FACES];
+    count[0] = v->tot_num_cell_faces;
     err = ncmpi_put_vara_int_all(ncid, varids[39], start, count,
 				 v->cell_faces); ERR;
 
@@ -460,14 +464,16 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
     block_ofsts[NUM_VERTICES] += v->num_verts;
     block_ofsts[NUM_COMP_CELLS] += v->num_complete_cells;
     block_ofsts[NUM_CELL_FACES] += v->tot_num_cell_faces;
-    block_ofsts[NUM_FACE_VERTS] += v->tot_num_face_verts;
+/* DEPRECATED */
+/*     block_ofsts[NUM_FACE_VERTS] += v->tot_num_face_verts; */
     block_ofsts[NUM_ORIG_PARTS] += v->num_orig_particles;
     block_ofsts[NUM_NEIGHBORS] += num_neighbors;
     block_ofsts[NUM_BLOCKS]++;
     block_ofsts[NUM_LOC_TETRAS] += v->num_loc_tets;
     block_ofsts[NUM_REM_TETRAS] += v->num_rem_tets;
     block_ofsts[NUM_UNIQUE_FACES] += v->num_faces;
-    block_ofsts[NEW_NUM_CELL_FACES] += v->new_tot_num_cell_faces;
+/* DEPRECATED */
+/*     block_ofsts[NEW_NUM_CELL_FACES] += v->new_tot_num_cell_faces; */
 
     /* debug */
 /*     fprintf(stderr, "gid = %d num_verts = %d num_complete_cells = %d " */
@@ -523,12 +529,12 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
   err = ncmpi_inq_varid(ncid, "block_off_num_verts", &varids[5]); ERR;
   err = ncmpi_inq_varid(ncid, "block_off_num_complete_cells", &varids[6]); ERR;
   err = ncmpi_inq_varid(ncid, "block_off_tot_num_cell_faces", &varids[7]); ERR;
-  err = ncmpi_inq_varid(ncid, "block_off_tot_num_face_verts", &varids[8]); ERR;
+/*   err = ncmpi_inq_varid(ncid, "block_off_tot_num_face_verts", &varids[8]); ERR; */
   err = ncmpi_inq_varid(ncid, "block_off_num_orig_particles", &varids[9]); ERR;
   err = ncmpi_inq_varid(ncid, "block_off_num_loc_tets", &varids[26]); ERR;
   err = ncmpi_inq_varid(ncid, "block_off_num_rem_tets", &varids[29]); ERR;
   err = ncmpi_inq_varid(ncid, "block_off_num_faces", &varids[35]); ERR;
-  err = ncmpi_inq_varid(ncid, "block_off_new_num_cell_faces", &varids[36]); ERR;
+/*   err = ncmpi_inq_varid(ncid, "block_off_new_num_cell_faces", &varids[36]); ERR; */
 
   /* get number of blocks */
   MPI_Offset num_g_blocks; /* 64 bit version of tot_blcoks */
@@ -569,9 +575,10 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
     err = ncmpi_inq_varid(ncid, "tot_num_cell_faces", &varids[2]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[2], start, count, 
 				 &(v->tot_num_cell_faces)); ERR;
-    err = ncmpi_inq_varid(ncid, "tot_num_face_verts", &varids[3]); ERR;
-    err = ncmpi_get_vara_int_all(ncid, varids[3], start, count, 
-				 &(v->tot_num_face_verts)); ERR;
+/* DEPRECATED */
+/*     err = ncmpi_inq_varid(ncid, "tot_num_face_verts", &varids[3]); ERR; */
+/*     err = ncmpi_get_vara_int_all(ncid, varids[3], start, count,  */
+/* 				 &(v->tot_num_face_verts)); ERR; */
     err = ncmpi_inq_varid(ncid, "num_orig_particles", &varids[4]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[4], start, count, 
 				 &(v->num_orig_particles)); ERR;
@@ -585,9 +592,10 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
     err = ncmpi_inq_varid(ncid, "num_faces", &varids[33]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[33], start, count, 
 				 &(v->num_faces)); ERR;
-    err = ncmpi_inq_varid(ncid, "new_num_cell_faces", &varids[34]); ERR;
-    err = ncmpi_get_vara_int_all(ncid, varids[34], start, count, 
-				 &(v->new_tot_num_cell_faces)); ERR;
+/* DEPRECATED */
+/*     err = ncmpi_inq_varid(ncid, "new_num_cell_faces", &varids[34]); ERR; */
+/*     err = ncmpi_get_vara_int_all(ncid, varids[34], start, count,  */
+/* 				 &(v->new_tot_num_cell_faces)); ERR; */
 
     /* block bounds */
     start[0] = start_block_ofst + b;
@@ -657,37 +665,40 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
     err = ncmpi_get_vara_float_all(ncid, varids[17], start, count, 
 				   v->vols); ERR;
 
+/* DEPRECATED */
     /* num_cell_faces, uses same block offsets as complete cells */
-    v->num_cell_faces = (int *)malloc(v->num_complete_cells * sizeof(int));
-    start[0] = block_ofsts[start_block_ofst + b];
-    count[0] = v->num_complete_cells;
-    err = ncmpi_inq_varid(ncid, "num_cell_faces", &varids[18]); ERR;
-    err = ncmpi_get_vara_int_all(ncid, varids[18], start, count, 
-				 v->num_cell_faces); ERR;
+/*     v->num_cell_faces = (int *)malloc(v->num_complete_cells * sizeof(int)); */
+/*     start[0] = block_ofsts[start_block_ofst + b]; */
+/*     count[0] = v->num_complete_cells; */
+/*     err = ncmpi_inq_varid(ncid, "num_cell_faces", &varids[18]); ERR; */
+/*     err = ncmpi_get_vara_int_all(ncid, varids[18], start, count,  */
+/* 				 v->num_cell_faces); ERR; */
 
+/* DEPRECATED */
     /* num_face_verts */
-    start[0] = 0;
-    count[0] = *tot_blocks;
-    err = ncmpi_get_vara_longlong_all(ncid, varids[7], start, count, 
-				      (long long *)block_ofsts); ERR;
-    v->num_face_verts = (int *)malloc(v->tot_num_cell_faces * sizeof(int));
-    start[0] = block_ofsts[start_block_ofst + b];
-    count[0] = v->tot_num_cell_faces;
-    err = ncmpi_inq_varid(ncid, "num_face_verts", &varids[19]); ERR;
-    err = ncmpi_get_vara_int_all(ncid, varids[19], start, count, 
-				 v->num_face_verts); ERR;
+/*     start[0] = 0; */
+/*     count[0] = *tot_blocks; */
+/*     err = ncmpi_get_vara_longlong_all(ncid, varids[7], start, count,  */
+/* 				      (long long *)block_ofsts); ERR; */
+/*     v->num_face_verts = (int *)malloc(v->tot_num_cell_faces * sizeof(int)); */
+/*     start[0] = block_ofsts[start_block_ofst + b]; */
+/*     count[0] = v->tot_num_cell_faces; */
+/*     err = ncmpi_inq_varid(ncid, "num_face_verts", &varids[19]); ERR; */
+/*     err = ncmpi_get_vara_int_all(ncid, varids[19], start, count,  */
+/* 				 v->num_face_verts); ERR; */
 
+/* DEPRECATED */
     /* face_verts */
-    start[0] = 0;
-    count[0] = *tot_blocks;
-    err = ncmpi_get_vara_longlong_all(ncid, varids[8], start, count, 
-				      (long long *)block_ofsts); ERR;
-    v->face_verts = (int *)malloc(v->tot_num_face_verts * sizeof(int));
-    start[0] = block_ofsts[start_block_ofst + b];
-    count[0] = v->tot_num_face_verts;
-    err = ncmpi_inq_varid(ncid, "face_verts", &varids[20]); ERR;
-    err = ncmpi_get_vara_int_all(ncid, varids[20], start, count, 
-				 v->face_verts); ERR;
+/*     start[0] = 0; */
+/*     count[0] = *tot_blocks; */
+/*     err = ncmpi_get_vara_longlong_all(ncid, varids[8], start, count,  */
+/* 				      (long long *)block_ofsts); ERR; */
+/*     v->face_verts = (int *)malloc(v->tot_num_face_verts * sizeof(int)); */
+/*     start[0] = block_ofsts[start_block_ofst + b]; */
+/*     count[0] = v->tot_num_face_verts; */
+/*     err = ncmpi_inq_varid(ncid, "face_verts", &varids[20]); ERR; */
+/*     err = ncmpi_get_vara_int_all(ncid, varids[20], start, count,  */
+/* 				 v->face_verts); ERR; */
 
     /* neighbors */
     err = ncmpi_inq_varid(ncid, "neighbors", &varids[21]); ERR;
@@ -796,11 +807,11 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
     /* cell_faces */
     start[0] = 0;
     count[0] = *tot_blocks;
-    err = ncmpi_get_vara_longlong_all(ncid, varids[36], start, count, 
+    err = ncmpi_get_vara_longlong_all(ncid, varids[7], start, count, 
 				      (long long *) block_ofsts); ERR;
-    v->cell_faces = (int *)malloc(v->new_tot_num_cell_faces * sizeof(int));
+    v->cell_faces = (int *)malloc(v->tot_num_cell_faces * sizeof(int));
     start[0] = block_ofsts[start_block_ofst + b];
-    count[0] = v->new_tot_num_cell_faces;
+    count[0] = v->tot_num_cell_faces;
     err = ncmpi_inq_varid(ncid, "cell_faces", &varids[39]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[39], start, count, 
 				 v->cell_faces); ERR;
@@ -858,12 +869,13 @@ void create_datatype(void* vblock, int did, int lid, DIY_Datatype *dtype) {
       DIY_Addr(v->areas)                              },
     { DIY_FLOAT, ADDR, v->num_complete_cells, 
       DIY_Addr(v->vols)                               },
-    { DIY_INT,    ADDR, v->num_complete_cells, 
-      DIY_Addr(v->num_cell_faces)                     },
-    { DIY_INT,    ADDR, v->tot_num_cell_faces, 
-      DIY_Addr(v->num_face_verts)                     },
-    { DIY_INT,    ADDR, v->tot_num_face_verts, 
-      DIY_Addr(v->face_verts)                         },
+  /* DEPRECATED */
+/*     { DIY_INT,    ADDR, v->num_complete_cells,  */
+/*       DIY_Addr(v->num_cell_faces)                     }, */
+/*     { DIY_INT,    ADDR, v->tot_num_cell_faces,  */
+/*       DIY_Addr(v->num_face_verts)                     }, */
+/*     { DIY_INT,    ADDR, v->tot_num_face_verts,  */
+/*       DIY_Addr(v->face_verts)                         }, */
     { DIY_INT,    ADDR, v->num_loc_tets * 4, 
       DIY_Addr(v->loc_tets)                           },
     { DIY_INT,    ADDR, v->num_rem_tets * 4, 
@@ -876,14 +888,14 @@ void create_datatype(void* vblock, int did, int lid, DIY_Datatype *dtype) {
       DIY_Addr(v->faces)                              },
     { DIY_INT,    ADDR, v->num_orig_particles,
       DIY_Addr(v->cell_faces_start)                   },
-    { DIY_INT,    ADDR, v->new_tot_num_cell_faces,
+    { DIY_INT,    ADDR, v->tot_num_cell_faces,
       DIY_Addr(v->cell_faces)                         },
     { DIY_FLOAT,  OFST, 3, 
       offsetof(struct vblock_t, maxs)                 },
 
   };
 
-  DIY_Create_struct_datatype(DIY_Addr(vblock), 17, map, dtype);
+  DIY_Create_struct_datatype(DIY_Addr(vblock), 14, map, dtype);
 
   DIY_Destroy_datatype(&ftype);
 

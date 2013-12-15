@@ -75,7 +75,7 @@ default: all
 ifeq ($(ARCH), BGP)
 all: libtess.a dump
 else
-all: libtess.a draw dump dense
+all: libtess.a draw dump #dense
 endif
 
 libtess.a: $(TESS_OBJS)

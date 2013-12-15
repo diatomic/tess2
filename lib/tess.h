@@ -65,15 +65,17 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
 int gen_delaunay_output(facetT *facetlist, struct vblock_t *vblock,
 			int *gids, int *nids, unsigned char *dirs,
 			struct remote_ic_t *rics, int lid, int num_recvd);
-int gen_convex_output(facetT *facetlist, struct cblock_t *cblock);
-void convex_to_voronoi(struct cblock_t *cblock, struct vblock_t *vblock,
-		       int *vmap, int cell);
+/* DEPRECATED */
+/* int gen_convex_output(facetT *facetlist, struct cblock_t *cblock); */
+/* void convex_to_voronoi(struct cblock_t *cblock, struct vblock_t *vblock, */
+/* 		       int *vmap, int cell); */
 void complete_cells(struct vblock_t *vblock, int lid);
 void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock, 
 		      int lid);
 void cell_faces(struct vblock_t *vblock);
-void prep_vertices(struct vblock_t *vblock, int comp_cell, 
-		   double *vertices, int *vmap);
+/* DEPRECATED */
+/* void prep_vertices(struct vblock_t *vblock, int comp_cell,  */
+/* 		   double *vertices, int *vmap); */
 void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs);
 void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 		int *num_particles, int *num_orig_particles, 
@@ -82,7 +84,8 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 void local_cells(int nblocks, struct vblock_t *tblocks, 
 		 struct vblock_t *vblocks, int dim,
 		 int *num_particles, float **particles);
-void cell_hulls(int nblocks, struct vblock_t *vblocks, int dim);
+/* DEPRECATED */
+/* void cell_hulls(int nblocks, struct vblock_t *vblocks, int dim); */
 void neighbor_particles(int nblocks, float **particles, int *num_particles, 
 			int **gids, int **nids, unsigned char **dirs);
 void neighbor_is_complete(int nblocks, struct vblock_t *vblocks,

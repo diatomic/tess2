@@ -67,13 +67,28 @@ int main(int argc, char** argv) {
     m = 0;
     for (int j = 0; j < vblocks[i]->num_complete_cells; j++) { // cells
 
-      for (int k = 0; k < vblocks[i]->num_cell_faces[j]; k++) { // faces
+      int cell = vblocks[i]->complete_cells[j]; // current cell
+      int num_faces; // number of face in the current cell
+      int num_verts; // number of vertices in the current face
 
-	num_face_verts.push_back(vblocks[i]->num_face_verts[n]);
+      if (cell < vblocks[i]->num_orig_particles - 1)
+	num_faces = vblocks[i]->cell_faces_start[cell + 1] -
+	  vblocks[i]->cell_faces_start[cell];
+      else
+	num_faces = vblocks[i]->tot_num_cell_faces -
+	  vblocks[i]->cell_faces_start[cell];
 
-	for (int l = 0; l < vblocks[i]->num_face_verts[n]; l++) { // vertices
+      for (int k = 0; k < vblocks[i]->num_faces; k++) { // faces
 
-	  int v = vblocks[i]->face_verts[m];
+	int start = vblocks[i]->cell_faces_start[cell];
+	int face = vblocks[i]->cell_faces[start + k];
+	num_verts = vblocks[i]->faces[face].num_verts;
+
+	num_face_verts.push_back(num_verts);
+
+	for (int l = 0; l < num_verts; l++) { // vertices
+
+	  int v = vblocks[i]->faces[face].verts[l];
 	  vec3d s;
 	  s.x = vblocks[i]->verts[3 * v];
 	  s.y = vblocks[i]->verts[3 * v + 1];

@@ -24,18 +24,20 @@
 #define ERR {if(err!=NC_NOERR)printf("Error at line=%d: %s\n", __LINE__, ncmpi_strerror(err));}
 
 /* quantity vector */
-#define NUM_QUANTS 11
+#define NUM_QUANTS 9
 #define NUM_VERTICES 0
 #define NUM_COMP_CELLS 1
 #define NUM_CELL_FACES 2
-#define NUM_FACE_VERTS 3
-#define NUM_ORIG_PARTS 4
-#define NUM_NEIGHBORS 5
-#define NUM_BLOCKS 6
-#define NUM_LOC_TETRAS 7
-#define NUM_REM_TETRAS 8
-#define NUM_UNIQUE_FACES 9
-#define NEW_NUM_CELL_FACES 10
+/* DEPRECATED */
+/* #define NUM_FACE_VERTS 3 */
+#define NUM_ORIG_PARTS 3
+#define NUM_NEIGHBORS 4
+#define NUM_BLOCKS 5
+#define NUM_LOC_TETRAS 6
+#define NUM_REM_TETRAS 7
+#define NUM_UNIQUE_FACES 8
+/* DEPRECATED */
+/* #define NEW_NUM_CELL_FACES 10 */
 
 #ifdef __cplusplus
 extern "C"
