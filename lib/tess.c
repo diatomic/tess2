@@ -138,7 +138,7 @@ void tess_finalize() {
 */
 void tess(float **particles, int *num_particles, char *out_file) {
 
-  voronoi(nblocks, particles, num_particles, times, out_file);
+  voronoi_delaunay(nblocks, particles, num_particles, times, out_file);
 
 }
 /*------------------------------------------------------------------------*/
@@ -187,7 +187,7 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   for (i = 0; i < nblocks; i++)
     num_particles[i] = gen_particles(i, &particles[i], jitter);
 
-  voronoi(nblocks, particles, num_particles, times, "vor.out");
+  voronoi_delaunay(nblocks, particles, num_particles, times, "vor.out");
 
   /* cleanup */
   for (i = 0; i < nblocks; i++)
@@ -200,7 +200,7 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
 }
 /*--------------------------------------------------------------------------*/
 /*
-  parallel voronoi (and later possibly delaunay) tesselation
+  parallel voronoi and delaunay tesselation
 
   nblocks: local number of blocks
   particles: particles[block_num][particle] 
@@ -209,8 +209,8 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   times: times for particle exchange, voronoi cells, convex hulls, and output
   out_file: output file name
 */
-void voronoi(int nblocks, float **particles, int *num_particles, 
-	     double *times, char *out_file) {
+void voronoi_delaunay(int nblocks, float **particles, int *num_particles, 
+		      double *times, char *out_file) {
 
   int *num_orig_particles; /* number of original particles, before any
 			      neighbor exchange */
@@ -591,11 +591,6 @@ void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles) {
 	float p0[3], p1[3]; 
 	int p; /* index of particle (could be neighbor's) */
 
-	/* debug */
-/* 	fprintf(stderr, "f = %d fid = %d p0 = %d p1 = %d\n", */
-/* 		f, fid, vblocks[b].faces[fid].cells[0],  */
-/* 		vblocks[b].faces[fid].cells[1]); */
-
 	p = vblocks[b].faces[fid].cells[0];
 	p0[0] = particles[b][3 * p];
 	p0[1] = particles[b][3 * p + 1];
@@ -630,16 +625,6 @@ void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles) {
 	vblocks[b].num_complete_cells++;
 
       }
-
-      /* debug, assert that the two methods of computing area and volume agree */
-/*       if (fabs(vblocks[b].areas[j] - vblocks[b].new_areas[j]) > 1.0e-5 || */
-/* 	  fabs(vblocks[b].vols[j] - vblocks[b].new_vols[j]) > 1.0e-5) */
-/* 	fprintf(stderr, "comlete cell %d new_area %.3f (old-new diff %.3e) " */
-/* 		"new_vol %.3f (old-new diff %.3e)\n", */
-/* 		j, vblocks[b].new_areas[j], */
-/* 		vblocks[b].areas[j] - vblocks[b].new_areas[j], */
-/* 		vblocks[b].new_vols[j], */
-/* 		vblocks[b].vols[j] - vblocks[b].new_vols[j]); */
 
     } /* for all complete cells */
 
@@ -679,10 +664,6 @@ void face_areas(int nblocks, struct vblock_t *vblocks) {
 	int v1 = vblocks[b].faces[f].verts[v - 1];
 	int v2 = vblocks[b].faces[f].verts[v];
 
-	/* debug */
-/* 	fprintf(stderr, "face %d num_verts %d verts [%d %d %d]\n", */
-/* 		f, vblocks[b].faces[f].num_verts, v0, v1, v2); */
-
 	/* vectors for two sides of triangle v1v1 and v0v2 */
 	float s1[3], s2[3]; 
 	s1[0] = vblocks[b].verts[3 * v1] - 
@@ -710,114 +691,11 @@ void face_areas(int nblocks, struct vblock_t *vblocks) {
 
       } /* for all vertices */
 
-      /* debug */
-/*       fprintf(stderr, "face %d has area %.3f\n", f, vblocks[b].faces[f].area); */
-
     } /* for all faces */
 
   } /* for all blocks */
 
 }
-/*--------------------------------------------------------------------------*/
-/* DEPRECATED */
-/* /\* */
-/*   creates convex hulls for completed cells */
-
-/*   nblocks: number of blocks */
-/*   vblocks: pointer to array of vblocks */
-/*   dim: number of dimensions (eg. 3) */
-
-/* *\/ */
-/* void cell_hulls(int nblocks, struct vblock_t *vblocks, int dim) { */
-
-/*   boolT ismalloc = False;    /\* True if qhull should free points in */
-/* 				qh_freeqhull() or reallocation *\/ */
-/*   char flags[250];          /\* option flags for qhull, see qh-quick.htm *\/ */
-/*   int exitcode;             /\* 0 if no error from qhull *\/ */
-/*   int curlong, totlong;     /\* memory remaining after qh_memfreeshort *\/ */
-/*   int *vmap; /\* map of convex hull vertex ids back to original voronoi ids *\/ */
-/*   struct cblock_t cblock; /\* convex hull block *\/ */
-/*   FILE *dev_null; /\* file descriptor for writing to /dev/null *\/ */
-/*   int i, j; */
-
-/*   /\* convex hull vertices *\/ */
-/*   double *vertices; */
-
-/*   /\* debug *\/ */
-/*   double t0, prep_time, proc_time, post_time; */
-/*   prep_time = 0.0; */
-/*   proc_time = 0.0; */
-/*   post_time = 0.0; */
-
-/*   dev_null = fopen("/dev/null", "w"); */
-/*   assert(dev_null != NULL); */
-
-/*   /\* for all blocks *\/ */
-/*   for (i = 0; i < nblocks; i++) { */
-
-/*     vblocks[i].areas = */
-/*       (float *)malloc(vblocks[i].num_orig_particles * sizeof(float)); */
-/*     vblocks[i].vols = */
-/*       (float *)malloc(vblocks[i].num_orig_particles * sizeof(float)); */
-
-/*     vblocks[i].num_complete_cells = 0; */
-
-/*     /\* for all complete cells in the current block *\/ */
-/*     for (j = 0; j < vblocks[i].temp_num_complete_cells; j++) {  */
-
-/*       /\* debug *\/ */
-/*       t0 = MPI_Wtime(); */
-
-/*       /\* prepare vertices and compute convex hull *\/ */
-
-/*       int num_verts =  */
-/* 	vblocks[i].num_cell_verts[vblocks[i].temp_complete_cells[j]]; */
-
-/*       vertices = (double *)malloc(num_verts * 3 * sizeof(double)); */
-/*       vmap = (int *)malloc(num_verts * sizeof(int)); */
-/*       prep_vertices(&vblocks[i], j, vertices, vmap); */
-
-/*       /\* debug *\/ */
-/*       prep_time += (MPI_Wtime() - t0); */
-/*       t0 = MPI_Wtime(); */
-
-/*       sprintf (flags, "qhull o FS"); /\* convex hull *\/ */
-/*       exitcode = qh_new_qhull(dim, num_verts, vertices, ismalloc, */
-/* 			      flags, dev_null, stderr); */
-
-/*       /\* debug *\/ */
-/*       proc_time += (MPI_Wtime() - t0); */
-/*       t0 = MPI_Wtime(); */
-
-/*       /\* compute convex hull, check volume against filter range, and */
-/* 	 store the complete cell if it passes *\/ */
-/*       if (gen_convex_output(qh facet_list, &cblock)) { */
-/* 	vblocks[i].complete_cells[vblocks[i].num_complete_cells] =  */
-/* 	  vblocks[i].temp_complete_cells[j]; */
-/* 	vblocks[i].num_complete_cells++; */
-/* 	convex_to_voronoi(&cblock, &vblocks[i], vmap,  */
-/* 			  vblocks[i].num_complete_cells - 1); */
-/*       } */
-
-/*       /\* debug *\/ */
-/*       post_time += (MPI_Wtime() - t0); */
-
-/*       /\* cleanup *\/ */
-/*       free(vertices); */
-/*       free(vmap); */
-/*       qh_freeqhull(!qh_ALL);                 /\* free long memory *\/ */
-/*       qh_memfreeshort(&curlong, &totlong);  /\* free short memory and *\/ */
-/*       if (curlong || totlong) */
-/* 	fprintf (stderr, "qhull internal warning: did not free %d bytes of " */
-/* 		 "long memory (%d pieces)\n", totlong, curlong); */
-
-/*     } /\* for all complete cells in the current block *\/ */
-
-/*   } /\* for all blocks *\/ */
-
-/*   fclose(dev_null); */
-
-/* } */
 /*--------------------------------------------------------------------------*/
 /*
   exchanges particles with neighbors
@@ -896,142 +774,6 @@ void neighbor_particles(int nblocks, float **particles, int *num_particles,
   free(recv_particles);
 
 }
-/*--------------------------------------------------------------------------*/
-/* DEPRECATED */
-/*   exchanges particles with neighbors */
-
-/*   nblocks: local number of blocks */
-/*   vblocks: local blocks */
-/*   particles: particles before and after neighbor exchange (input / output) */
-/*   num_particles: number of new particles in each block (input / output) */
-/*   gids: global block ids of owners of received particles in each of my blocks */
-/*   nids: native particle ids of received particles in each of my blocks */
-/*    (allocated by this function, user's responsibility to free) */
-/*   dirs: wrapping direction of received particles in each of my blocks */
-/*   ghost: proximity threshold to neighbors, to determine wheter near enough  */
-/*    (allocated by this function, user's responsibility to free) */
-
-/*   to send the site to the neighbor */
-/* *\/ */
-/* void neighbor_particles(int nblocks, struct vblock_t *vblocks, */
-/* 			float **particles, int *num_particles, */
-/* 			int **gids, int **nids, unsigned char **dirs, */
-/* 			float ghost) { */
-
-/*   void ***recv_particles; /\* pointers to particles in ecah block  */
-/* 			     that are received from neighbors *\/ */
-/*   int *num_recv_particles; /\* number of received particles for each block *\/ */
-/*   int i, j; */
-/*   struct bb_t bb; /\* current block bounds *\/ */
-/*   struct remote_particle_t rp; /\* particle being sent or received *\/ */
-/*   int chunk_size = 1024; /\* allocation chunk size for sent particles *\/ */
-
-/*   recv_particles = (void ***)malloc(nblocks * sizeof(void **)); */
-/*   num_recv_particles = (int *)malloc(nblocks * sizeof(int)); */
-
-/*   /\* for all blocks *\/ */
-/*   for (i = 0; i < nblocks; i++) { */
-
-/*     DIY_Block_bounds(0, i, &bb); */
-
-/*     /\* for all particles in the current block *\/ */
-/*     for (j = 0; j < num_particles[i]; j++) { */
-
-/*       /\* only enqueue particles close enough to block boundary *\/ */
-/*       if (particles[i][3 * j]   -   bb.min[0] < ghost || */
-/* 	  bb.max[0]   -   particles[i][3 * j] < ghost || */
-/* 	  particles[i][3 * j + 1] - bb.min[1] < ghost || */
-/* 	  bb.max[1] - particles[i][3 * j + 1] < ghost || */
-/* 	  particles[i][3 * j + 2] - bb.min[2] < ghost || */
-/* 	  bb.max[2] - particles[i][3 * j + 2] < ghost) { */
-
-/* 	rp.x = particles[i][3 * j]; */
-/* 	rp.y = particles[i][3 * j + 1]; */
-/* 	rp.z = particles[i][3 * j + 2]; */
-/* 	rp.gid = DIY_Gid(0, i); */
-/* 	rp.nid = j; */
-/* 	rp.dir = 0x00; */
-/* 	DIY_Enqueue_item_all_near(0, i, (void *)&rp, */
-/* 				  NULL, sizeof(struct remote_particle_t), */
-/* 				  &particles[i][3 * j], */
-/* 				  ghost, &transform_particle); */
-
-/* #ifdef DELAUNAY */
-
-/* 	/\* record that this particle was sent *\/ */
-/* 	add_int(j, &(vblocks[i].sent_particles), */
-/* 		&(vblocks[i].num_sent_particles), */
-/* 		&(vblocks[i].alloc_sent_particles), chunk_size); */
-
-/* #endif */
-
-/*       } /\* if close enough to boundary *\/ */
-
-/*     } /\* for all particles *\/ */
-
-/*   } /\* for all blocks *\/ */
-
-/*   /\* exchange neighbors *\/ */
-/*   DIY_Exchange_neighbors(0, recv_particles, num_recv_particles, 1.0,  */
-/* 			 &item_type); */
-
-/*   /\* copy received particles to particles *\/ */
-/*   for (i = 0; i < nblocks; i++) { */
-
-/* #ifdef DELAUNAY */
-
-/*     gids[i] = (int *)malloc(num_recv_particles[i] * sizeof(int)); */
-/*     nids[i] = (int *)malloc(num_recv_particles[i] * sizeof(int)); */
-/*     dirs[i] = (unsigned char *)malloc(num_recv_particles[i]); */
-
-/* #endif */
-
-/*     int n = 0; */
- 
-/*     if (num_recv_particles[i]) { */
-
-/*       /\* grow space *\/ */
-/*       particles[i] =  */
-/* 	(float *)realloc(particles[i],  */
-/* 			 (num_particles[i] + num_recv_particles[i]) * */
-/* 			 3 * sizeof(float)); */
-
-/*       /\* copy received particles *\/ */
-/*       for (j = 0; j < num_recv_particles[i]; j++) {  */
-
-/* 	particles[i][3 * num_particles[i]] = */
-/* 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->x; */
-/* 	particles[i][3 * num_particles[i] + 1] = */
-/* 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->y; */
-/* 	particles[i][3 * num_particles[i] + 2] = */
-/* 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->z; */
-
-/* #ifdef DELAUNAY */
-
-/* 	gids[i][n] =  */
-/* 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->gid; */
-/* 	nids[i][n] =  */
-/* 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->nid; */
-/* 	dirs[i][n] =  */
-/* 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->dir; */
-
-/* #endif */
-
-/* 	num_particles[i]++; */
-/* 	n++; */
-
-/*       } /\* copy received particles *\/ */
-
-/*     } /\* if num_recv_particles *\/ */
-
-/*   } /\* for all blocks *\/ */
-
-/*   /\* clean up *\/ */
-/*   DIY_Flush_neighbors(0, recv_particles, num_recv_particles, &item_type); */
-/*   free(num_recv_particles); */
-/*   free(recv_particles); */
-
-/* } */
 /*--------------------------------------------------------------------------*/
 /*
   exchanges is_complete list for exchanged particles with neighbors
@@ -1757,16 +1499,6 @@ void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs) {
     (*vblocks)[i].areas = NULL;
     (*vblocks)[i].vols = NULL;
     (*vblocks)[i].face_areas = NULL;
-  /* DEPRECATED */
-/*     (*vblocks)[i].new_areas = NULL; */
-/*     (*vblocks)[i].new_vols = NULL; */
-/*     (*vblocks)[i].tot_num_cell_faces = 0; */
-/*     (*vblocks)[i].tot_num_face_verts = 0; */
-/*     (*vblocks)[i].num_cell_faces = NULL; */
-/*     (*vblocks)[i].num_face_verts = NULL; */
-/*     (*vblocks)[i].alloc_num_face_verts = 0; */
-/*     (*vblocks)[i].face_verts = NULL; */
-/*     (*vblocks)[i].alloc_face_verts = 0; */
     (*vblocks)[i].loc_tets = NULL;
     (*vblocks)[i].num_loc_tets = 0;
     (*vblocks)[i].rem_tet_gids = NULL;
@@ -1828,17 +1560,6 @@ void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
       free(vblocks[i].vols);
     if (vblocks[i].face_areas)
       free(vblocks[i].face_areas);
-  /* DEPRECATED */
-/*     if (vblocks[i].new_areas) */
-/*       free(vblocks[i].new_areas); */
-/*     if (vblocks[i].new_vols) */
-/*       free(vblocks[i].new_vols); */
-/*     if (vblocks[i].num_cell_faces) */
-/*       free(vblocks[i].num_cell_faces); */
-/*     if (vblocks[i].num_face_verts) */
-/*       free(vblocks[i].num_face_verts); */
-/*     if (vblocks[i].face_verts) */
-/*       free(vblocks[i].face_verts); */
     if (vblocks[i].loc_tets)
       free(vblocks[i].loc_tets);
     if (vblocks[i].rem_tet_gids)
@@ -2048,40 +1769,6 @@ void cell_faces(struct vblock_t *vblock) {
   /* cleanup */
   free(counts);
 
-  /* debug: print the cell faces */
-/*   int count; */
-/*   for (i = 0; i < vblock->num_orig_particles; i++) { */
-/*     if (i < vblock->num_orig_particles - 1) { */
-/*       count = vblock->cell_faces_start[i + 1] - vblock->cell_faces_start[i]; */
-/*       fprintf(stderr, "cell %d has %d faces (%d - %d): ", i, count, */
-/* 	      vblock->cell_faces_start[i + 1], vblock->cell_faces_start[i]); */
-/*     } */
-/*     else { */
-/*       count = vblock->tot_num_cell_faces - vblock->cell_faces_start[i]; */
-/*       fprintf(stderr, "cell %d has %d faces (%d - %d): ", i, count, */
-/* 	      vblock->tot_num_cell_faces, vblock->cell_faces_start[i]); */
-/*     } */
-/*     int j; */
-/*     for (j = 0; j < count; j++) { */
-/*       int start = vblock->cell_faces_start[i]; */
-/*       fprintf(stderr, "%d ", vblock->cell_faces[start + j]); */
-/*     } */
-/*     fprintf(stderr, "\n"); */
-/*   } */
-
-  /* debug: print the faces and face vertices */
-/*   int j; */
-/*   fprintf(stderr, "\n%d total unique faces\n", vblock->num_faces); */
-/*   for (i = 0; i < vblock->num_faces; i++) { */
-/*     fprintf(stderr, "face %d lies between cells %d %d and has %d verts: ", */
-/* 	    i, */
-/* 	    vblock->faces[i].cells[0], vblock->faces[i].cells[1], */
-/* 	    vblock->faces[i].num_verts); */
-/*     for (j = 0; j < vblock->faces[i].num_verts; j++) */
-/*       fprintf(stderr, "%d ", vblock->faces[i].verts[j]); */
-/*     fprintf(stderr, "\n"); */
-/*   } */
-
 }
 /*--------------------------------------------------------------------------*/
 /*
@@ -2111,9 +1798,6 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 	  (int *)malloc(vblock->num_orig_particles * sizeof(int));
   vblock->complete_cells =
 	  (int *)malloc(vblock->num_orig_particles * sizeof(int));
-  /* DEPRECATED */
-/*   vblock->num_cell_faces = */
-/*     (int *)malloc(vblock->num_orig_particles * sizeof(int)); */
 
   DIY_Block_bounds(0, lid, &bounds);
 
@@ -2216,39 +1900,6 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 
 }
 /*--------------------------------------------------------------------------*/
-/* DEPRECATED */
-/* /\* */
-/*   prepares vertices for convex hull computation */
-
-/*   vblock: one voronoi block */
-/*   cell: the current complete cell */
-/*   vertices: vertex array, allocated by caller */
-/*   vmap: vertex map from these vertices back to original vertex ids, allocated */
-/*   by caller */
-/* *\/ */
-/* void prep_vertices(struct vblock_t *vblock, int cell, double *vertices, */
-/* 		   int *vmap) { */
-
-/*   int i, k; */
-/*   int num_verts = vblock->num_cell_verts[vblock->temp_complete_cells[cell]]; */
-
-/*   /\* compute index of starting vertex *\/ */
-/*   int start_vert = 0; /\* index of first vertex *\/ */
-/*   for (i = 0; i < (vblock->temp_complete_cells)[cell]; i++) */
-/*     start_vert += (vblock->num_cell_verts)[i]; */
-
-/*   /\* copy vertices *\/ */
-/*   for (k = 0; k < num_verts; k++) { */
-/*     int vid = (vblock->cells)[start_vert + k]; /\* current vertex id *\/ */
-/*     vertices[3 * k]     = (vblock->verts)[3 * vid]; */
-/*     vertices[3 * k + 1] = (vblock->verts)[3 * vid + 1]; */
-/*     vertices[3 * k + 2] = (vblock->verts)[3 * vid + 2]; */
-/*     vmap[k] = vid; */
-
-/*   } */
-
-/* } */
-/*--------------------------------------------------------------------------*/
 /*
   generates test particles for a  block
 
@@ -2336,12 +1987,6 @@ int gen_particles(int lid, float **particles, float jitter) {
 
   act_num_particles = n;
 
-  /* debug: print particles */
-/*   for (n = 0; n < act_num_particles; n++) */
-/*     fprintf(stderr, "block = %d particle[%d] = [%.2lf %.2lf %.2lf]\n", */
-/* 	    lid, n, (*particles)[3 * n], (*particles)[3 * n + 1], */
-/* 	    (*particles)[3 * n + 2]); */
-
   return act_num_particles;
 
 }
@@ -2402,15 +2047,6 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
   */
   vblock->num_verts = numcenters;
   int temp_num_cells = numvertices;
-
-  /* debug */
-/*   if (temp_num_cells != num_particles) { */
-/*     fprintf(stderr, "number of qhull cells = %d, " */
-/* 	    "number of original particles = %d\n",  */
-/* 	    temp_num_cells, num_particles); */
-/*     for (i = 0; i < num_skip_cells; i++) */
-/*       fprintf(stderr, "skiping cell %d\n", skip_cells[i]); */
-/*   } */
 
   /* vertices */
   vblock->verts = (double *)malloc(sizeof(double) * 3 * vblock->num_verts);
@@ -2598,19 +2234,6 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
   if (skip_cells)
     free(skip_cells);
 
-  /* debug */
-/*   int j; */
-/*   fprintf(stderr, "\n%d total unique faces\n", vblock->num_faces); */
-/*   for (i = 0; i < vblock->num_faces; i++) { */
-/*     fprintf(stderr, "face %d lies between cells %d %d and has %d verts: ", */
-/* 	    i, */
-/* 	    vblock->faces[i].cells[0], vblock->faces[i].cells[1], */
-/* 	    vblock->faces[i].num_verts); */
-/*     for (j = 0; j < vblock->faces[i].num_verts; j++) */
-/*       fprintf(stderr, "%d ", vblock->faces[i].verts[j]); */
-/*     fprintf(stderr, "\n"); */
-/*   } */
-
   return temp_num_cells;
 
 }
@@ -2796,125 +2419,9 @@ int gen_delaunay_output(facetT *facetlist, struct vblock_t *vblock,
   vblock->num_loc_tets = n / 4;
   vblock->num_rem_tets = m / 4;
 
-  /* debug */
-/*   fprintf(stderr, "num tets = %d\n", vblock->num_tets); */
-/*   for (n = 0; n < vblock->num_tets; n++) */
-/*     fprintf(stderr, "%d %d %d %d\n", */
-/* 	    vblock->tets[4 * n], vblock->tets[4 * n + 1], */
-/* 	    vblock->tets[4 * n + 2], vblock->tets[4 * n + 3]); */
-/*   fprintf(stderr, "\n"); */
-
   return (vblock->num_loc_tets + vblock->num_rem_tets);
 
 }
-/*--------------------------------------------------------------------------*/
-/* DEPRECATED */
-/* /\* */
-/*   generates convex hull output */
-
-/*   facetlist: qhull list of convex hull facets */
-/*   cblock: pointer to one convex hull block */
-
-/*   returns: 0 = hull did not pass volume filter test, discard */
-/*   1 = hull passed volume filter test, save */
-
-/*   side effects: if return value is 1, allocates num_cell_faces,  */
-/*   num_face_verts, face_verts, areas, */
-/*   vols data structures inside of vblock, caller's responsibility to free */
-/* *\/ */
-/* int gen_convex_output(facetT *facetlist, struct cblock_t *cblock) { */
-
-/*   facetT *facet; */
-/*   setT *vertices; */
-/*   vertexT *vertex, **vertexp; */
-/*   int num_verts; /\* number of vertices in current face *\/ */
-/*   int face; /\* current face *\/ */
-/*   int vert; /\* current vertex *\/ */
-
-/*   if ((min_vol > 0 && qh totvol < min_vol) || */
-/*       (max_vol > 0 && qh totvol > max_vol)) */
-/*     return 0; */
-
-/*   /\* get number of faces *\/ */
-/*   cblock->num_cell_faces = 0; */
-/*   FORALLfacet_(facetlist) */
-/*     cblock->num_cell_faces++; */
-
-/*   /\* allocate memory and assign values *\/ */
-/*   cblock->num_face_verts =  */
-/* 	  (int *)malloc(cblock->num_cell_faces * sizeof(int)); */
-/*   cblock->face_verts =  */
-/* 	  (int **)malloc(cblock->num_cell_faces * sizeof(int *)); */
-
-/*   face = 0; */
-/*   FORALLfacet_(facetlist) { */
-/*     vertices= qh_facet3vertex(facet); */
-/*     num_verts = qh_setsize(vertices); */
-/*     cblock->num_face_verts[face] = num_verts; */
-/*     cblock->face_verts[face] = (int *)malloc(num_verts * sizeof(int)); */
-/*     vert = 0; */
-/*     FOREACHvertex_(vertices) { */
-/*       cblock->face_verts[face][vert] = qh_pointid(vertex->point); */
-/*       vert++; */
-/*     } */
-/*     qh_settempfree(&vertices); */
-/*     face++; */
-/*   } */
-
-/*   /\* area and volume *\/ */
-/*   cblock->area = qh totarea; */
-/*   cblock->vol = qh totvol; */
-
-/*   return 1; */
-
-/* } */
-/*--------------------------------------------------------------------------*/
-/* DEPRECATED */
-/* /\* */
-/*   copies convex hull output to voronoi block */
-
-/*   cblock: pointer to one convex hull block */
-/*   vblock: pointer to one voronoi block, allocated by caller */
-/*   vmap: map of convex hull vertex ids back to original voronoi ids */
-/*   cell: index of current cell */
-
-/*   side effects: allocates complete_cells, areas, vols, num_cell_faces */
-/*   data structures inside of vblock, caller's responsibility to free */
-/* *\/ */
-/* void convex_to_voronoi(struct cblock_t *cblock, struct vblock_t *vblock, */
-/* 		       int *vmap, int cell) { */
-
-/*   int j, k; */
-/*   int chunk_size = 1024; /\* dynamic memory allocation amount *\/ */
-
-/*   /\* copy *\/ */
-/*   (vblock->areas)[cell] = cblock->area; */
-/*   (vblock->vols)[cell] = cblock->vol; */
-/*   (vblock->num_cell_faces)[cell] = cblock->num_cell_faces; */
-
-/*   for (j = 0; j < (vblock->num_cell_faces)[cell]; j++) { */
-
-/*     add_int((cblock->num_face_verts)[j], &(vblock->num_face_verts),  */
-/* 	    &(vblock->tot_num_cell_faces), &(vblock->alloc_num_face_verts),  */
-/* 	    chunk_size); */
-
-/*     /\* add_int incremented vblock->tot_num_cell_faces, so subtracting 1 when */
-/*        using in the remainder of this loop *\/ */
-/*     for (k = 0; k < (vblock->num_face_verts)[vblock->tot_num_cell_faces - 1];  */
-/* 	 k++) */
-/*       add_int(vmap[(cblock->face_verts)[j][k]], &(vblock->face_verts), */
-/* 	      &(vblock->tot_num_face_verts), &(vblock->alloc_face_verts),  */
-/* 	      chunk_size); */
-
-/*   } */
-
-/*   /\* free convex hull memory *\/ */
-/*   for (j = 0; j < cblock->num_cell_faces; j++) */
-/*     free((cblock->face_verts)[j]); */
-/*   free(cblock->face_verts); */
-/*   free(cblock->num_face_verts); */
-
-/* } */
 /*--------------------------------------------------------------------------*/
 /*
   prints a block

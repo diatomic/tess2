@@ -1101,14 +1101,6 @@ void clip_cells(float z_clip) {
 	sites.push_back(s);
       }
 
-      // DEPRECATED
-//       // increment face and vert to point to start of next cell
-//       for (int i = 0; i < vblocks[block]->num_cell_faces[cell]; i++) {
-// 	for (int j = 0; j < vblocks[block]->num_face_verts[face]; j++)
-// 	  vert++;
-// 	face++;
-//       }
-
     } // cells
 
   } // blocks
@@ -1409,91 +1401,8 @@ void PrepRenderingData() {
 void PrepCellRendering(int &num_vis_cells) {
 
   num_vis_cells = 0; // numbe of visible cells
-//   int n, m;
 
   for (int i = 0; i < nblocks; i++) { // blocks
-
-    // --- old version of cell faces DEPRECATED
-
-//     n = 0; // index into num_face_verts
-//     m = 0; // index into face_verts
-//     for (int j = 0; j < vblocks[i]->num_complete_cells; j++) { // cells
-
-//       int cell = vblocks[i]->complete_cells[j]; // current cell
-
-//       for (int k = 0; k < vblocks[i]->num_cell_faces[j]; k++) { // faces
-
-// 	if (vblocks[i]->vols[j] >= min_vol &&
-// 	    (max_vol <= 0.0 || vblocks[i]->vols[j] <= max_vol)) {
-// 	  num_face_verts.push_back(vblocks[i]->num_face_verts[n]);
-// 	  face_vols.push_back(vblocks[i]->vols[j]);
-// 	  if (i == 0 && j == 0)
-// 	    min_vol_act = vblocks[i]->vols[j];
-// 	  if (vblocks[i]->vols[j] < min_vol_act)
-// 	    min_vol_act = vblocks[i]->vols[j];
-// 	  if (vblocks[i]->vols[j] > max_vol_act)
-// 	    max_vol_act = vblocks[i]->vols[j];
-// 	}
-
-// 	int v0; // starting vertex of this face in verts list
-
-// 	for (int l = 0; l < vblocks[i]->num_face_verts[n]; l++) { // vertices
-
-// 	  int v = vblocks[i]->face_verts[m];
-// 	  vec3d s;
-// 	  s.x = vblocks[i]->save_verts[3 * v];
-// 	  s.y = vblocks[i]->save_verts[3 * v + 1];
-// 	  s.z = vblocks[i]->save_verts[3 * v + 2];
-// 	  m++;
-// 	  if (vblocks[i]->vols[j] >= min_vol &&
-// 	      (max_vol <= 0.0 || vblocks[i]->vols[j] <= max_vol)) {
-// 	    verts.push_back(s);
-// 	    if (l == 0)
-// 	      v0 = (int)verts.size() - 1; // note starting vertex of this face
-// 	  }
-
-// 	} // vertices
-
-// 	n++;
-
-// 	// face normal (flat shading, one normal per face)
-// 	vec3d normal;
-// 	Normal(&verts[v0], normal);
-
-// 	// check sign of dot product of normal with vector from site 
-// 	// to first face vertex to see if normal has correct direction
-// 	// want outward normal
-// 	vec3d v;
-// 	v.x = verts[v0].x - sites[cell].x;
-// 	v.y = verts[v0].y - sites[cell].y;
-// 	v.z = verts[v0].z - sites[cell].z;
-// 	if (v.x * normal.x + v.y * normal.y + v.z * normal.z < 0.0) {
-// 	  normal.x *= -1.0;
-// 	  normal.y *= -1.0;
-// 	  normal.z *= -1.0;
-// 	}
-// 	vor_normals.push_back(normal);
-
-//       } // faces
-
-//       if (vblocks[i]->vols[j] >= min_vol &&
-// 	  (max_vol <= 0.0 || vblocks[i]->vols[j] <= max_vol))
-// 	num_vis_cells++;
-
-//     } // cells
-
-
-    // debug: print the faces and face vertices
-//     fprintf(stderr, "\n%d total unique faces\n", vblocks[i]->num_faces);
-//     for (int k = 0; k < vblocks[i]->num_faces; k++) {
-//       fprintf(stderr, "face %d lies between cells %d %d and has %d verts: ",
-// 	      k,
-// 	      vblocks[i]->faces[k].cells[0], vblocks[i]->faces[k].cells[1],
-// 	      vblocks[i]->faces[k].num_verts);
-//       for (int j = 0; j < vblocks[i]->faces[k].num_verts; j++)
-// 	fprintf(stderr, "%d ", vblocks[i]->faces[k].verts[j]);
-//       fprintf(stderr, "\n");
-//     }
 
     for (int j = 0; j < vblocks[i]->num_complete_cells; j++) { // cells
 

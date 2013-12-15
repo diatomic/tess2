@@ -28,16 +28,12 @@
 #define NUM_VERTICES 0
 #define NUM_COMP_CELLS 1
 #define NUM_CELL_FACES 2
-/* DEPRECATED */
-/* #define NUM_FACE_VERTS 3 */
 #define NUM_ORIG_PARTS 3
 #define NUM_NEIGHBORS 4
 #define NUM_BLOCKS 5
 #define NUM_LOC_TETRAS 6
 #define NUM_REM_TETRAS 7
 #define NUM_UNIQUE_FACES 8
-/* DEPRECATED */
-/* #define NEW_NUM_CELL_FACES 10 */
 
 #ifdef __cplusplus
 extern "C"

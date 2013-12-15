@@ -20,8 +20,6 @@
 #define TOT_NUM_CELL_VERTS 1
 #define NUM_COMPLETE_CELLS 2
 #define TOT_NUM_CELL_FACES 3
-/* DEPRECATED */
-/* #define TOT_NUM_FACE_VERTS 4 */
 #define NUM_ORIG_PARTICLES 4
 #define NUM_LOC_TETS 5
 #define NUM_REM_TETS 6
@@ -96,24 +94,6 @@ struct vblock_t {
   float *areas; /* surface areas of complete cells */
   float *vols; /* volumes of complete cells */
   float *face_areas; /* area of each face in faces array */
-  /* DEPRECATED */
-/*   float *new_areas; /\* new version of surface areas of complete cells *\/ */
-/*   float *new_vols; /\* new version of volumes of complete cells *\/ */
-/*   int tot_num_cell_faces; /\* total number of faces in complete cells *\/ */
-/*   int *num_cell_faces; /\* number of faces in complete cells, in order of */
-/* 			  complete cells *\/ */
-/*   int *num_face_verts; /\* number of vertices in each face of complete cells,  */
-/* 			  in order of complete cells and faces in them  */
-/* 			  num_face_verts[comp_cell][face] *\/ */
-/*   int alloc_num_face_verts; /\* number of allocated ints in num_face_verts *\/ */
-/*   int tot_num_face_verts; /\* total number of vertices in faces of  */
-/* 			     complete cells *\/   */
-/*   int *face_verts; /\* vertices in each face of complete cells,  */
-/* 		      in order of complete cells and faces of in them  */
-/* 		      face_verts[comp_cell][face][vertex] *\/ */
-/*   int alloc_face_verts; /\* number of allocated ints in face_verts *\/ */
-
-  /* new version of voronoi faces */
   int num_faces; /* total number of unique faces */
   struct vface_t *faces; /* faces between up to two voronoi cells */
   int *cell_faces_start; /* starting offset in faces for each cell, both
@@ -145,18 +125,6 @@ struct vblock_t {
   float maxs[3]; /* block maximum corner */
 
 };
-
-/* DEPRECATED */
-/* temporary convex hull output for one cell */
-/* struct cblock_t { */
-
-/*   float area; /\* surface area *\/ */
-/*   float vol; /\* volume *\/ */
-/*   int num_cell_faces; /\* number of faces *\/ */
-/*   int *num_face_verts; /\* number of vertices in each face *\/ */
-/*   int **face_verts; /\* vertices in each face *\/ */
-
-/* }; */
 
 /* statistical summary */
 struct stats_t {
