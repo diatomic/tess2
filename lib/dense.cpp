@@ -62,30 +62,17 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 		  float **density);
 void IterateCellsCIC(int block, int *block_min_idx, int *block_num_idx, 
 		     float **density);
-void *CreateReadType(int did, int lid, int *hdr, DIY_Datatype *dtype);
-void CellBounds(vblock_t *vblock, int cell, int face, int vert,
-		float *cell_min, float *cell_max, float *centroid,
-		vector<float> &normals, vector<float> &face_mins,
-		vector<float> &face_maxs);
-void ComputeNormal(vblock_t *vblock, int face, int vert, float *normal);
-// DEPRECATED
-// float PtPlaneDist(float *pt, vblock_t *vblock, int face, int vert,
-// 		  float *normal);
-bool PtInCell(float *pt, vblock_t *vblock, int cell, int face, int vert,
-	      float *normals, float *face_mins, float *face_maxs,
-	      float *cell_centroid);
+void CellBounds(vblock_t *vblock, int c_cell, float *cell_min, float *cell_max, 
+		float *centroid, vector<float> &normals);
+void ComputeNormal(vblock_t *vblock, int face, float *normal);
+bool PtInCell(float *pt, vblock_t *vblock, int cell, float *normals);
 void Global2LocalIdx(int *global_idx, int *local_idx, int *block_min_idx);
-int CellGridPts(vblock_t *vblock, int cell, int face, 
-		int vert, float *cell_mins, float *cell_maxs, 
+int CellGridPts(vblock_t *vblock, int cell, float *cell_mins, float *cell_maxs, 
 		grid_pt_t* &grid_pts, int * &border, int& alloc_grid_pts,
-		float *normals, float *face_mins, float *face_maxs,
-		float *cell_centroid);
-int CellInteriorGridPts(vblock_t *vblock, int cell, 
-			int face, int vert,int *cell_grid_pts, 
+		float *normals);
+int CellInteriorGridPts(vblock_t *vblock, int cell, int *cell_grid_pts, 
 			int *cell_min_grid_idx, float *cell_min_grid_pos, 
-			grid_pt_t *grid_pts, int *border, float *normals,
-			float *face_mins, float *face_maxs,
-			float *cell_centroid);
+			grid_pt_t *grid_pts, int *border, float *normals);
 void GridStepParams(int num_given_bounds, 
 		    float *given_mins, float *given_maxs);
 void ItemDtype(DIY_Datatype *dtype);
@@ -334,8 +321,6 @@ int main(int argc, char** argv) {
 void IterateCells(int block, int *block_min_idx, int *block_num_idx, 
 		  float **density) {
 
-  int face = 0; // faces counter
-  int vert = 0; // face vertices counter
   float cell_min[3], cell_max[3], cell_centroid[3]; // cell bounds
   float grid_pos[3]; // physical position of grid point
   int alloc_grid_pts = 0; // number of grid points allocated
@@ -356,20 +341,17 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
   for (int cell = 0; cell < vblocks[block]->num_complete_cells; cell++) {
 
     vector <float> normals; // cell normals
-    vector <float> face_mins, face_maxs; // face bounds
 
     // cell bounds
-    CellBounds(vblocks[block], cell, face, vert, cell_min, cell_max,
-	       cell_centroid, normals, face_mins, face_maxs);
+    CellBounds(vblocks[block], cell, cell_min, cell_max,
+	       cell_centroid, normals);
 
     // debug
     check_mass++;
 
     // grid points covered by this cell
-    num_grid_pts = CellGridPts(vblocks[block], cell, face, 
-			       vert, cell_min, cell_max, grid_pts, 
-			       border, alloc_grid_pts, &normals[0],
-			       &face_mins[0], &face_maxs[0], cell_centroid);
+    num_grid_pts = CellGridPts(vblocks[block], cell, cell_min, cell_max, 
+			       grid_pts,  border, alloc_grid_pts, &normals[0]);
 
     // debug
     if (num_grid_pts > max_cell_grid_pts)
@@ -413,13 +395,6 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 
     } // grid points covered by cell
 
-    // increment face and vert to point to start of next cell
-    for (int i = 0; i < vblocks[block]->num_cell_faces[cell]; i++) {
-      for (int j = 0; j < vblocks[block]->num_face_verts[face]; j++)
-	vert++;
-      face++;
-    }
-
   } // cells
 
   if (grid_pts)
@@ -429,83 +404,84 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 
 }
 //--------------------------------------------------------------------------
-//
-// allocates a new block and creates DIY datatype for it
-//
-// did: domain id
-// lid: local block number
-// hdr: block header
-// dtype: pointer to datatype
-//
-// side effects: commits datatype, DIY will cleanup
-//
-// returns: address of new block
-//
-void *CreateReadType(int did, int lid, int *hdr, DIY_Datatype *dtype) {
+// // DEPRECATED
+// //
+// // allocates a new block and creates DIY datatype for it
+// //
+// // did: domain id
+// // lid: local block number
+// // hdr: block header
+// // dtype: pointer to datatype
+// //
+// // side effects: commits datatype, DIY will cleanup
+// //
+// // returns: address of new block
+// //
+// void *CreateReadType(int did, int lid, int *hdr, DIY_Datatype *dtype) {
 
-  did = did; // quiet compiler warning
-  lid = lid; 
+//   did = did; // quiet compiler warning
+//   lid = lid; 
 
-  // allocate space
+//   // allocate space
 
-  struct vblock_t *v = new vblock_t;
+//   struct vblock_t *v = new vblock_t;
 
-  v->num_verts = hdr[NUM_VERTS];
-  v->tot_num_cell_verts = hdr[TOT_NUM_CELL_VERTS];
-  v->num_complete_cells = hdr[NUM_COMPLETE_CELLS];
-  v->tot_num_cell_faces = hdr[TOT_NUM_CELL_FACES];
-  v->tot_num_face_verts = hdr[TOT_NUM_FACE_VERTS];
-  v->num_orig_particles = hdr[NUM_ORIG_PARTICLES];
+//   v->num_verts = hdr[NUM_VERTS];
+//   v->tot_num_cell_verts = hdr[TOT_NUM_CELL_VERTS];
+//   v->num_complete_cells = hdr[NUM_COMPLETE_CELLS];
+//   v->tot_num_cell_faces = hdr[TOT_NUM_CELL_FACES];
+//   v->tot_num_face_verts = hdr[TOT_NUM_FACE_VERTS];
+//   v->num_orig_particles = hdr[NUM_ORIG_PARTICLES];
 
-  if (v->num_verts > 0)
-    v->save_verts = new float[3 * v->num_verts];
-  if (v->num_orig_particles > 0) {
-    v->num_cell_verts = new int[v->num_orig_particles];
-    v->sites = new float[3 * v->num_orig_particles];
-  }
-  if (v->tot_num_cell_verts > 0)
-    v->cells = new int[v->tot_num_cell_verts];
-  if (v->num_complete_cells > 0) {
-    v->complete_cells = new int[v->num_complete_cells];
-    v->areas = new float[v->num_complete_cells];
-    v->vols = new float[v->num_complete_cells];
-    v->num_cell_faces = new int[v->num_complete_cells];
-  }
-  if (v->tot_num_cell_faces > 0)
-    v->num_face_verts = new int[v->tot_num_cell_faces];
-  if (v->tot_num_face_verts > 0)
-    v->face_verts = new int[v->tot_num_face_verts];
+//   if (v->num_verts > 0)
+//     v->save_verts = new float[3 * v->num_verts];
+//   if (v->num_orig_particles > 0) {
+//     v->num_cell_verts = new int[v->num_orig_particles];
+//     v->sites = new float[3 * v->num_orig_particles];
+//   }
+//   if (v->tot_num_cell_verts > 0)
+//     v->cells = new int[v->tot_num_cell_verts];
+//   if (v->num_complete_cells > 0) {
+//     v->complete_cells = new int[v->num_complete_cells];
+//     v->areas = new float[v->num_complete_cells];
+//     v->vols = new float[v->num_complete_cells];
+//     v->num_cell_faces = new int[v->num_complete_cells];
+//   }
+//   if (v->tot_num_cell_faces > 0)
+//     v->num_face_verts = new int[v->tot_num_cell_faces];
+//   if (v->tot_num_face_verts > 0)
+//     v->face_verts = new int[v->tot_num_face_verts];
 
-  struct map_block_t map[] = {
+//   struct map_block_t map[] = {
 
-    { DIY_FLOAT,  OFST, 3, 
-      offsetof(struct vblock_t, mins)                 },
-    { DIY_FLOAT, ADDR, v->num_verts * 3, 
-      DIY_Addr(v->save_verts)                         },
-    { DIY_FLOAT, ADDR, v->num_orig_particles * 3,
-      DIY_Addr(v->sites)                              },
-    { DIY_INT,    ADDR, v->num_complete_cells, 
-      DIY_Addr(v->complete_cells)                     },
-    { DIY_FLOAT, ADDR, v->num_complete_cells, 
-      DIY_Addr(v->areas)                              },
-    { DIY_FLOAT, ADDR, v->num_complete_cells, 
-      DIY_Addr(v->vols)                               },
-    { DIY_INT,    ADDR, v->num_complete_cells, 
-      DIY_Addr(v->num_cell_faces)                     },
-    { DIY_INT,    ADDR, v->tot_num_cell_faces, 
-      DIY_Addr(v->num_face_verts)                     },
-    { DIY_INT,    ADDR, v->tot_num_face_verts, 
-      DIY_Addr(v->face_verts)                         },
-    { DIY_FLOAT,  OFST, 3, 
-      offsetof(struct vblock_t, maxs)                 },
+//     { DIY_FLOAT,  OFST, 3, 
+//       offsetof(struct vblock_t, mins)                 },
+//     { DIY_FLOAT, ADDR, v->num_verts * 3, 
+//       DIY_Addr(v->save_verts)                         },
+//     { DIY_FLOAT, ADDR, v->num_orig_particles * 3,
+//       DIY_Addr(v->sites)                              },
+//     { DIY_INT,    ADDR, v->num_complete_cells, 
+//       DIY_Addr(v->complete_cells)                     },
+//     { DIY_FLOAT, ADDR, v->num_complete_cells, 
+//       DIY_Addr(v->areas)                              },
+//     { DIY_FLOAT, ADDR, v->num_complete_cells, 
+//       DIY_Addr(v->vols)                               },
+//     { DIY_INT,    ADDR, v->num_complete_cells, 
+//       DIY_Addr(v->num_cell_faces)                     },
+//     { DIY_INT,    ADDR, v->tot_num_cell_faces, 
+//       DIY_Addr(v->num_face_verts)                     },
+//     { DIY_INT,    ADDR, v->tot_num_face_verts, 
+//       DIY_Addr(v->face_verts)                         },
+//     { DIY_FLOAT,  OFST, 3, 
+//       offsetof(struct vblock_t, maxs)                 },
 
-  };
+//   };
 
-  DIY_Create_struct_datatype(DIY_Addr(v), 10, map, dtype);
+//   DIY_Create_struct_datatype(DIY_Addr(v), 10, map, dtype);
 
-  return v;
+//   return v;
 
-}
+// }
 //--------------------------------------------------------------------------
 //
 // parse args
@@ -657,21 +633,13 @@ void BlockGridParams(int lid, int *block_min_idx, int *block_max_idx,
 // get cell bounds
 //
 // vblock: one voronoi block
-// cell: current cell counter
-// face: current face counter
-// vert: current vertex counter
+// c_cell: current cell counter
 // cell_min, cell_max: cell bounds (output)
 // centroid: centroid, mean of all vertices (output)
 // normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...) (output)
-// face_mins: face minima (minx_0,miny_0,minz_0,minx_1,miny_1,minz_1, ...) 
-//  (output)
-// face_maxs: face maxima (maxx_0,maxy_0,maxz_0,maxx_1,maxy_1,maxz_1, ...) 
-//  (output)
 //
-void CellBounds(vblock_t *vblock, int cell, int face, int vert,
-		float *cell_min, float *cell_max, float *centroid,
-		vector<float> &normals, vector<float> &face_mins,
-		vector<float> &face_maxs) {
+void CellBounds(vblock_t *vblock, int c_cell, float *cell_min, float *cell_max, 
+		float *centroid, vector<float> &normals) {
 
   float n[3]; // face normal
 
@@ -680,29 +648,55 @@ void CellBounds(vblock_t *vblock, int cell, int face, int vert,
   centroid[2] = 0.0;
   int tot_verts = 0;
 
+  int cell = vblock->complete_cells[c_cell];
+  int num_faces; // number of faces in the current cell
+  int num_verts; // number of vertices in the current face
+
+  // number of faces in the current cell
+  if (cell < vblock->num_orig_particles - 1)
+    num_faces = vblock->cell_faces_start[cell + 1] -
+      vblock->cell_faces_start[cell];
+  else
+    num_faces = vblock->tot_num_cell_faces -
+      vblock->cell_faces_start[cell];
+
   // grow vectors to correct size
-  normals.reserve(3 * vblock->num_cell_faces[cell]);
-  face_mins.reserve(3 * vblock->num_cell_faces[cell]);
-  face_maxs.reserve(3 * vblock->num_cell_faces[cell]);
+  normals.reserve(3 * num_faces);
 
   // get cell bounds
-  for (int k = 0; k < vblock->num_cell_faces[cell]; k++) { // faces
+  for (int k = 0; k < num_faces; k++) { // faces
+
+    int start = vblock->cell_faces_start[cell];
+    int face = vblock->cell_faces[start + k];
+    num_verts = vblock->faces[face].num_verts;
 
     // normal
-    ComputeNormal(vblock, face, vert, n);
+    ComputeNormal(vblock, face, n);
+    // check sign of dot product of normal with vector from site 
+    // to first face vertex to see if normal has correct direction
+    // want outward normal
+    int v0 = vblock->faces[face].verts[0];
+    float v[3];
+    v[0] = vblock->save_verts[3 * v0] - vblock->sites[3 * cell];
+    v[1] = vblock->save_verts[3 * v0 + 1] - vblock->sites[3 * cell + 1];
+    v[2] = vblock->save_verts[3 * v0 + 2] - vblock->sites[3 * cell + 2];
+    if (v[0] * n[0] + v[1] * n[1] + v[2] * n[2] < 0.0) {
+      n[0] *= -1.0;
+      n[1] *= -1.0;
+      n[2] *= -1.0;
+    }
     normals.push_back(n[0]);
     normals.push_back(n[1]);
     normals.push_back(n[2]);
 
-    for (int l = 0; l < vblock->num_face_verts[face]; l++) { // vertices
+    // debug
+//     fprintf(stderr, "1: c_cell %d cell %d k %d face %d normal [%.3f %.3f %.3f]\n",
+// 	    c_cell, cell, k, face, n[0], n[1], n[2]);
 
-      int v = vblock->face_verts[vert];
+    for (int l = 0; l < num_verts; l++) { // vertices
 
-      // debug
-//       fprintf(stderr, "vert = %d v = [%.3f %.3f %.3f]\n", vert,
-// 	      vblock->save_verts[3 * v], vblock->save_verts[3 * v + 1],
-// 	      vblock->save_verts[3 * v + 2]);
- 	  
+      int v = vblock->faces[face].verts[l];
+
       // extrema for entire cell
       if (k == 0 && l == 0 || vblock->save_verts[3 * v] < cell_min[0])
 	cell_min[0] = vblock->save_verts[3 * v];
@@ -722,50 +716,15 @@ void CellBounds(vblock_t *vblock, int cell, int face, int vert,
 	cell_max[2] = vblock->save_verts[3 * v + 2];
       centroid[2] += vblock->save_verts[3 * v + 2];
 
-      // extrema for this face
-      if (l == 0 || vblock->save_verts[3 * v] < face_mins[3 * k])
-	face_mins[3 * k] = vblock->save_verts[3 * v];
-      if (l == 0 || vblock->save_verts[3 * v] > face_maxs[3 * k])
-	face_maxs[3 * k] = vblock->save_verts[3 * v];
-
-      if (l == 0 || vblock->save_verts[3 * v + 1] < face_mins[3 * k + 1])
-	face_mins[3 * k + 1] = vblock->save_verts[3 * v + 1];
-      if (l == 0 || vblock->save_verts[3 * v + 1] > face_maxs[3 * k + 1])
-        face_maxs[3 * k + 1] = vblock->save_verts[3 * v + 1];
-
-      if (l == 0 || vblock->save_verts[3 * v + 2] < face_mins[3 * k + 2])
-	face_mins[3 * k + 2] = vblock->save_verts[3 * v + 2];
-      if (l == 0 || vblock->save_verts[3 * v + 2] > face_maxs[3 * k + 2])
-	face_maxs[3 * k + 2] = vblock->save_verts[3 * v + 2];
-
-      vert++;
       tot_verts++;
 
     } // vertices
-
-    face++;
 
   } // faces
 
   centroid[0] /= tot_verts;
   centroid[1] /= tot_verts;
   centroid[2] /= tot_verts;
-
-  // debug
-//   fprintf(stderr, "cell %d mins[%.3f %.3f %.3f] maxs[%.3f %.3f %.3f]\n",
-// 	  cell, cell_min[0], cell_min[1], cell_min[2],
-// 	  cell_max[0], cell_max[1], cell_max[2]);
-//   for (int k = 0; k < vblock->num_cell_faces[cell]; k++) {
-//     fprintf(stderr, "face %d mins[%.3f %.3f %.3f] maxs[%.3f %.3f %.3f]\n",
-// 	    k, face_mins[3 * k], face_mins[3 * k + 1], face_mins[3 * k + 2],
-// 	    face_maxs[3 * k], face_maxs[3 * k + 1], face_maxs[3 * k + 2]);
-//     assert(face_mins[3 * k] >= cell_min[0] && 
-// 	   face_maxs[3 * k] <= cell_max[0] &&
-// 	   face_mins[3 * k + 1] >= cell_min[1] && 
-// 	   face_maxs[3 * k + 1] <= cell_max[1] &&
-// 	   face_mins[3 * k + 2] >= cell_min[2] && 
-// 	   face_maxs[3 * k + 2] <= cell_max[2]);
-//   }
 
 } 
 //--------------------------------------------------------------------------
@@ -995,14 +954,10 @@ void phys2idx(float *pos, int *grid_idx) {
 //   three points when the points are colinear or slightly nonplanar. 
 //
 // vblock: one voronoi block
-// face: current face counter
-// vert: current vertex counter
+// face: face id
 // normal: (output) normal, allocated by caller
 //
-// winding order is assumed to be consistent; for the tess data model this
-//  produces an inward normal
-//
-void ComputeNormal(vblock_t *vblock, int face, int vert, float *normal) {
+void ComputeNormal(vblock_t *vblock, int face, float *normal) {
 
   int v; // index of vertex
   float cur[3], next[3]; // current and next vertex
@@ -1011,17 +966,17 @@ void ComputeNormal(vblock_t *vblock, int face, int vert, float *normal) {
   normal[1] = 0.0;
   normal[2] = 0.0;
 
-  for (int i = 0; i < vblock->num_face_verts[face]; i++) {
+  for (int i = 0; i < vblock->faces[face].num_verts; i++) {
 
     // get current and next vertex going around the face
-    v = vblock->face_verts[vert + i];
+    v = vblock->faces[face].verts[i];
     cur[0] = vblock->save_verts[3 * v];
     cur[1] = vblock->save_verts[3 * v + 1];
     cur[2] = vblock->save_verts[3 * v + 2];
-    if (i + 1 < vblock->num_face_verts[face])
-      v = vblock->face_verts[vert + i + 1]; // next vertex 
+    if (i + 1 < vblock->faces[face].num_verts)
+      v = vblock->faces[face].verts[i + 1]; // next vertex 
     else
-      v = vblock->face_verts[vert]; // next = last = first vertex
+      v = vblock->faces[face].verts[0]; // next = last = first vertex
     next[0] = vblock->save_verts[3 * v];
     next[1] = vblock->save_verts[3 * v + 1];
     next[2] = vblock->save_verts[3 * v + 2];
@@ -1029,10 +984,6 @@ void ComputeNormal(vblock_t *vblock, int face, int vert, float *normal) {
     normal[0] += (cur[1] - next[1]) * (cur[2] + next[2]);
     normal[1] += (cur[2] - next[2]) * (cur[0] + next[0]);
     normal[2] += (cur[0] - next[0]) * (cur[1] + next[1]);
-
-    // debug
-//     fprintf(stderr, "face = %d cur [ %.1f %.1f %.1f] next [%.1f %.1f %.1f]\n",
-// 	    face, cur[0], cur[1], cur[2], next[0], next[1], next[2]);
 
   }
 
@@ -1045,139 +996,17 @@ void ComputeNormal(vblock_t *vblock, int face, int vert, float *normal) {
 
 }
 //--------------------------------------------------------------------------
-// // DEPRECATED, unsuccessful attempt to use face bounding boxes to limit search
-// //
-// // whether a point lies inside a cell
-// //
-// // pt: point
-// // vblock: one voronoi block
-// // cell: current cell counter
-// // face: current face counter
-// // vert: current vertex counter
-// // normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
-// // face_mins: face minima (minx_0,miny_0,minz_0,minx_1,miny_1,minz_1, ...) 
-// // face_maxs: face maxima (maxx_0,maxy_0,maxz_0,maxx_1,maxy_1,maxz_1, ...) 
-// // cell_centroid: physical (continuous) cell center (x,y,z)
-// //
-// // returns whether point is in cell (true) or not (false)
-// //
-// bool PtInCell(float *pt, vblock_t *vblock, int cell, int face, int vert,
-// 	      float *normals, float *face_mins, float *face_maxs,
-// 	      float *cell_centroid) {
-
-//   int sign; // sign of distance (1 or -1)
-//   int old_sign = 0; // previous sign, 0 = uninitialized
-//   int v; // vertex id
-//   float v0[3]; // first vertex
-//   float dist = 0.0; // signed distance from point to plane
-
-//   for (int k = 0; k < vblock->num_cell_faces[cell]; k++) { // faces
-
-//     // debug
-// //     fprintf(stderr, "cell = %d face = %d face_mins = [%.3f %.3f %.3f] "
-// // 	    "face_maxs = [%.3f %.3f %.3f] centroid = [%.3f %.3f %.3f]\n",
-// // 	    cell, face,
-// // 	    face_mins[3*k], face_mins[3*k+1], face_mins[3*k+2], 
-// // 	    face_maxs[3*k], face_maxs[3*k+1], face_maxs[3*k+2],
-// // 	    cell_centroid[0], cell_centroid[1], cell_centroid[2]);
-
-//     dist = 0.0;
-
-//   // debug
-//   float fast_dist = 0.0;
-
-//     // point can be determined to be inside face based on face bounds
-//     if (face_maxs[3*k] < cell_centroid[0] && pt[0] > face_maxs[3*k] ||
-// 	face_mins[3*k] > cell_centroid[0] && pt[0] < face_mins[3*k] ||
-// 	face_maxs[3*k+1] < cell_centroid[1] && pt[1] > face_maxs[3*k+1] ||
-// 	face_mins[3*k+1] > cell_centroid[1] && pt[1] < face_mins[3*k+1] ||
-// 	face_maxs[3*k+2] < cell_centroid[2] && pt[2] > face_maxs[3*k+2] ||
-// 	face_mins[3*k+2] > cell_centroid[2] && pt[2] < face_mins[3*k+2])
-//       fast_dist = 1.0; // any positive distance will do
-
-//     // point can be determined to be outside face based on face bounds
-//     else if (face_maxs[3*k] < cell_centroid[0] && pt[0] < face_mins[3*k] ||
-// 	     face_mins[3*k] > cell_centroid[0] && pt[0] > face_maxs[3*k] ||
-// 	     face_maxs[3*k+1] < cell_centroid[1] && pt[1] < face_mins[3*k+1] ||
-// 	     face_mins[3*k+1] > cell_centroid[1] && pt[1] > face_maxs[3*k+1] ||
-// 	     face_maxs[3*k+2] < cell_centroid[2] && pt[2] < face_mins[3*k+2] ||
-// 	     face_mins[3*k+2] > cell_centroid[2] && pt[2] > face_maxs[3*k+2])
-//       fast_dist = -1.0; // any negative distance will do
-
-// //     else {
-
-//       // compute distance from point to face
-
-//       // first vertex in the face
-//       v = vblock->face_verts[vert];
-//       v0[0] = vblock->save_verts[3 * v];
-//       v0[1] = vblock->save_verts[3 * v + 1];
-//       v0[2] = vblock->save_verts[3 * v + 2];
-
-//       float *n = &(normals[3 * k]); // current normal
-//       dist = n[0] * (pt[0] - v0[0]) + n[1] * (pt[1] - v0[1]) + 
-// 	n[2] * (pt[2] - v0[2]);
-
-// //     }
-
-//     // debug
-// //       if (fast_dist < 0.0 && fabs(dist) > eps && dist > 0.0)
-// // 	fprintf(stderr, "fast_dist outside and dist inside: "
-// // 		"pt = [%.3f %.3f %.3f] face_mins = [%.3f %.3f %.3f] "
-// // 		"face_maxs = [%.3f %.3f %.3f] centroid = [%.3f %.3f %.3f]\n",
-// // 		pt[0], pt[1], pt[2], 
-// // 		face_mins[3*k], face_mins[3*k+1], face_mins[3*k+2], 
-// // 		face_maxs[3*k], face_maxs[3*k+1], face_maxs[3*k+2],
-// // 		cell_centroid[0], cell_centroid[1], cell_centroid[2]);
-
-// //       if (fast_dist > 0.0 && fabs(dist) > eps && dist < 0.0)
-// // 	fprintf(stderr, "fast_dist inside and dist outside: "
-// // 		"pt = [%.3f %.3f %.3f] face_mins = [%.3f %.3f %.3f] "
-// // 		"face_maxs = [%.3f %.3f %.3f] centroid = [%.3f %.3f %.3f]\n",
-// // 		pt[0], pt[1], pt[2], 
-// // 		face_mins[3*k], face_mins[3*k+1], face_mins[3*k+2], 
-// // 		face_maxs[3*k], face_maxs[3*k+1], face_maxs[3*k+2],
-// // 		cell_centroid[0], cell_centroid[1], cell_centroid[2]);
-
-//     // check sign of distance only if non-zero
-//     if (fabs(dist) > eps) {
-//       sign = (dist >= 0.0 ? 1 : -1);
-//       if (old_sign == 0)
-// 	old_sign = sign;
-//       if (old_sign != sign)
-// 	return false;
-//     }
-
-//     vert += vblock->num_face_verts[face]; // set vert to start of next face
-//     face++;
-
-//   } // faces
-
-//   // debug
-//   assert(sign == 1); // for points inside to all faces and therefore the cell
-
-//   return true;
-
-// }
-//--------------------------------------------------------------------------
 //
 // whether a point lies inside a cell
 //
 // pt: point
 // vblock: one voronoi block
-// cell: current cell counter
-// face: current face counter
-// vert: current vertex counter
+// c_cell: current complete cell counter
 // normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
-// face_mins: face minima (minx_0,miny_0,minz_0,minx_1,miny_1,minz_1, ...) 
-// face_maxs: face maxima (maxx_0,maxy_0,maxz_0,maxx_1,maxy_1,maxz_1, ...) 
-// cell_centroid: physical (continuous) cell center (x,y,z)
 //
 // returns whether point is in cell (true) or not (false)
 //
-bool PtInCell(float *pt, vblock_t *vblock, int cell, int face, int vert,
-	      float *normals, float *face_mins, float *face_maxs,
-	      float *cell_centroid) {
+bool PtInCell(float *pt, vblock_t *vblock, int c_cell, float *normals) {
 
   int sign; // sign of distance (1 or -1)
   int old_sign = 0; // previous sign, 0 = uninitialized
@@ -1185,14 +1014,26 @@ bool PtInCell(float *pt, vblock_t *vblock, int cell, int face, int vert,
   float v0[3]; // first vertex
   float dist = 0.0; // signed distance from point to plane
 
-  for (int k = 0; k < vblock->num_cell_faces[cell]; k++) { // faces
+  int cell = vblock->complete_cells[c_cell]; // current cell
+  int num_faces; // number of faces in the current cell
+  if (cell < vblock->num_orig_particles - 1)
+    num_faces = vblock->cell_faces_start[cell + 1] -
+      vblock->cell_faces_start[cell];
+  else
+    num_faces = vblock->tot_num_cell_faces -
+      vblock->cell_faces_start[cell];
+
+  for (int k = 0; k < num_faces; k++) { // faces
+
+    int start = vblock->cell_faces_start[cell];
+    int face = vblock->cell_faces[start + k];
 
     dist = 0.0;
 
     // compute distance from point to face
 
     // first vertex in the face
-    v = vblock->face_verts[vert];
+    v = vblock->faces[face].verts[0];
     v0[0] = vblock->save_verts[3 * v];
     v0[1] = vblock->save_verts[3 * v + 1];
     v0[2] = vblock->save_verts[3 * v + 2];
@@ -1209,9 +1050,6 @@ bool PtInCell(float *pt, vblock_t *vblock, int cell, int face, int vert,
       if (old_sign != sign)
 	return false;
     }
-
-    vert += vblock->num_face_verts[face]; // set vert to start of next face
-    face++;
 
   } // faces
 
@@ -1232,8 +1070,6 @@ bool PtInCell(float *pt, vblock_t *vblock, int cell, int face, int vert,
 //
 // vblock: one voronoi block
 // cell: current cell counter
-// face: current face counter
-// vert: current vertex counter
 // cell_mins: minimum cell vertex (x,y,z)
 // cell_maxs: maximum cell vertex (x,y,z)
 // grid_pts: (output) grid points covered by this cell, allocated by this
@@ -1242,17 +1078,12 @@ bool PtInCell(float *pt, vblock_t *vblock, int cell, int face, int vert,
 // alloc_grid_pts: number of grid points currently allocated, this function
 //   will realloc to the new size if needed, otherwise will leave old size
 // normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
-// face_mins: face minima (minx_0,miny_0,minz_0,minx_1,miny_1,minz_1, ...) 
-// face_maxs: face maxima (maxx_0,maxy_0,maxz_0,maxx_1,maxy_1,maxz_1, ...) 
-// cell_centroid: physical (continuous) cell center (x,y,z)
 //
 // returns: number of grid points covered by this cell
 //
-int CellGridPts(vblock_t *vblock, int cell, int face, 
-		int vert, float *cell_mins, float *cell_maxs, 
-		grid_pt_t* &grid_pts, int* &border, int &alloc_grid_pts,
-		float *normals, float *face_mins, float *face_maxs,
-		float *cell_centroid) {
+int CellGridPts(vblock_t *vblock, int cell, float *cell_mins, 
+		float *cell_maxs,  grid_pt_t* &grid_pts, int* &border, 
+		int &alloc_grid_pts, float *normals) {
 
   float center[3]; // cell center
   int num_grid_pts; // number of grid points covered by this cell
@@ -1287,11 +1118,12 @@ int CellGridPts(vblock_t *vblock, int cell, int face,
     alloc_grid_pts = npts;
   }
 
-  num_grid_pts = CellInteriorGridPts(vblock, cell, face,
-				     vert, cell_grid_pts, cell_min_grid_idx,
-				     cell_min_grid_pos, grid_pts, border,
-				     normals, face_mins, face_maxs, 
-				     cell_centroid);
+  num_grid_pts = CellInteriorGridPts(vblock, cell, cell_grid_pts, 
+				     cell_min_grid_idx, cell_min_grid_pos, 
+				     grid_pts, border, normals);
+
+  // debug
+//   fprintf(stderr, "2: cell = %d num_grid_pts = %d\n", cell, num_grid_pts);
 
   // if no grid points covered by cell, pick a single grid point near to the
   // cell centroid
@@ -1301,8 +1133,8 @@ int CellGridPts(vblock_t *vblock, int cell, int face,
     center[1] = (cell_mins[1] + cell_maxs[1]) / 2.0f;
     center[2] = (cell_mins[2] + cell_maxs[2]) / 2.0f;
     phys2idx(center, grid_pts[num_grid_pts].idx);
-//     grid_pts[num_grid_pts].dense = mass / vblock->vols[cell];
-    // depost mass onto one grid point, density will be computed from this later
+
+    // deposit mass onto one grid point, density will be computed from this later
     grid_pts[num_grid_pts].mass = mass;
     num_grid_pts = 1;
 
@@ -1449,26 +1281,18 @@ void SummaryStats(float max_dense, float tot_mass,
 //
 // vblock: one voronoi block
 // cell: current cell counter
-// face: current face counter
-// vert: current vertex counter
 // cell_grid_pts: number of grid points covered by cell bounding box
 // cell_min_grid_idx: cell minimum grid point global index
 // cell_min_grid_pos: cell minimum grid point physical position
 // grid_pts: (output) grid points covered by this cell, allocated by caller
 // border: cell border, min and max x index for each y and z index
 // normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
-// face_mins: face minima (minx_0,miny_0,minz_0,minx_1,miny_1,minz_1, ...) 
-// face_maxs: face maxima (maxx_0,maxy_0,maxz_0,maxx_1,maxy_1,maxz_1, ...) 
-// cell_centroid: physical (continuous) cell center (x,y,z)
 //
 // returns: number of interior grid points
 //
-int CellInteriorGridPts(vblock_t *vblock, int cell, 
-			int face, int vert, int *cell_grid_pts, 
+int CellInteriorGridPts(vblock_t *vblock, int cell, int *cell_grid_pts, 
 			int *cell_min_grid_idx, float *cell_min_grid_pos, 
-			grid_pt_t *grid_pts, int *border, float *normals,
-			float *face_mins, float *face_maxs,
-			float *cell_centroid) {
+			grid_pt_t *grid_pts, int *border, float *normals) {
 
   int num_grid_pts = 0; // current number of grid points interior to cell
   int tot_num_grid_pts = 0; // total number of grid points interior to cell
@@ -1478,13 +1302,11 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
   for (int zi = 0; zi < cell_grid_pts[2]; zi++) { // z
     for (int yi = 0; yi < cell_grid_pts[1]; yi++) { // y
       for (int xi = 0; xi < cell_grid_pts[0]; xi++) { // x
-
 	grid_pos[0] = cell_min_grid_pos[0] + xi * grid_step_size[0];
 	grid_pos[1] = cell_min_grid_pos[1] + yi * grid_step_size[1];
 	grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
 	tot_interior_evals++;
-	if (PtInCell(grid_pos, vblock, cell, face, vert, normals,
-		     face_mins, face_maxs, cell_centroid)) {
+	if (PtInCell(grid_pos, vblock, cell, normals)) {
 	  grid_pts[num_grid_pts].idx[0] = cell_min_grid_idx[0] + xi;
 	  grid_pts[num_grid_pts].idx[1] = cell_min_grid_idx[1] + yi;
 	  grid_pts[num_grid_pts].idx[2] = cell_min_grid_idx[2] + zi;
@@ -1526,26 +1348,18 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
 //
 // vblock: one voronoi block
 // cell: current cell counter
-// face: current face counter
-// vert: current vertex counter
 // cell_grid_pts: number of grid points covered by cell bounding box
 // cell_min_grid_idx: cell minimum grid point global index
 // cell_min_grid_pos: cell minimum grid point physical position
 // grid_pts: (output) grid points covered by this cell, allocated by caller
 // border: cell border, min and max x index for each y and z index
 // normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
-// face_mins: face minima (minx_0,miny_0,minz_0,minx_1,miny_1,minz_1, ...) 
-// face_maxs: face maxima (maxx_0,maxy_0,maxz_0,maxx_1,maxy_1,maxz_1, ...) 
-// cell_centroid: physical (continuous) cell center (x,y,z)
 //
 // returns: number of interior grid points
 //
-int CellInteriorGridPts(vblock_t *vblock, int cell, 
-			int face, int vert, int *cell_grid_pts, 
+int CellInteriorGridPts(vblock_t *vblock, int cell, int *cell_grid_pts, 
 			int *cell_min_grid_idx, float *cell_min_grid_pos, 
-			grid_pt_t *grid_pts, int *border, float *normals,
-			float *face_mins, float *face_maxs,
-			flaot *cell_centroid) {
+			grid_pt_t *grid_pts, int *border, float *normals) {
 
   int num_grid_pts = 0; // current number of grid points interior to cell
   int tot_num_grid_pts = 0; // total number of grid points interior to cell
@@ -1565,8 +1379,7 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
       grid_pos[1] = cell_min_grid_pos[1] + yi * grid_step_size[1];
       grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
       tot_interior_evals++;
-      if (PtInCell(grid_pos, vblock, cell, face, vert, normals, 
-		   face_mins, face_maxs, cell_centroid)) {
+      if (PtInCell(grid_pos, vblock, cell, face, vert, normals)) {
 	x_in_left = true;
 	x_in_right = true;
       }
@@ -1585,8 +1398,7 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
 	grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
 
 	tot_interior_evals++;
-	if (PtInCell(grid_pos, vblock, cell, face, vert, normals,
-		     face_mins, face_maxs, cell_centroid)) {
+	if (PtInCell(grid_pos, vblock, cell, normals)) {
 	  if (x_in_left) { // remains interior, keep stepping
 	    if (xi < min_xi)
 	      min_xi = xi;
@@ -1624,8 +1436,7 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
 	grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
 
 	tot_interior_evals++;
-	if (PtInCell(grid_pos, vblock, cell, face, vert, normals,
-		     face_mins, face_maxs, cell_centroid)) {
+	if (PtInCell(grid_pos, vblock, cell, face, vert, normals)) {
 	  if (x_in_right) {// remains interior, keep stepping
 	    if (xi < min_xi) 
 	      min_xi = xi;
@@ -1702,26 +1513,18 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
 //
 // vblock: one voronoi block
 // cell: current cell counter
-// face: current face counter
-// vert: current vertex counter
 // cell_grid_pts: number of grid points covered by cell bounding box
 // cell_min_grid_idx: cell minimum grid point global index
 // cell_min_grid_pos: cell minimum grid point physical position
 // grid_pts: (output) grid points covered by this cell, allocated by caller
 // border: cell border, min and max x index for each y and z index
 // normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
-// face_mins: face minima (minx_0,miny_0,minz_0,minx_1,miny_1,minz_1, ...) 
-// face_maxs: face maxima (maxx_0,maxy_0,maxz_0,maxx_1,maxy_1,maxz_1, ...) 
-// cell_centroid: physical (continuous) cell center (x,y,z)
 //
 // returns: number of interior grid points
 //
-int CellInteriorGridPts(vblock_t *vblock, int cell, 
-			int face, int vert, int *cell_grid_pts, 
+int CellInteriorGridPts(vblock_t *vblock, int cell, int *cell_grid_pts, 
 			int *cell_min_grid_idx, float *cell_min_grid_pos, 
-			grid_pt_t *grid_pts, int *border, float *normals,
-			float *face_mins, float *face_maxs,
-			float *cell_centroid) {
+			grid_pt_t *grid_pts, int *border, float *normals) {
 
   int num_grid_pts = 0; // current number of grid points interior to cell
   int tot_num_grid_pts = 0; // total number of grid points interior to cell
@@ -1737,9 +1540,6 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
   int yj; // second, temporary index in y
   int first_x; // x index of border crossing at first y line in each z
 
-  // debug
-//   fprintf(stderr, "cell %d cell_grid_pts[%d %d %d]\n", cell,
-// 	  cell_grid_pts[0], cell_grid_pts[1], cell_grid_pts[2]);
   int y_steps = 0; // see how many y_steps we ended up making
 
   // find the border points of the cell
@@ -1755,12 +1555,6 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
     for (yj = 0; yj < y_start; yj++) { // prior to start
       border[2 * (zi * cell_grid_pts[1] + yj)]     = 1; // min
       border[2 * (zi * cell_grid_pts[1] + yj) + 1] = 0; // max
-      // debug
-//       if (yj == 0)
-// 	fprintf(stderr, "1: cell = %d size [%d %d %d] has no border points "
-// 		" between y = 0 and y = %d at z = %d\n",
-// 		cell, cell_grid_pts[0], cell_grid_pts[1], cell_grid_pts[2],
-// 		y_start - 1, zi);
     }
 
     // y step
@@ -1779,8 +1573,7 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
       grid_pos[1] = cell_min_grid_pos[1] + yi * grid_step_size[1];
       grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
       tot_interior_evals++;
-      if (PtInCell(grid_pos, vblock, cell, face, vert, normals,
-		   face_mins, face_maxs, cell_centroid)) {
+      if (PtInCell(grid_pos, vblock, cell, normals)) {
 	x_in_left = true;
 	x_in_right = true;
       }
@@ -1797,8 +1590,7 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
 	grid_pos[0] = cell_min_grid_pos[0] + xi * grid_step_size[0];
 
 	tot_interior_evals++;
-	if (PtInCell(grid_pos, vblock, cell, face, vert, normals,
-		     face_mins, face_maxs, cell_centroid)) {
+	if (PtInCell(grid_pos, vblock, cell, normals)) {
 	  if (x_in_left) { // remains interior, keep stepping
 	    if (xi < min_xi)
 	      min_xi = xi;
@@ -1834,8 +1626,7 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
 	grid_pos[0] = cell_min_grid_pos[0] + xi * grid_step_size[0];
 
 	tot_interior_evals++;
-	if (PtInCell(grid_pos, vblock, cell, face, vert, normals,
-		     face_mins, face_maxs, cell_centroid)) {
+	if (PtInCell(grid_pos, vblock, cell, normals)) {
 	  if (x_in_right) {// remains interior, keep stepping
 	    if (xi < min_xi) 
 	      min_xi = xi;
@@ -1896,15 +1687,10 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
 	grid_pos[2] = cell_min_grid_pos[2] + (zi + 1) * grid_step_size[2];
 	grid_pos[0] = cell_min_grid_pos[0] + first_x * grid_step_size[0];
 
-	// debug
-// 	if (first_y > 0)
-// 	  fprintf(stderr, "cell %d z %d checking loosening y from %d\n",
-// 		  cell, zi, first_y);
 	for (yj = first_y; yj > 0; yj--) {
 	  grid_pos[1] = cell_min_grid_pos[1] + yj * grid_step_size[1];
 	  tot_interior_evals++;
-	  if (!PtInCell(grid_pos, vblock, cell, face, vert, normals,
-			face_mins, face_maxs, cell_centroid))
+	  if (!PtInCell(grid_pos, vblock, cell, normals))
 	    break;
 	}
 	y_start = yj;
@@ -1924,28 +1710,6 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
       }
 
     } // y step
-
-    // debug: report when some y steps were saved
-//     if (y_start > 0 || yi < cell_grid_pts[1])
-//     if (y_start > 0)
-//       fprintf(stderr, "cell %d z %d y steps were from [%d %d] instead of "
-// 	      "[0 %d]\n", cell, zi, y_start, yi, cell_grid_pts[1]);
-
-    // debug: assert that the counts match
-//     num_grid_pts = 0;
-//     for (int zk = 0; zk <= zi; zk++) { // z
-//       for (int yk = 0; yk < cell_grid_pts[1]; yk++) { // y
-// 	int min_xk = border[2 * (zk * cell_grid_pts[1] + yk)];
-// 	int max_xk = border[2 * (zk * cell_grid_pts[1] + yk) + 1];
-// 	for (int xk = min_xk; xk <= max_xk; xk++) // x
-// 	  num_grid_pts++;
-//       }
-//     }
-//     fprintf(stderr, "cell = %d after z = %d tot_num_grid_pts = %d "
-// 	    "num_grid_pts = %d\n",
-// 	    cell, zi, tot_num_grid_pts, num_grid_pts);
-//     assert(tot_num_grid_pts == num_grid_pts); // sanity
-
 
   } // z step
 
@@ -1969,12 +1733,6 @@ int CellInteriorGridPts(vblock_t *vblock, int cell,
       }
     }
   }
-
-  // debug
-//   fprintf(stderr, "cell = %d tot_num_grid_pts = %d num_grid_pts = %d "
-// 	  "total y steps = %d out of possible %d\n",
-// 	  cell, tot_num_grid_pts, num_grid_pts, y_steps,
-// 	  cell_grid_pts[1] * cell_grid_pts[2]);
 
   // cleanup
   assert(tot_num_grid_pts == num_grid_pts); // sanity

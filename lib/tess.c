@@ -296,9 +296,6 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   times[VOL_TIME] = MPI_Wtime();
 #endif
 
-  /* create convex hulls for completed cells */
-/*   cell_hulls(nblocks, vblocks, dim); */
-
   /* compute volume and surface area manually (not using convex hulls) */
   cell_vols(nblocks, vblocks, particles);
 

@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------
  *
- * voronoi data structures
+ * voronoi and delaunay data structures
  *
  * Tom Peterka
  * Argonne National Laboratory

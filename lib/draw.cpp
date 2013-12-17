@@ -1407,7 +1407,7 @@ void PrepCellRendering(int &num_vis_cells) {
     for (int j = 0; j < vblocks[i]->num_complete_cells; j++) { // cells
 
       int cell = vblocks[i]->complete_cells[j]; // current cell
-      int num_faces; // number of face in the current cell
+      int num_faces; // number of faces in the current cell
       int num_verts; // number of vertices in the current face
 
       if (cell < vblocks[i]->num_orig_particles - 1)

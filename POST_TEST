@@ -28,7 +28,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=8
+num_procs=4
 
 # number of BG/P nodes for vn mode
 num_nodes=$[$num_procs / 4]
@@ -44,18 +44,18 @@ tb=$[$num_procs * 1]
 #tb=2
 
 # inout file
-#infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"
+infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/6606356352.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/input-data/nfw_particles_1e5.dat"
-infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/input-data/cnfw_particles_2e5.dat"
+#infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/input-data/cnfw_particles_2e5.dat"
 
 # output file
-#outfile="7445077095.out"
+outfile="7445077095.out"
 #outfile="6606356352.out"
 #outfile="nfw.out"
 #outfile="mchalo00.out"
 #outfile="nor_ex.out"
-outfile="cnfw_2e5.out"
+#outfile="cnfw_2e5.out"
 
 #volume range (-1.0: unused)
 minv=-1.0
