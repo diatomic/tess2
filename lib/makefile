@@ -13,8 +13,8 @@
 
 include ../user_defs.mk
 
-INCLUDES = $(DIY_INC) $(QHULL_INC) $(PNETCDF_INC)
-LIBS = $(DIY_LIB) $(QHULL_LIB) $(PNETCDF_LIB)
+INCLUDES = $(DIY_INC) $(DELAUNAY_INC) $(PNETCDF_INC)
+LIBS = $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB)
 
 ###########
 
@@ -22,6 +22,7 @@ ifeq ($(ARCH), MAC_OSX) # mac version
 
 CCFLAGS = -g -Wall -Wextra
 CCFLAGS += -DMAC_OSX $(TIMING) -fopenmp
+CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS = -framework GLUT -framework OpenGL
 CC=mpicc
 CXX=mpicxx
@@ -34,6 +35,7 @@ ifeq ($(ARCH), LINUX) # linux version
 
 CCFLAGS = -g
 CCFLAGS += -DLINUX $(TIMING)
+CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS = -lglut -lGLU -lGL
 CC=mpicc
 CXX=mpicxx
@@ -47,6 +49,7 @@ ifeq ($(ARCH), BGP) # BG/P version
 CCFLAGS = -O3 -qarch=450d -qtune=450
 #CCFLAGS = -g
 CCFLAGS += -DBGP $(TIMING)
+CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS =
 CC=mpixlc_r
 CXX=mpixlcxx_r
@@ -57,7 +60,8 @@ endif
 
 ###########
 
-TESS_OBJS = tess.o io.o
+TESS_OBJS = tess.o tess-qhull.o io.o
+#TESS_OBJS = tess.o tess-cgal.o io.o
 DRAW_OBJS = draw.o ser_io.o swap.o io.o
 DUMP_OBJS = dump.o ser_io.o swap.o
 DENSE_OBJS = dense.o io.o

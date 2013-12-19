@@ -15,11 +15,12 @@
 #ifndef _TESS_H
 #define _TESS_H
 
-#define qh_QHimport
-#include "qhull_a.h"
+#include <stdlib.h>	// needed for RAND_MAX
 
 #include "voronoi.h"
 #include "diy.h"
+
+extern MPI_Comm comm; /* MPI communicator */
 
 /* public */
 
@@ -60,25 +61,38 @@ void tess(float **particles, int *num_particles, char *out_file);
 void voronoi_delaunay(int nblocks, float **particles, int *num_particles, 
 		      double *times, char *out_file);
 int gen_particles(int lid, float **particles, float jitter);
-int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
-		       int num_particles);
-int gen_delaunay_output(facetT *facetlist, struct vblock_t *vblock,
-			int *gids, int *nids, unsigned char *dirs,
-			struct remote_ic_t *rics, int lid, int num_recvd);
+#ifdef __cplusplus
+extern "C"
+#endif
 void complete_cells(struct vblock_t *vblock, int lid);
+#ifdef __cplusplus
+extern "C"
+#endif
 void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock, 
 		      int lid);
+#ifdef __cplusplus
+extern "C"
+#endif
 void cell_faces(struct vblock_t *vblock);
 void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs);
+#ifdef __cplusplus
+extern "C"
+#endif
 void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 		int *num_particles, int *num_orig_particles, 
 		float **particles, int **gids, int **nids, 
 		unsigned char **dirs, double *times);
+#ifdef __cplusplus
+extern "C"
+#endif
 void local_cells(int nblocks, struct vblock_t *tblocks, 
 		 struct vblock_t *vblocks, int dim,
 		 int *num_particles, float **particles);
 void neighbor_particles(int nblocks, float **particles, int *num_particles, 
 			int **gids, int **nids, unsigned char **dirs);
+#ifdef __cplusplus
+extern "C"
+#endif
 void neighbor_is_complete(int nblocks, struct vblock_t *vblocks,
 			  struct remote_ic_t **rics);
 void item_type(DIY_Datatype *type);
@@ -105,5 +119,11 @@ void add_sent(struct sent_t val, struct sent_t **vals, int *numvals,
 int cell_bounds(struct vblock_t *vblock, int cell, int vert);
 void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles);
 void face_areas(int nblocks, struct vblock_t *vblocks);
-
+#ifdef __cplusplus
+extern "C"
+#endif
+void gen_delaunay_tet(int tet_verts[4], struct vblock_t *vblock,
+		      int *gids, int *nids, unsigned char *dirs,
+		      struct remote_ic_t *rics, int lid, int num_recvd,
+		      int *n, int *m);
 #endif

@@ -1,4 +1,8 @@
-add_library		(tess tess.c io.c)
+if			(use_cgal)
+    add_library		(tess tess.c tess-cgal.cpp io.c)
+else			(use_cgal)
+    add_library		(tess tess.c tess-qhull.c io.c)
+endif			(use_cgal)
 
 include_directories	(${OPENGL_INCLUDE_DIR} ${GLUT_INCLUDE_DIR})
 add_executable		(draw draw.cpp ser_io.cpp swap.cpp io.c)

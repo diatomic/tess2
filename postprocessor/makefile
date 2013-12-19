@@ -13,8 +13,8 @@
 
 include ../user_defs.mk
 
-INCLUDES = $(DIY_INC) $(QHULL_INC) $(PNETCDF_INC) -I../lib
-LIBS = -L../lib -ltess $(DIY_LIB) $(QHULL_LIB) $(PNETCDF_LIB)
+INCLUDES = $(DIY_INC) $(DELAUANAY_INC) $(PNETCDF_INC) -I../lib
+LIBS = -L../lib -ltess $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB)
 
 ###########
 
@@ -22,6 +22,7 @@ ifeq ($(ARCH), MAC_OSX) # mac version
 
 CCFLAGS = -g
 CCFLAGS += -DMAC_OSX -fopenmp
+CCFLAGS += ${DELAUNAY_CCFLAGS}
 CXX=mpicxx
 
 endif
@@ -32,6 +33,7 @@ ifeq ($(ARCH), LINUX) # linux version
 
 CCFLAGS = -g
 CCFLAGS += -DLINUX
+CCFLAGS += ${DELAUNAY_CCFLAGS}
 CXX=mpicxx
 
 endif
