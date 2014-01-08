@@ -332,7 +332,13 @@ void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
       Point p(particles[3*j],
 	      particles[3*j+1],
 	      particles[3*j+2]);
-      points.push_back(std::make_pair(p, j));
+#ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
+      points.push_back(std::make_pair(p,j));
+#else
       Dt.insert(p)->info() = j;
+#endif
     }
+#ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
+    Dt.insert(points.begin(), points.end());
+#endif
 }
