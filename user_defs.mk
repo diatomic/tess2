@@ -35,7 +35,7 @@ QHULL_LIB = -L$(HOME)/software/qhull-2011.2/lib -lqhullstatic
 CGAL_LIB = -L/usr/lib -lgmp -lCGAL
 PNETCDF_LIB = -L$(HOME)/software/parallel-netcdf-1.3.0/lib -lpnetcdf
 
-CGAL_CCFLAGS=-frounding-math
+CGAL_CCFLAGS=-frounding-math -DCGAL_DISABLE_ROUNDING_MATH_CHECK
 
 DELAUNAY_INC=${QHULL_INC}
 DELAUNAY_LIB=${QHULL_LIB}

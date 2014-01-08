@@ -91,16 +91,11 @@ fi
 
 if [ "$ARCH" = "LINUX" ]; then
 
-mpiexec -n $num_procs $exe $args
+#mpiexec -n $num_procs $exe $args
 
 #mpiexec -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 
-#XXX: tess won't run under valgrind, when built using CGAL, and if the code
-#     is compiled using just `make`.  It will, however, run under valgrind when
-#     built via CMake.  I don't understand this, but it has something to do with
-#     valgrind not handling FPU rounding modes. The real question is what in
-#     CMake's configuration disables this issue.
-#mpiexec -n $num_procs valgrind -q $exe $args
+mpiexec -n $num_procs valgrind -q $exe $args
 
 #mpiexec -n $num_procs valgrind -q --leak-check=yes $exe $args
 
