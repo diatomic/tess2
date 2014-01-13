@@ -15,6 +15,8 @@
 #ifndef _VORONOI_H
 #define _VORONOI_H
 
+#include "diy.h"
+
 /* header */
 #define NUM_VERTS 0 /* indices of header elements */
 #define TOT_NUM_CELL_VERTS 1
@@ -27,6 +29,7 @@
 
 #define MAX_HIST_BINS 256 /* maximum number of bins in cell volume histogram */
 #define MAX_FACE_VERTS 24 /* maximum number of vertices per face */
+#define MAX_NEIGHBORS 27 /* maximum number of neighbor blocks */
 
 /* timing info */
 #define MAX_TIMES 8 /* max number of timing components */
@@ -54,7 +57,8 @@ struct remote_ic_t {
 /* sent particle */
 struct sent_t {
   int particle; /* site (particle) index sent to neighbor */
-  float ghost; /* ghost size used to send this particle */
+  struct gb_t neigh_gbs[MAX_NEIGHBORS]; /* blocks to whom particle was sent */
+  int num_gbs; /* number of neighboring blocks to whom it was sent */
 };
 
 /* face between up to two voronoi cells */

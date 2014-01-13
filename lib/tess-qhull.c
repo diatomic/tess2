@@ -477,7 +477,6 @@ int gen_delaunay_output(facetT *facetlist, struct vblock_t *vblock,
   int m = 0; /* number of vertices in non strictly local final tets */
   int v; /* vertex in current tet (0, 1, 2, 3) */
   int tet_verts[4]; /* current tet verts */
-  int i;
 
   /* count number of facets */
   FORALLfacet_(facetlist) {

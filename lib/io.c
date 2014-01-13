@@ -351,9 +351,15 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 
     /* num_neighbors, neighbors, neigh_procs */
     int num_neighbors = DIY_Num_neighbors(0, b);
+    struct gb_t *neigh_gbs =
+      (struct gb_t *)malloc(num_neighbors * sizeof(struct gb_t));
     int *neighbors = (int*)malloc(num_neighbors * sizeof(int));
     int *neigh_procs = (int*)malloc(num_neighbors * sizeof(int));
-    DIY_Get_neighbors(0, b, neighbors, neigh_procs);
+    DIY_Get_neighbors(0, b, neigh_gbs);
+    for (i = 0; i < num_neighbors; i++) {
+      neighbors[i] = neigh_gbs[i].gid;
+      neigh_procs[i] = neigh_gbs[i].proc;
+    }
     start[0] = block_ofsts[NUM_BLOCKS];
     count[0] = 1;
     err = ncmpi_put_vara_int_all(ncid, varids[24], start, count, 
@@ -420,6 +426,7 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
     /* cleanup */
     free(neighbors);
     free(neigh_procs);
+    free(neigh_gbs);
 
   }
 

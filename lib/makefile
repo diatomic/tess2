@@ -60,8 +60,7 @@ endif
 
 ###########
 
-TESS_OBJS = tess.o tess-qhull.o io.o
-#TESS_OBJS = tess.o tess-cgal.o io.o
+TESS_OBJS = tess.o io.o $(TESS_CONV_OBJ)
 DRAW_OBJS = draw.o ser_io.o swap.o io.o
 DUMP_OBJS = dump.o ser_io.o swap.o
 DENSE_OBJS = dense.o io.o
