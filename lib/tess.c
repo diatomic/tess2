@@ -1396,128 +1396,16 @@ void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
 
 }
 /*---------------------------------------------------------------------------*/
-/* /\* DEPRECATED *\/ */
-/* /\* */
-/*   determines cells that are incomplete or too close to neighbor such that */
-/*   they might change after neighbor exchange. The particles corresponding */
-/*   to sites of these cells are enqueued for exchange with neighors */
-
-/*   tblock: one temporary voronoi block */
-/*   vblock: one voronoi block */
-/*   lid: local id of block */
-/* *\/ */
-/* void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock, */
-/* 		      int lid) { */
-
-/*   struct bb_t bounds; /\* block bounds *\/ */
-/*   int vid; /\* vertex id *\/ */
-/*   int j, k, n; */
-/*   int start_n; /\* index into cells at start of new cell *\/ */
-/*   int chunk_size = 1024; /\* allocation chunk size for sent particles *\/ */
-/*   struct remote_particle_t rp; /\* particle being sent or received *\/ */
-
-/*   DIY_Block_bounds(0, lid, &bounds); */
-
-/*   n = 0; /\* index into tblock->cells *\/ */
-
-/*   /\* for all cells *\/ */
-/*   for (j = 0; j < tblock->num_orig_particles; j++) { */
-
-/*     if (!tblock->num_cell_verts[j]) */
-/*       continue; */
-
-/*     float ghost = 0.0; /\* ghost distance for neighbor exchange will be */
-/* 			  max of circumsphere radii from vertex to site */
-/* 			  for all vertices in a cell *\/ */
-/*     int complete = 1; /\* assume complete cell unless found otherwise *\/ */
-
-/*     /\* for all vertex indices in the current cell *\/ */
-/*     for (k = 0; k < tblock->num_cell_verts[j]; k++) { */
-
-/*       if (k == 0) */
-/* 	start_n = n; */
-
-/*       vid = tblock->cells[n]; */
-
-/*       /\* radius of delaunay circumshpere is the distance from */
-/* 	 voronoi vertex to voronoi site *\/ */
-/*       float sph_rad = */
-/* 	sqrt((tblock->verts[3 * vid] - tblock->sites[3 * j]) * */
-/* 	     (tblock->verts[3 * vid] - tblock->sites[3 * j]) + */
-/* 	     (tblock->verts[3 * vid + 1] - tblock->sites[3 * j + 1]) * */
-/* 	     (tblock->verts[3 * vid + 1] - tblock->sites[3 * j + 1]) + */
-/* 	     (tblock->verts[3 * vid + 2] - tblock->sites[3 * j + 2]) * */
-/* 	     (tblock->verts[3 * vid + 2] - tblock->sites[3 * j + 2])); */
-
-/*       /\* if a vertex is not the infinite vertex and is within the */
-/* 	 delaunay circomsphere radius of block bounds *\/ */
-/*       if (vid && */
-/* 	  (tblock->verts[3 * vid]     < bounds.min[0] + sph_rad || */
-/* 	   tblock->verts[3 * vid]     > bounds.max[0] - sph_rad || */
-/* 	   tblock->verts[3 * vid + 1] < bounds.min[1] + sph_rad || */
-/* 	   tblock->verts[3 * vid + 1] > bounds.max[1] - sph_rad || */
-/* 	   tblock->verts[3 * vid + 2] < bounds.min[2] + sph_rad || */
-/* 	   tblock->verts[3 * vid + 2] > bounds.max[2] - sph_rad)) { */
-
-/* 	/\* use 2 * the max cicumsphere radius, ie max cicumsphere diameter, */
-/* 	   of all vertices in the cell as the ghost size *\/ */
-/* 	if (2 * sph_rad > ghost) */
-/* 	  ghost = 2 * sph_rad; */
-/*       } */
-/*       if (!vid) /\* found qhull's inifnite vertex; incomplete cell *\/ */
-/* 	complete = 0; */
-
-/*       n++; */
-
-/*     } /\* for all vertex indices in this cell *\/ */
-
-/*     /\* sanity check, every incomplete cell should be sent somewhere */
-/*        not always the case for real data, but the number of warnings should */
-/*        be small, 1 or 2 appears normal *\/ */
-/*     if (ghost == 0.0 && !complete) */
-/*       fprintf(stderr, "warning: cell = %d is incomplete but not " */
-/* 	      "sent to any neighbors\n", j); */
-
-/*     /\* enqueue for neighbor exchange *\/ */
-/*     if (ghost > 0.0) { */
-
-/*       rp.x = tblock->sites[3 * j]; */
-/*       rp.y = tblock->sites[3 * j + 1]; */
-/*       rp.z = tblock->sites[3 * j + 2]; */
-/*       rp.gid = DIY_Gid(0, lid); */
-/*       rp.nid = j; */
-/*       rp.dir = 0x00; */
-
-/*       DIY_Enqueue_item_all_near(0, lid, (void *)&rp, */
-/* 				NULL, sizeof(struct remote_particle_t), */
-/* 				&(tblock->sites[3 * j]), */
-/* 				ghost, &transform_particle); */
-
-/*       /\* save the details of the sent particle for later sending */
-/* 	 completion status of sent particles to same neighbors *\/ */
-/*       struct sent_t sent; */
-/*       sent.particle = j; */
-/*       sent.ghost = ghost; */
-/*       add_sent(sent, &(vblock->sent_particles), */
-/* 	      &(vblock->num_sent_particles), */
-/* 	      &(vblock->alloc_sent_particles), chunk_size); */
-
-/*     } /\* if ghost > 0.0 *\/ */
-
-/*   } /\* for all cells *\/ */
-
-/* } */
-/*--------------------------------------------------------------------------*/
 /*
   determines cells that are incomplete or too close to neighbor such that
-  they might change after neighbor exchange. The particles corresponding 
+  they might change after neighbor exchange. The particles corresponding
   to sites of these cells are enqueued for exchange with neighors
 
   tblock: one temporary voronoi block
   vblock: one voronoi block
   lid: local id of block
 */
-void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock, 
+void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
 		      int lid) {
 
   struct bb_t bounds; /* block bounds */
@@ -1531,23 +1419,17 @@ void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
   DIY_Block_bounds(0, lid, &bounds);
 
   /* get gids of all neighbors, in case a particle needs to be
-     sent to all neighbors 
+     sent to all neighbors
      (enumerating all gids manually (not via DIY_Enqueue_Item_all)
      to be consisent with enumerating particular neighbors) */
-  int num_all_neigh_gids = DIY_Num_neighbors(0, lid);
+  int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
   struct gb_t all_neigh_gbs[MAX_NEIGHBORS];
   DIY_Get_neighbors(0, lid, all_neigh_gbs);
-
-  /* debug */
-/*   fprintf(stderr, "num_all_neigh_gids = %d\n", num_all_neigh_gids); */
 
   n = 0; /* index into tblock->cells */
 
   /* for all cells */
   for (j = 0; j < tblock->num_orig_particles; j++) {
-
-    if (!tblock->num_cell_verts[j])
-      continue;
 
     complete = 1; /* assume complete cell unless found otherwise */
     sent.num_gbs = 0;
@@ -1559,7 +1441,7 @@ void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
 
       /* radius of delaunay circumshpere is the distance from
 	 voronoi vertex to voronoi site */
-      float sph_rad = 
+      float sph_rad =
 	sqrt((tblock->verts[3 * vid] - tblock->sites[3 * j]) *
 	     (tblock->verts[3 * vid] - tblock->sites[3 * j]) +
 	     (tblock->verts[3 * vid + 1] - tblock->sites[3 * j + 1]) *
@@ -1567,29 +1449,18 @@ void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
 	     (tblock->verts[3 * vid + 2] - tblock->sites[3 * j + 2]) *
 	     (tblock->verts[3 * vid + 2] - tblock->sites[3 * j + 2]));
 
-      /* if a vertex is not the infinite vertex, add any neighbors 
+      /* if a vertex is not the infinite vertex, add any neighbors
 	 within the delaunay circumsphere radius of block bounds */
       if (vid) {
 	float pt[3]; /* target point as a float (verts are double) */
 	pt[0] = tblock->verts[3 * vid];
 	pt[1] = tblock->verts[3 * vid + 1];
 	pt[2] = tblock->verts[3 * vid + 2];
-	DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs), 
+	DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
 			     MAX_NEIGHBORS, pt, sph_rad);
-	/* debug */
-/* 	if (sent.num_gbs) { */
-/* 	  for (i = 0; i < sent.num_gbs; i++) */
-/* 	    fprintf(stderr, "+ (gid %d dir %d) ",  */
-/* 		    sent.neigh_gbs[i].gid, sent.neigh_gbs[i].neigh_dir); */
-/* 	  fprintf(stderr, "\n"); */
-/* 	} */
-
       }
-
-      if (!vid) { /* found qhull's inifnite vertex; incomplete cell */
+      else
 	complete = 0;
-	break;
-      }
 
       n++;
 
@@ -1603,46 +1474,35 @@ void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
     rp.dir = 0x00;
 
     /* particle needs to be sent either to particular neighbors or to all */
-    if (!complete || sent.num_gbs > 0.0) {
+    if (!complete || sent.num_gbs) {
 
-      /* incomplete cell goes to all neighbors */
+      /* incomplete cell goes to all neighbors except self */
       if (!complete) {
+	sent.num_gbs = 0;
 	int my_gid = DIY_Gid(0, lid);
-	int n = 0;
-	/* copy all neighbors but skip self */
-	for (i = 0; i < num_all_neigh_gids; i++) {
-	  if (all_neigh_gbs[i].gid != my_gid) {
-	    sent.neigh_gbs[n].gid = all_neigh_gbs[i].gid;
-	    sent.neigh_gbs[n].neigh_dir = all_neigh_gbs[i].neigh_dir;
-	    n++;
-/* 	    fprintf(stderr, "*(gid %d dir %d)",  */
-/* 		    all_neigh_gids[i].gid, all_neigh_gids[i].neigh_dir); */
+	for (i = 0; i < num_all_neigh_gbs; i++) {
+	  if (all_neigh_gbs[i].gid != my_gid || 
+	      all_neigh_gbs[i].neigh_dir != 0x00) {
+	    sent.neigh_gbs[sent.num_gbs].gid = all_neigh_gbs[i].gid;
+	    sent.neigh_gbs[sent.num_gbs].neigh_dir = all_neigh_gbs[i].neigh_dir;
+	    sent.num_gbs++;
 	  }
 	}
-/* 	fprintf(stderr, "\n"); */
-	sent.num_gbs = n;
       }
-
-      /* debug */
-/*       fprintf(stderr, "Sending to: "); */
-/*       for (i = 0; i < sent.num_gbs; i++) */
-/* 	fprintf(stderr, "(gid %d dir %d) ",  */
-/* 		sent.neigh_gbs[i].gid, sent.neigh_gbs[i].neigh_dir); */
-/*       fprintf(stderr, "\n"); */
 
       DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
 			   NULL, sizeof(struct remote_particle_t),
-			   sent.neigh_gbs, sent.num_gbs, 
+			   sent.neigh_gbs, sent.num_gbs,
 			   &transform_particle);
 
-      /* save the details of the sent particle for later sending 
+      /* save the details of the sent particle for later sending
 	 completion status of sent particles to same neighbors */
       sent.particle = j;
       add_sent(sent, &(vblock->sent_particles),
 	       &(vblock->num_sent_particles),
 	       &(vblock->alloc_sent_particles), chunk_size);
 
-    }
+    } /* if !complete || sent.num_gbs) */
 
   } /* for all cells */
 
