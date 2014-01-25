@@ -245,12 +245,24 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   /* create local voronoi cells */
   local_cells(nblocks, tblocks, vblocks, dim, num_particles, particles);
 
+  /* keep track of which particles lie on the convex hull of the local points */
+  int** convex_hull_particles	  = (int**) malloc(nblocks * sizeof(int*));
+  int*  num_convex_hull_particles = (int*)  malloc(nblocks * sizeof(int));
+  /* determine which cells are incomplete or too close to neighbor */
+  for (i = 0; i < nblocks; i++)
+    incomplete_cells_initial(&tblocks[i], &vblocks[i], i,
+			     &convex_hull_particles[i],
+			     &num_convex_hull_particles[i]);
+
   /* cleanup local temporary blocks */
   destroy_blocks(nblocks, tblocks, NULL);
 
 #ifdef TIMING
   MPI_Barrier(comm);
   times[LOCAL_TIME] = MPI_Wtime() - times[LOCAL_TIME];
+  if (rank == 0)
+    fprintf(stderr, "-----------------------------------\n");
+  MPI_Barrier(comm);
   times[EXCH_TIME] = MPI_Wtime();
 #endif
 
@@ -261,7 +273,14 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   gids = (int **)malloc(nblocks * sizeof(int *));
   nids = (int **)malloc(nblocks * sizeof(int *));
   dirs = (unsigned char **)malloc(nblocks * sizeof(unsigned char *));
-  neighbor_particles(nblocks, particles, num_particles, 
+  /* intialize to NULL to make realloc inside neighbor_particles just work */
+  for (i = 0; i < nblocks; ++i) {
+    gids[i] = NULL;
+    nids[i] = NULL;
+    dirs[i] = NULL;
+  }
+
+  neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
 
 #ifdef TIMING
@@ -269,7 +288,37 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   times[EXCH_TIME] = MPI_Wtime() - times[EXCH_TIME];
 #endif
 
+  /* Second, decisive phase */
+
+  /* reset real blocks and allocate and initialize temporary blocks again */
+  reset_blocks(nblocks, vblocks);
+  create_blocks(nblocks, &tblocks, NULL); /* temporary */
+
+  /* Recompute local cells
+     TODO: here an later it's wasteful to recompute everything from scratch;
+     it would be wiser to just insert new points. Current limitation: qhull */
+  local_cells(nblocks, tblocks, vblocks, dim, num_particles, particles);
+
+  for (i = 0; i < nblocks; i++)
+    incomplete_cells_final(&tblocks[i], &vblocks[i], i, convex_hull_particles[i], num_convex_hull_particles[i]);
+
+  /* cleanup local temporary blocks */
+  destroy_blocks(nblocks, tblocks, NULL);
+  
+  /* exchange particles with neighbors */
+  neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
+		     gids, nids, dirs);
+
+  /* cleanup convex_hull_particles */
+  for (i = 0; i < nblocks; ++i)
+    free(convex_hull_particles[i]);
+  free(convex_hull_particles);
+  free(num_convex_hull_particles);
+
 #ifdef TIMING
+  MPI_Barrier(comm);
+  if (rank == 0)
+    fprintf(stderr, "-----------------------------------\n");
   MPI_Barrier(comm);
   times[CELL_TIME] = MPI_Wtime();
 #endif
@@ -510,7 +559,8 @@ void face_areas(int nblocks, struct vblock_t *vblocks) {
 
   to send the site to the neighbor
 */
-void neighbor_particles(int nblocks, float **particles, int *num_particles,
+void neighbor_particles(int nblocks, float **particles,
+			int *num_particles, int *num_orig_particles,
 			int **gids, int **nids, unsigned char **dirs) {
 
   void ***recv_particles; /* pointers to particles in ecah block 
@@ -533,11 +583,12 @@ void neighbor_particles(int nblocks, float **particles, int *num_particles,
 /*     fprintf(stderr, "num_particles in gid %d before exchange is %d\n", */
 /* 	    DIY_Gid(0, i), num_particles[i]); */
 
-    gids[i] = (int *)malloc(num_recv_particles[i] * sizeof(int));
-    nids[i] = (int *)malloc(num_recv_particles[i] * sizeof(int));
-    dirs[i] = (unsigned char *)malloc(num_recv_particles[i]);
+    int n = (num_particles[i] - num_orig_particles[i]);
+    int new_remote_particles = num_recv_particles[i] + n;
 
-    int n = 0;
+    gids[i] = (int *)realloc(gids[i], new_remote_particles * sizeof(int));
+    nids[i] = (int *)realloc(nids[i], new_remote_particles * sizeof(int));
+    dirs[i] = (unsigned char *)realloc(dirs[i], new_remote_particles);
  
     if (num_recv_particles[i]) {
 
@@ -1341,7 +1392,7 @@ void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs) {
   frees blocks and headers
 
   num_blocks: number of blocks
-  vblocks: pointer to array of vblocks
+  vblocks: array of vblocks
   hdrs: pointer to array of headers, pass NULL if not used
 */
 void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
@@ -1397,6 +1448,136 @@ void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
 }
 /*---------------------------------------------------------------------------*/
 /*
+  resets blocks and headers between phases
+  destroys and re-creates most of the block, but keeps data related
+  sent particles
+
+  num_blocks: number of blocks
+  vblocks: array of vblocks
+*/
+void reset_blocks(int num_blocks, struct vblock_t *vblocks) {
+
+  int i;
+
+  for (i = 0; i < num_blocks; i++) {
+
+    /* free old data */
+    if (vblocks[i].verts)
+      free(vblocks[i].verts);
+    if (vblocks[i].save_verts)
+      free(vblocks[i].save_verts);
+    if (vblocks[i].num_cell_verts)
+      free(vblocks[i].num_cell_verts);
+    if (vblocks[i].cells)
+      free(vblocks[i].cells);
+    if (vblocks[i].sites)
+      free(vblocks[i].sites);
+    if (vblocks[i].temp_complete_cells)
+      free(vblocks[i].temp_complete_cells);
+    if (vblocks[i].complete_cells)
+      free(vblocks[i].complete_cells);
+    if (vblocks[i].is_complete)
+      free(vblocks[i].is_complete);
+    if (vblocks[i].areas)
+      free(vblocks[i].areas);
+    if (vblocks[i].vols)
+      free(vblocks[i].vols);
+    if (vblocks[i].face_areas)
+      free(vblocks[i].face_areas);
+    if (vblocks[i].loc_tets)
+      free(vblocks[i].loc_tets);
+    if (vblocks[i].rem_tet_gids)
+      free(vblocks[i].rem_tet_gids);
+    if (vblocks[i].rem_tet_nids)
+      free(vblocks[i].rem_tet_nids);
+    if (vblocks[i].rem_tet_wrap_dirs)
+      free(vblocks[i].rem_tet_wrap_dirs);
+    /* keep sent_particles, don't free them */
+    if (vblocks[i].faces)
+      free(vblocks[i].faces);
+    if (vblocks[i].cell_faces_start)
+      free(vblocks[i].cell_faces_start);
+    if (vblocks[i].cell_faces)
+      free(vblocks[i].cell_faces);
+
+    /* initialize new data */
+    vblocks[i].num_verts = 0;
+    vblocks[i].verts = NULL;
+    vblocks[i].save_verts = NULL;
+    vblocks[i].num_cell_verts = NULL;
+    vblocks[i].tot_num_cell_verts = 0;
+    vblocks[i].cells = NULL;
+    vblocks[i].sites = NULL;
+    vblocks[i].temp_num_complete_cells = 0;
+    vblocks[i].temp_complete_cells = NULL;
+    vblocks[i].num_complete_cells = 0;
+    vblocks[i].complete_cells = NULL;
+    vblocks[i].is_complete = NULL;
+    vblocks[i].areas = NULL;
+    vblocks[i].vols = NULL;
+    vblocks[i].face_areas = NULL;
+    vblocks[i].loc_tets = NULL;
+    vblocks[i].num_loc_tets = 0;
+    vblocks[i].rem_tet_gids = NULL;
+    vblocks[i].rem_tet_nids = NULL;
+    vblocks[i].rem_tet_wrap_dirs = NULL;
+    vblocks[i].num_rem_tets = 0;
+    /* keep sent_particles, don't reset num_sent_particles,
+       alloc_sent_particles, sent_particles */
+    vblocks[i].num_faces = 0;
+    vblocks[i].tot_num_cell_faces = 0;
+    vblocks[i].faces = NULL;
+    vblocks[i].cell_faces_start = NULL;
+    vblocks[i].cell_faces = NULL;
+
+  }
+
+}
+/*---------------------------------------------------------------------------*/
+/*
+  finds the direction of the nearest block to the given point
+
+  p: coordinates of the point
+  bounds: block bounds
+*/
+unsigned char nearest_neighbor(float* p, struct bb_t* bounds) {
+
+  /* TODO: possibly find the 3 closest neighbors, and look at the ratio of
+     the distances to deal with the corners  */
+
+  int		i;
+  float	        dists[6];
+  unsigned char dirs[6] = { DIY_X0, DIY_X1, DIY_Y0, DIY_Y1, DIY_Z0, DIY_Z1 };
+
+  for (i = 0; i < 3; ++i) {
+    dists[2*i]     = p[i] - bounds->min[i];
+    dists[2*i + 1] = bounds->max[i] - p[i];
+  }
+
+  int   smallest = 0;
+  for (i = 1; i < 6; ++i) {
+    if (dists[i] < dists[smallest]) {
+      smallest = i;
+    }
+  }
+
+  return dirs[smallest];
+
+}
+
+/*---------------------------------------------------------------------------*/
+/*
+  returns distance between points p and q
+*/
+float distance(float* p, float* q) {
+
+  return sqrt((p[0] - q[0]) * (p[0] - q[0]) +
+	      (p[1] - q[1]) * (p[1] - q[1]) +
+	      (p[2] - q[2]) * (p[2] - q[2]));
+
+}
+/*---------------------------------------------------------------------------*/
+/*
   determines cells that are incomplete or too close to neighbor such that
   they might change after neighbor exchange. The particles corresponding
   to sites of these cells are enqueued for exchange with neighors
@@ -1404,9 +1585,13 @@ void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
   tblock: one temporary voronoi block
   vblock: one voronoi block
   lid: local id of block
+  convex_hull_particles: pointer to convex hull particles to recheck later
+  num_convex_hull_particles: number of convex hull particles
 */
-void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
-		      int lid) {
+void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
+			      int lid,
+			      int** convex_hull_particles,
+			      int*  num_convex_hull_particles) {
 
   struct bb_t bounds; /* block bounds */
   int vid; /* vertex id */
@@ -1415,6 +1600,10 @@ void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
   struct remote_particle_t rp; /* particle being sent or received */
   struct sent_t sent; /* info about sent particle saved for later */
   int complete; /* no vertices in the cell are the infinite vertex */
+
+  int allocated_convex_hull = 8;
+  *convex_hull_particles = (int*)malloc(8 * sizeof(int));
+  *num_convex_hull_particles = 0;
 
   DIY_Block_bounds(0, lid, &bounds);
 
@@ -1439,16 +1628,6 @@ void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
 
       vid = tblock->cells[n];
 
-      /* radius of delaunay circumshpere is the distance from
-	 voronoi vertex to voronoi site */
-      float sph_rad =
-	sqrt((tblock->verts[3 * vid] - tblock->sites[3 * j]) *
-	     (tblock->verts[3 * vid] - tblock->sites[3 * j]) +
-	     (tblock->verts[3 * vid + 1] - tblock->sites[3 * j + 1]) *
-	     (tblock->verts[3 * vid + 1] - tblock->sites[3 * j + 1]) +
-	     (tblock->verts[3 * vid + 2] - tblock->sites[3 * j + 2]) *
-	     (tblock->verts[3 * vid + 2] - tblock->sites[3 * j + 2]));
-
       /* if a vertex is not the infinite vertex, add any neighbors
 	 within the delaunay circumsphere radius of block bounds */
       if (vid) {
@@ -1456,11 +1635,25 @@ void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
 	pt[0] = tblock->verts[3 * vid];
 	pt[1] = tblock->verts[3 * vid + 1];
 	pt[2] = tblock->verts[3 * vid + 2];
+	/* radius of delaunay circumshpere is the distance from
+	   voronoi vertex to voronoi site */
+	float sph_rad = distance(pt, &tblock->sites[3 * j]);
 	DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
 			     MAX_NEIGHBORS, pt, sph_rad);
       }
-      else
+      else {
+	/* should do this at most once per cell because at most
+	   one infinite vertex */
 	complete = 0;
+	(*convex_hull_particles)[*num_convex_hull_particles] = j;
+	++(*num_convex_hull_particles);
+	if (*num_convex_hull_particles >= allocated_convex_hull) {
+	    allocated_convex_hull *= 2;
+	    *convex_hull_particles = 
+	      (int*)realloc(*convex_hull_particles, 
+			    allocated_convex_hull * sizeof(int));
+	}
+      }
 
       n++;
 
@@ -1476,18 +1669,27 @@ void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
     /* particle needs to be sent either to particular neighbors or to all */
     if (!complete || sent.num_gbs) {
 
-      /* incomplete cell goes to all neighbors except self */
       if (!complete) {
+
+	/* incomplete cell goes to the closest neighbor */
+	unsigned char nearest_dir = 
+	  nearest_neighbor(&(tblock->sites[3 * j]), &bounds);
+
+	/* Send the particle to the neighbor in direction dirs[smallest] */
 	sent.num_gbs = 0;
-	int my_gid = DIY_Gid(0, lid);
 	for (i = 0; i < num_all_neigh_gbs; i++) {
-	  if (all_neigh_gbs[i].gid != my_gid || 
-	      all_neigh_gbs[i].neigh_dir != 0x00) {
+
+	  if (all_neigh_gbs[i].gid != 0x00 &&
+	      all_neigh_gbs[i].neigh_dir == nearest_dir) {
 	    sent.neigh_gbs[sent.num_gbs].gid = all_neigh_gbs[i].gid;
-	    sent.neigh_gbs[sent.num_gbs].neigh_dir = all_neigh_gbs[i].neigh_dir;
+	    sent.neigh_gbs[sent.num_gbs].neigh_dir = 
+	      all_neigh_gbs[i].neigh_dir;
 	    sent.num_gbs++;
 	  }
+
 	}
+	assert(sent.num_gbs <= 1); /* sanity */
+
       }
 
       DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
@@ -1502,9 +1704,133 @@ void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock,
 	       &(vblock->num_sent_particles),
 	       &(vblock->alloc_sent_particles), chunk_size);
 
-    } /* if !complete || sent.num_gbs) */
+    } /* if (!complete || sent.num_gbs) */
 
   } /* for all cells */
+
+}
+/*---------------------------------------------------------------------------*/
+/* 
+   Go through the original convex hull particles and enqueue any remaining
+   incomplete cells to all neighbors
+
+   tblock: one temporary voronoi block
+   vblock: one voronoi block
+   lid: local id of block
+   convex_hull_particles: convex hull particles to check
+   num_convex_hull_particles: number of particles
+*/
+void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
+			    int lid,
+			    int* convex_hull_particles,
+			    int  num_convex_hull_particles) {
+  int i, j, k, l, n;
+  int vid; /* vertex id */
+  struct bb_t bounds; /* local block bounds */
+  struct remote_particle_t rp; /* particle being sent or received */
+  struct sent_t sent; /* info about sent particle saved for later */
+  int chunk_size = 1024; /* allocation chunk size for sent particles */
+  
+  DIY_Block_bounds(0, lid, &bounds);
+
+  /* get gids of all neighbors, in case a particle needs to be
+     sent to all neighbors
+     (enumerating all gids manually (not via DIY_Enqueue_Item_all)
+     to be consisent with enumerating particular neighbors) */
+  int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
+  struct gb_t all_neigh_gbs[MAX_NEIGHBORS];
+  DIY_Get_neighbors(0, lid, all_neigh_gbs);
+
+  /* We must go through all the particles to maintain n
+     (the index into the vetices array) */
+  i = 0; n = 0;
+  for (j = 0; j < tblock->num_orig_particles; j++) {
+
+    sent.num_gbs = 0;
+
+    if (j == convex_hull_particles[i]) {
+      
+      /* direction of closest neighbor */
+      unsigned char nearest_dir = 
+	nearest_neighbor(&(tblock->sites[3*j]), &bounds);
+
+      for (k = 0; k < tblock->num_cell_verts[j]; ++k) {
+
+	vid = tblock->cells[n + k];
+
+	if (!vid) {
+
+	  /* local point still on the convex hull goes to everybody
+	     it hasn't gone to yet */
+	  sent.num_gbs = 0;
+	  for (l = 0; l < num_all_neigh_gbs; l++) {
+	    if (all_neigh_gbs[l].neigh_dir != 0x00 &&
+		all_neigh_gbs[l].neigh_dir != nearest_dir) {
+	      sent.neigh_gbs[sent.num_gbs].gid =
+		all_neigh_gbs[l].gid;
+	      sent.neigh_gbs[sent.num_gbs].neigh_dir =
+		all_neigh_gbs[l].neigh_dir;
+	      sent.num_gbs++;
+	    }
+	  }
+
+	} 
+	else { /* if (!vid) */
+
+	  float pt[3]; /* target point as a float (verts are double) */
+	  pt[0] = tblock->verts[3 * vid];
+	  pt[1] = tblock->verts[3 * vid + 1];
+	  pt[2] = tblock->verts[3 * vid + 2];
+
+	  /* radius of delaunay circumshpere is the distance from
+	     voronoi vertex to voronoi site */
+	  float sph_rad = distance(pt, &tblock->sites[3 * j]);
+	  DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
+			       MAX_NEIGHBORS, pt, sph_rad);
+
+	  /* remove the neighbor in the nearest_dir;
+	     we've already sent to it */
+	  for (l = 0; l < sent.num_gbs; ++l) {
+	    if (sent.neigh_gbs[l].neigh_dir == nearest_dir) {
+	      sent.neigh_gbs[l] = sent.neigh_gbs[sent.num_gbs - 1];
+	      sent.num_gbs--;
+	    }
+	  }
+
+	} /* if (!vid) */
+
+      } /* for k = 0; k < tblock->num_cell_verts[j] */
+
+      if (sent.num_gbs) {
+
+	rp.x = tblock->sites[3 * j];
+	rp.y = tblock->sites[3 * j + 1];
+	rp.z = tblock->sites[3 * j + 2];
+	rp.gid = DIY_Gid(0, lid);
+	rp.nid = j;
+	rp.dir = 0x00;
+
+	DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
+			     NULL, sizeof(struct remote_particle_t),
+			     sent.neigh_gbs, sent.num_gbs,
+			     &transform_particle);
+
+	sent.particle = j;
+	add_sent(sent, &(vblock->sent_particles),
+		 &(vblock->num_sent_particles),
+		 &(vblock->alloc_sent_particles), chunk_size);
+
+      }
+
+      ++i;
+      if (i > num_convex_hull_particles)
+	break;
+
+    } /* if (j == convex_hull_particles[i]) */
+
+    n += tblock->num_cell_verts[j];
+
+  }
 
 }
 /*--------------------------------------------------------------------------*/

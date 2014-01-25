@@ -32,6 +32,8 @@ void local_cells(int nblocks, struct vblock_t *tblocks,
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
 
+    fprintf(stderr, "Num particles (local): %d\n", num_particles[i]);
+
     /* deep copy from float to double (qhull API is double) */
     double *pts = (double *)malloc(num_particles[i] * 3 * sizeof(double));
     for (j = 0; j < 3 * num_particles[i]; j++)
@@ -62,9 +64,6 @@ void local_cells(int nblocks, struct vblock_t *tblocks,
       tblocks[i].sites[3 * j + 1] = particles[i][3 * j + 1];
       tblocks[i].sites[3 * j + 2] = particles[i][3 * j + 2];
     }
-
-    /* determine which cells are incomplete or too close to neighbor */
-    incomplete_cells(&tblocks[i], &vblocks[i], i);
 
     /* clean up qhull */
     qh_freeqhull(!qh_ALL);                 /* free long memory */
@@ -114,6 +113,8 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
+    
+    fprintf(stderr, "Num particles (orig): %d\n", num_particles[i]);
 
     /* number of received particles */
     num_recvd = num_particles[i] - num_orig_particles[i];

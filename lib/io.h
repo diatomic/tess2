@@ -21,7 +21,7 @@
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
-#define ERR {if(err!=NC_NOERR)printf("Error at line=%d: %s\n", __LINE__, ncmpi_strerror(err));}
+#define ERR {if(err!=NC_NOERR)printf("Error at line %d in %s: %s\n", __LINE__, __FILE__, ncmpi_strerror(err));}
 
 /* quantity vector */
 #define NUM_QUANTS 9

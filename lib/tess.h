@@ -68,8 +68,12 @@ void complete_cells(struct vblock_t *vblock, int lid);
 #ifdef __cplusplus
 extern "C"
 #endif
-void incomplete_cells(struct vblock_t *tblock, struct vblock_t *vblock, 
-		      int lid);
+void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock, 
+			      int lid,
+			      int** convex_hull_particles, int* num_convex_hull_particles);
+void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock, 
+			    int lid,
+			    int* convex_hull_particles, int num_convex_hull_particles);
 #ifdef __cplusplus
 extern "C"
 #endif
@@ -88,7 +92,8 @@ extern "C"
 void local_cells(int nblocks, struct vblock_t *tblocks, 
 		 struct vblock_t *vblocks, int dim,
 		 int *num_particles, float **particles);
-void neighbor_particles(int nblocks, float **particles, int *num_particles, 
+void neighbor_particles(int nblocks, float **particles,
+			int *num_particles, int *num_orig_particles,
 			int **gids, int **nids, unsigned char **dirs);
 #ifdef __cplusplus
 extern "C"
@@ -98,6 +103,7 @@ void neighbor_is_complete(int nblocks, struct vblock_t *vblocks,
 void item_type(DIY_Datatype *type);
 void ic_type(DIY_Datatype *dtype);
 void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs);
+void reset_blocks(int num_blocks, struct vblock_t *vblocks);
 void collect_stats(int nblocks, struct vblock_t *vblocks, double *times);
 void aggregate_stats(int nblocks, struct vblock_t *vblocks, 
 		     struct stats_t *loc_stats);

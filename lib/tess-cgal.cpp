@@ -21,10 +21,14 @@ void local_cells(int nblocks, struct vblock_t *tblocks,
 
   int i,j;
 
+  unsigned total = 0;
+
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
     Delaunay3D Dt;
     construct_delaunay(Dt, num_particles[i], particles[i]);
+    total += num_particles[i];
+    std::cout << "Num particles (local): " << num_particles[i] << std::endl;
 
     /* process voronoi output */
     gen_voronoi_output(Dt, &tblocks[i], num_particles[i]);
@@ -38,11 +42,9 @@ void local_cells(int nblocks, struct vblock_t *tblocks,
       tblocks[i].sites[3 * j + 1] = particles[i][3 * j + 1];
       tblocks[i].sites[3 * j + 2] = particles[i][3 * j + 2];
     }
-
-    /* determine which cells are incomplete or too close to neighbor */
-    incomplete_cells(&tblocks[i], &vblocks[i], i);
-
   } /* for all blocks */
+
+  //std::cout << "Total particles in local_cells(): " << total << std::endl;
 }
 /*--------------------------------------------------------------------------*/
 /*
@@ -68,6 +70,7 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 
   int num_recvd; /* number of received particles in current block */
   int i,j;
+  unsigned total = 0;
 
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
@@ -77,6 +80,8 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 
     Delaunay3D Dt;
     construct_delaunay(Dt, num_particles[i], particles[i]);
+    std::cout << "Num particles (orig): " << num_particles[i] << std::endl;
+    total += num_particles[i];
 
     /* process voronoi output */
     gen_voronoi_output(Dt, &vblocks[i], num_particles[i]);
@@ -129,6 +134,7 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
     cell_faces(&vblocks[i]);
 
   } /* for all blocks */
+  //std::cout << "Total particles in orig_cells(): " << total << std::endl;
 }
 /*--------------------------------------------------------------------------*/
 /*
@@ -318,27 +324,26 @@ int gen_delaunay_output(Delaunay3D &Dt, struct vblock_t *vblock,
 /*--------------------------------------------------------------------------*/
 /*
    compute Delaunay
-
-   We should be inserting points as a batch (it would be much faster).
-   Unfortunately, when adding info to Delaunay points (as we do), there seems
-   to be a bug in CGAL's spatial sorting routines. I've reported it to the CGAL
-   mailing list.
 */
 void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
 {
+#ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
     std::vector< std::pair<Point,unsigned> > points; points.reserve(num_particles);
     for (unsigned j = 0; j < num_particles; j++)
     {
       Point p(particles[3*j],
 	      particles[3*j+1],
 	      particles[3*j+2]);
-#ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
       points.push_back(std::make_pair(p,j));
-#else
-      Dt.insert(p)->info() = j;
-#endif
     }
-#ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
     Dt.insert(points.begin(), points.end());
+#else
+    for (unsigned j = 0; j < num_particles; j++)
+    {
+      Point p(particles[3*j],
+	      particles[3*j+1],
+	      particles[3*j+2]);
+      Dt.insert(p)->info() = j;
+    }
 #endif
 }

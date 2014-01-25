@@ -29,17 +29,17 @@ ARCH=MAC_OSX
 
 # number of procs
 # must be <= tb
-num_procs=4
+num_procs=1
 
 # executable
 exe=./dense
 
 # input file
-#infile="vor.out.nc"
+infile="vor.out.nc"
 #infile="vor.out-100K.nc"
 #infile="vor.out-100K-2b.nc"
 #infile="vor-99.out.nc"
-infile="7445077095.out.nc"
+#infile="7445077095.out.nc"
 #infile="6606356352.out.nc"
 #infile="cnfw_2e5.out.nc"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/voronoi-results/nfw.out.nc"
@@ -52,15 +52,15 @@ infile="7445077095.out.nc"
 #gsize="40 40 40"
 #gsize="32 32 32"
 #gsize="64 64 64"
-#gsize="128 128 128"
+gsize="128 128 128"
 #gsize="256 256 256"
-gsize="512 512 512"
+#gsize="512 512 512"
 #gsize="1024 1024 1024"
 #gsize="2048 2048 2048"
 
 #projection plane
-#project=!
-project="0.0 0.0 1.0" #normal to plane, xy plane is the only one supported so far"
+project=!
+#project="0.0 0.0 1.0" #normal to plane, xy plane is the only one supported so far"
 
 # particle mass
 mass=1
