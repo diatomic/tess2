@@ -1679,7 +1679,7 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 	sent.num_gbs = 0;
 	for (i = 0; i < num_all_neigh_gbs; i++) {
 
-	  if (all_neigh_gbs[i].gid != 0x00 &&
+	  if (all_neigh_gbs[i].neigh_dir != 0x00 &&
 	      all_neigh_gbs[i].neigh_dir == nearest_dir) {
 	    sent.neigh_gbs[sent.num_gbs].gid = all_neigh_gbs[i].gid;
 	    sent.neigh_gbs[sent.num_gbs].neigh_dir = 
@@ -1773,7 +1773,6 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	      sent.num_gbs++;
 	    }
 	  }
-
 	} 
 	else { /* if (!vid) */
 
