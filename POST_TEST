@@ -23,6 +23,7 @@
 ARCH=MAC_OSX
 #ARCH=LINUX
 #ARCH=BGP
+#ARCH=BGQ
 #ARCH=FUSION
 #ARCH=XT
 #ARCH=XE
@@ -30,8 +31,12 @@ ARCH=MAC_OSX
 # number of procs
 num_procs=4
 
+# procs per node
+#ppn=4 # for BG/P
+ppn=1 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
+
 # number of BG/P nodes for vn mode
-num_nodes=$[$num_procs / 4]
+num_nodes=$[$num_procs / $ppn]
 if [ $num_nodes -lt 1 ]; then
     num_nodes=1
 fi
@@ -116,6 +121,12 @@ cqsub -n $num_procs -c $num_procs -p UltraVis -t 30 -m smp $exe $args
 
 # for use with valgrind_memcheck.o
 #cqsub -n $num_procs -c $num_procs -p UltraVis -t 30 -m smp $exe -- $args
+
+fi
+
+if [ "$ARCH" = "BGQ" ]; then
+
+qsub -n $num_nodes --mode c$ppn -A SDAV -t 60 $exe $args
 
 fi
 

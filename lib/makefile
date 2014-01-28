@@ -59,6 +59,21 @@ CXX=mpixlcxx_r
 endif
 
 ###########
+ifeq ($(ARCH), BGQ) # BG/Q version
+
+CCFLAGS = -O3
+#CCFLAGS = -g
+CCFLAGS += -DBGQ $(TIMING)
+CCFLAGS += ${DELAUNAY_CCFLAGS}
+GL_LIBS =
+CC=mpixlc_r
+CXX=mpixlcxx_r
+#CC=mpicxx
+#CXX=mpicxx
+
+endif
+
+###########
 
 TESS_OBJS = tess.o io.o $(TESS_CONV_OBJ)
 DRAW_OBJS = draw.o ser_io.o swap.o io.o
@@ -76,9 +91,13 @@ DENSE_OBJS = dense.o io.o
 default: all
 
 ifeq ($(ARCH), BGP)
-all: libtess.a dump
+all: libtess.a dump dense
+else
+ifeq ($(ARCH), BGQ)
+all: libtess.a dump dense
 else
 all: libtess.a draw dump dense
+endif
 endif
 
 libtess.a: $(TESS_OBJS)

@@ -53,6 +53,22 @@ endif
 
 ###########
 
+ifeq ($(ARCH), BGQ) # BG/Q version
+
+CCFLAGS = -O3
+#CCFLAGS = -g
+CCFLAGS += -DBGQ $(TIMING)
+CCFLAGS += ${DELAUNAY_CCFLAGS}
+GL_LIBS =
+CC=mpixlc_r
+CXX=mpixlcxx_r
+#CC=mpicxx
+#CXX=mpicxx
+
+endif
+
+###########
+
 OBJS = main.o
 
 
