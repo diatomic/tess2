@@ -5,6 +5,7 @@ option                      (optimize       "Build tess with optimization"		    
 option                      (debug          "Build tess with debugging on"		    OFF)
 option                      (timing	    "Build tess with timing"			    ON)
 option			    (use_cgal	    "Use CGAL"					    OFF)
+option			    (draw	    "Build draw"				    ON)
 
 if			    (timing)
     add_definitions	    (-DTIMING)
@@ -56,8 +57,10 @@ find_package                (MPI REQUIRED)
 find_package		    (Threads)
 
 # OpenGL
+if			    (draw)
 find_package		    (GLUT)
 find_package		    (OpenGL)
+endif			    (draw)
 
 # DIY
 find_path                   (DIY_INCLUDE_DIRS		diy.h)
