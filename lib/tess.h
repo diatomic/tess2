@@ -43,7 +43,8 @@ void tess_init(int num_blocks, int *gids,
 extern "C"
 #endif
 void tess_init_diy_exist(int num_blocks, float *global_mins, 
-			 float *global_maxs, float minvol, float maxvol, 
+			 float *global_maxs, int wrap,
+			 float minvol, float maxvol, 
 			 MPI_Comm mpi_comm, double *all_times);
 
 #ifdef __cplusplus
@@ -89,8 +90,7 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 #ifdef __cplusplus
 extern "C"
 #endif
-void local_cells(int nblocks, struct vblock_t *tblocks, 
-		 struct vblock_t *vblocks, int dim,
+void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 		 int *num_particles, float **particles);
 void neighbor_particles(int nblocks, float **particles,
 			int *num_particles, int *num_orig_particles,
@@ -125,6 +125,9 @@ void add_sent(struct sent_t val, struct sent_t **vals, int *numvals,
 int cell_bounds(struct vblock_t *vblock, int cell, int vert);
 void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles);
 void face_areas(int nblocks, struct vblock_t *vblocks);
+void write_particles(int nblocks, float **particles, int *num_particles, 
+		     char *outfile);
+void handle_error(int errcode, MPI_Comm comm, char *str);
 #ifdef __cplusplus
 extern "C"
 #endif

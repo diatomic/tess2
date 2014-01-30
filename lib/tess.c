@@ -90,14 +90,15 @@ void tess_init(int num_blocks, int *gids,
 
   num_blocks: local number of blocks in my process
   global_mins, global_maxs: overall data extents
+  wrap: whether wraparound neighbors are used
   minvol, maxvol: filter range for which cells to keep
   pass -1.0 to skip either or both bounds
   mpi_comm: MPI communicator
   all_times: times for particle exchange, voronoi cells, convex hulls, and output
 */
 void tess_init_diy_exist(int num_blocks, float *global_mins, 
-			 float *global_maxs, float minvol, float maxvol, 
-			 MPI_Comm mpi_comm, double *all_times) {
+			 float *global_maxs, int wrap, float minvol,
+			 float maxvol, MPI_Comm mpi_comm, double *all_times) {
 
   int i;
 
@@ -107,6 +108,7 @@ void tess_init_diy_exist(int num_blocks, float *global_mins,
   min_vol = minvol;
   max_vol = maxvol;
   times = all_times;
+  wrap_neighbors = wrap;
 
   /* data extents */
   for(i = 0; i < 3; i++) {
@@ -188,6 +190,10 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   for (i = 0; i < nblocks; i++)
     num_particles[i] = gen_particles(i, &particles[i], jitter);
 
+  /* save particles in a separate file for future reference */
+  write_particles(nblocks, particles, num_particles, "pts.out");
+
+  /* compute tessellations */
   voronoi_delaunay(nblocks, particles, num_particles, times, "vor.out");
 
   /* cleanup */
@@ -243,7 +249,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
   /* create local voronoi cells */
-  local_cells(nblocks, tblocks, vblocks, dim, num_particles, particles);
+  local_cells(nblocks, tblocks, dim, num_particles, particles);
 
   /* keep track of which particles lie on the convex hull of the local points */
   int** convex_hull_particles	  = (int**) malloc(nblocks * sizeof(int*));
@@ -297,7 +303,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   /* Recompute local cells
      TODO: here an later it's wasteful to recompute everything from scratch;
      it would be wiser to just insert new points. Current limitation: qhull */
-  local_cells(nblocks, tblocks, vblocks, dim, num_particles, particles);
+  local_cells(nblocks, tblocks, dim, num_particles, particles);
 
   for (i = 0; i < nblocks; i++)
     incomplete_cells_final(&tblocks[i], &vblocks[i], i, convex_hull_particles[i], num_convex_hull_particles[i]);
@@ -1774,7 +1780,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	    }
 	  }
 	} 
-	else { /* if (!vid) */
+	else { /* vid */
 
 	  float pt[3]; /* target point as a float (verts are double) */
 	  pt[0] = tblock->verts[3 * vid];
@@ -1791,12 +1797,13 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	     we've already sent to it */
 	  for (l = 0; l < sent.num_gbs; ++l) {
 	    if (sent.neigh_gbs[l].neigh_dir == nearest_dir) {
-	      sent.neigh_gbs[l] = sent.neigh_gbs[sent.num_gbs - 1];
+	      if (l < sent.num_gbs - 1)
+		sent.neigh_gbs[l] = sent.neigh_gbs[sent.num_gbs - 1];
 	      sent.num_gbs--;
 	    }
 	  }
 
-	} /* if (!vid) */
+	} /* vid */
 
       } /* for k = 0; k < tblock->num_cell_verts[j] */
 
@@ -1822,7 +1829,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
       }
 
       ++i;
-      if (i > num_convex_hull_particles)
+      if (i >= num_convex_hull_particles)
 	break;
 
     } /* if (j == convex_hull_particles[i]) */
@@ -2535,5 +2542,79 @@ void gen_delaunay_tet(int tet_verts[4], struct vblock_t *vblock,
     } /* I will own this tet */
 
   } /* not strictly local */
+}
+/*--------------------------------------------------------------------------*/
+/*
+ writes particles to a file in interleaved x,y,z order
+ no other block information is retained, all particles get sqaushed together
+
+ nblocks: locaal number of blocks
+ particles: particles in each local block
+ num_particles: number of particles in each local block
+ outfile: output file name
+*/
+void write_particles(int nblocks, float **particles, int *num_particles, 
+		     char *outfile) {
+
+  int i;
+  float *all_particles; /* particles from all local blocks merged */
+  MPI_Offset my_size; /* size of my particles */
+  MPI_Offset ofst; /* offset in file where I write my particles */
+  MPI_File fd;
+  MPI_Status status;
+
+  /* merge all blocks together into one */
+  int tot_particles = 0;
+  for (i = 0; i < nblocks; i++)
+    tot_particles += num_particles[i];
+  all_particles = (float *)malloc(tot_particles * 3 * sizeof(float));
+  int n = 0;
+  for (i = 0; i < nblocks; i++) {
+    memcpy(&all_particles[n], &particles[i][0], 
+	   num_particles[i] * 3 * sizeof(float));
+    n += num_particles[i] * 3;
+  }
+
+  /* compute my offset */
+  my_size = tot_particles * 3 * sizeof(float);
+  /* in MPI 2.2, should use MPI_OFFSET datatype, but
+     using MPI_LONG_LONG for backwards portability */
+  MPI_Exscan(&my_size, &ofst, 1, MPI_LONG_LONG, MPI_SUM, comm);
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+  if (rank == 0)
+    ofst = 0;
+
+  /* open */
+  int retval = MPI_File_open(comm, (char *)outfile,
+			     MPI_MODE_WRONLY | MPI_MODE_CREATE,
+			     MPI_INFO_NULL, &fd);
+  assert(retval == MPI_SUCCESS);
+  MPI_File_set_size(fd, 0); // start with an empty file every time
+
+  /* write */
+  retval = MPI_File_write_at_all(fd, ofst, all_particles, tot_particles * 3, 
+				 MPI_FLOAT, &status);
+  if (retval != MPI_SUCCESS)
+    handle_error(retval, comm, (char *)"MPI_File_write_at_all");
+
+  /* cleanup */
+  free(all_particles);
+  MPI_File_close(&fd);
+
+}
+/*--------------------------------------------------------------------------*/
+/*
+  MPI error handler
+  decodes and prints MPI error messages
+*/
+void handle_error(int errcode, MPI_Comm comm, char *str) {
+
+  char msg[MPI_MAX_ERROR_STRING];
+  int resultlen;
+  MPI_Error_string(errcode, msg, &resultlen);
+  fprintf(stderr, "%s: %s\n", str, msg);
+  MPI_Abort(comm, 1);
+
 }
 /*--------------------------------------------------------------------------*/

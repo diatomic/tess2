@@ -29,7 +29,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=4
+num_procs=1
 
 # procs per node
 #ppn=4 # for BG/P
@@ -49,18 +49,20 @@ tb=$[$num_procs * 1]
 #tb=2
 
 # inout file
-infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"
+#infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/6606356352.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/input-data/nfw_particles_1e5.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/input-data/cnfw_particles_2e5.dat"
+infile="${HOME}/tess/pts.out"
 
 # output file
-outfile="7445077095.out"
+#outfile="7445077095.out"
 #outfile="6606356352.out"
 #outfile="nfw.out"
 #outfile="mchalo00.out"
 #outfile="nor_ex.out"
 #outfile="cnfw_2e5.out"
+outfile="pts-vor.out"
 
 #volume range (-1.0: unused)
 minv=-1.0
@@ -72,11 +74,12 @@ maxv=-1.0
 # 2 = float interleaved x y z
 # 3 = double x's followed by y's followed by z's
 # 4 = double interleaved x y z
-it=0
+#it=0
 #it=3
+it=2
 
 # wrapped neihbors 0 or 1
-wrap=0
+wrap=1
 
 #------
 #

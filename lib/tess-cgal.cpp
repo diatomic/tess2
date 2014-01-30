@@ -8,15 +8,13 @@
 
   nblocks: number of blocks
   tblocks: pointer to array of temporary vblocks
-  vblocks: pointer to array of vblocks
   dim: number of dimensions (eg. 3)
   num_particles: number of particles in each block
   particles: particles in each block, particles[block_num][particle]
   where each particle is 3 values, px, py, pz
   times: timing
 */
-void local_cells(int nblocks, struct vblock_t *tblocks, 
-		 struct vblock_t *vblocks, int dim,
+void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 		 int *num_particles, float **particles) {
 
   int i,j;

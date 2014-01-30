@@ -12,6 +12,8 @@ void read_text_particles(char *infile, vector <float> &particles, float *mins,
 			 float *maxs);
 void read_double_particles(char *infile, vector <float> &particles, float *mins,
 			   float *maxs);
+void read_float_interleaved_particles(char *infile, vector <float> &particles, 
+				      float *mins, float *maxs);
 void SortParticles(vector <float> p, float *mins, float *maxs, 
 		   float **particles, int *num_particles);
 int Pt2Gid(float *pt, float *mins, float *maxs);
@@ -57,6 +59,9 @@ int main(int argc, char *argv[]) {
     case 0:
       read_text_particles(infile, p, mins, maxs);
       break;
+    case 2:
+      read_float_interleaved_particles(infile, p, mins, maxs);
+      break;
     case 3:
       read_double_particles(infile, p, mins, maxs);
       break;
@@ -88,7 +93,7 @@ int main(int argc, char *argv[]) {
   SortParticles(p, mins, maxs, particles, num_particles);
 
   // run tess in post processing mode
-  tess_init_diy_exist(nblocks, mins, maxs, minvol, maxvol, 
+  tess_init_diy_exist(nblocks, mins, maxs, wrap, minvol, maxvol, 
 		      MPI_COMM_WORLD, times);
   tess(particles, num_particles, outfile);
 
@@ -174,10 +179,6 @@ void read_text_particles(char *infile, vector <float> &particles, float *mins,
     particles.push_back(y);
     particles.push_back(z);
 
-    // debug
-//     if (particles.size() >= 999)
-//       break;
-
   }
 
   fclose(fd);
@@ -221,8 +222,7 @@ void read_double_particles(char *infile, vector <float> &particles, float *mins,
 
   // interleave particle coordinates, convert to single precision, store in
   // output vector
-//   for (int i = 0; i < num_particles; i++) {
-  for (int i = 0; i < 500000; i++) {
+  for (int i = 0; i < num_particles; i++) {
 
     if (i == 0) {
       mins[0] = x[i];
@@ -263,6 +263,76 @@ void read_double_particles(char *infile, vector <float> &particles, float *mins,
   delete[] x;
   delete[] y;
   delete[] z;
+  fclose(fd);
+
+}
+//----------------------------------------------------------------------------
+//
+// reads single precision particles from a raw binary file organized by
+// interleaved x,y,z,x,y,z,...
+//
+// infile: input file name
+// particles: (output) particles
+// mins, maxs: (output) global data extents
+//
+// crrently reads all particles into one block
+//
+void read_float_interleaved_particles(char *infile, vector <float> &particles, 
+				      float *mins, float *maxs) {
+
+  FILE *fd;
+
+  fd = fopen(infile, "r");
+  assert(fd != NULL);
+
+  // get number of particles from file size
+  fseek(fd, 0, SEEK_END);
+  int64_t file_size = ftell(fd); // file size in bytes
+  int64_t num_particles = file_size / sizeof(float) / 3; // number of particles
+  fseek(fd, 0, SEEK_SET);
+
+  // debug
+  fprintf(stderr, "number of particles = %d\n", (int)num_particles);
+
+  // read particles
+  particles.resize(num_particles * 3);
+  fread(&particles[0], sizeof(float), num_particles * 3, fd);
+
+  // find extents
+  for (int i = 0; i < num_particles; i++) {
+
+    if (i == 0) {
+      mins[0] = particles[3 * i];
+      mins[1] = particles[3 * i + 1];
+      mins[2] = particles[3 * i + 2];
+      maxs[0] = particles[3 * i];
+      maxs[1] = particles[3 * i + 1];
+      maxs[2] = particles[3 * i + 2];
+    }
+    else {
+      if (particles[3 * i] < mins[0])
+	mins[0] = particles[3 * i];
+      if (particles[3 * i + 1] < mins[1])
+	mins[1] = particles[3 * i + 1];
+      if (particles[3 * i + 2] < mins[2])
+	mins[2] = particles[3 * i + 2];
+      if (particles[3 * i] > maxs[0])
+	maxs[0] = particles[3 * i];
+      if (particles[3 * i + 1] > maxs[1])
+	maxs[1] = particles[3 * i + 1];
+      if (particles[3 * i + 2] > maxs[2])
+	maxs[2] = particles[3 * i + 2];
+    }
+
+    // debug
+//     fprintf(stderr, "%.3f %.3f %.3f\n", 
+// 	    particles[particles.size() - 3],
+// 	    particles[particles.size() - 2],
+// 	    particles[particles.size() - 1]);
+
+  }
+
+  // cleanup
   fclose(fd);
 
 }
