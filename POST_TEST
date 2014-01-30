@@ -78,6 +78,9 @@ maxv=-1.0
 #it=3
 it=2
 
+#byte swapping
+swap=0
+
 # wrapped neihbors 0 or 1
 wrap=1
 
@@ -86,7 +89,7 @@ wrap=1
 # program arguments
 #
 
-args="$tb $infile $outfile $minv $maxv $it $wrap"
+args="$tb $infile $outfile $minv $maxv $it $swap $wrap"
 
 #------
 #

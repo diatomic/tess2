@@ -18,6 +18,7 @@
 #include <stdlib.h>	// needed for RAND_MAX
 
 #include "voronoi.h"
+#include "swap.hpp"
 #include "diy.h"
 
 extern MPI_Comm comm; /* MPI communicator */

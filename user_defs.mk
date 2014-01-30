@@ -24,8 +24,8 @@ ARCH = MAC_OSX
 
 # 2. Set your choice of computational geometry library here (QHULL or CGAL)
 
-#CONV = QHULL
-CONV = CGAL
+CONV = QHULL
+#CONV = CGAL
 
 # 3. Set your dependency paths here
 

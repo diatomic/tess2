@@ -7,13 +7,14 @@
 using namespace std;
 
 void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
-	     float *minvol, float *maxvol, int *intype, int *wrap);
+	     float *minvol, float *maxvol, int *intype, int *swap, int *wrap);
 void read_text_particles(char *infile, vector <float> &particles, float *mins,
 			 float *maxs);
 void read_double_particles(char *infile, vector <float> &particles, float *mins,
-			   float *maxs);
+			   float *maxs, bool swap = false);
 void read_float_interleaved_particles(char *infile, vector <float> &particles, 
-				      float *mins, float *maxs);
+				      float *mins, float *maxs,
+				      bool swap = false);
 void SortParticles(vector <float> p, float *mins, float *maxs, 
 		   float **particles, int *num_particles);
 int Pt2Gid(float *pt, float *mins, float *maxs);
@@ -42,6 +43,7 @@ int main(int argc, char *argv[]) {
   int dim = 3; // 3d always
   int block_given[3] = {0, 0, 0}; // constraints on blocking (none)
   float block_ghost[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // ghost block overlap
+  int swap; // whether byte swapping
   int wrap; // whether wraparound neighbors are used
   int rank; // MPI usual
   vector <float> p; // temporary particles
@@ -50,7 +52,7 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   GetArgs(argc, argv, tot_blocks, infile, outfile, &minvol, &maxvol, 
-	  &intype, &wrap);
+	  &intype, &swap, &wrap);
 
   // root read points in serial
   if (rank == 0) {
@@ -60,10 +62,10 @@ int main(int argc, char *argv[]) {
       read_text_particles(infile, p, mins, maxs);
       break;
     case 2:
-      read_float_interleaved_particles(infile, p, mins, maxs);
+      read_float_interleaved_particles(infile, p, mins, maxs, swap);
       break;
     case 3:
-      read_double_particles(infile, p, mins, maxs);
+      read_double_particles(infile, p, mins, maxs, swap);
       break;
     default:
       fprintf(stderr, "file type %d not supported yet\n", intype);
@@ -114,9 +116,9 @@ int main(int argc, char *argv[]) {
 // gets command line args
 //
 void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
-	     float *minvol, float *maxvol, int *intype, int *wrap) {
+	     float *minvol, float *maxvol, int *intype, int *swap, int *wrap) {
 
-  assert(argc >= 8);
+  assert(argc >= 9);
 
   tb = atoi(argv[1]);
   strcpy(infile, argv[2]);
@@ -124,7 +126,8 @@ void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
   *minvol = atof(argv[4]);
   *maxvol = atof(argv[5]);
   *intype = atoi(argv[6]);
-  *wrap = atoi(argv[7]);
+  *swap = atoi(argv[7]);
+  *wrap = atoi(argv[8]);
 
 }
 //----------------------------------------------------------------------------
@@ -192,11 +195,12 @@ void read_text_particles(char *infile, vector <float> &particles, float *mins,
 // infile: input file name
 // particles: (output) particles
 // mins, maxs: (output) global data extents
+// swap: whether to byte swap (false by default)
 //
 // crrently reads all particles into one block
 //
 void read_double_particles(char *infile, vector <float> &particles, float *mins,
-			   float *maxs) {
+			   float *maxs, bool swap) {
 
   FILE *fd;
 
@@ -219,6 +223,11 @@ void read_double_particles(char *infile, vector <float> &particles, float *mins,
   fread(x, sizeof(double), num_particles, fd);
   fread(y, sizeof(double), num_particles, fd);
   fread(z, sizeof(double), num_particles, fd);
+  if (swap) {
+    Swap((char *)x, (int)num_particles, (int)(sizeof(double)));
+    Swap((char *)y, (int)num_particles, (int)(sizeof(double)));
+    Swap((char *)z, (int)num_particles, (int)(sizeof(double)));
+  }
 
   // interleave particle coordinates, convert to single precision, store in
   // output vector
@@ -274,11 +283,13 @@ void read_double_particles(char *infile, vector <float> &particles, float *mins,
 // infile: input file name
 // particles: (output) particles
 // mins, maxs: (output) global data extents
+// swap: whether tp swap bytes (false by default)
 //
 // crrently reads all particles into one block
 //
 void read_float_interleaved_particles(char *infile, vector <float> &particles, 
-				      float *mins, float *maxs) {
+				      float *mins, float *maxs, 
+				      bool swap) {
 
   FILE *fd;
 
@@ -297,6 +308,8 @@ void read_float_interleaved_particles(char *infile, vector <float> &particles,
   // read particles
   particles.resize(num_particles * 3);
   fread(&particles[0], sizeof(float), num_particles * 3, fd);
+  if (swap)
+    Swap((char *)&particles[0], num_particles * 3, sizeof(float));
 
   // find extents
   for (int i = 0; i < num_particles; i++) {
