@@ -14,7 +14,7 @@
 include ../user_defs.mk
 
 INCLUDES = $(DIY_INC) $(DELAUNAY_INC) $(PNETCDF_INC) -I../lib
-LIBS = -L../lib -ltess $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB)
+LIBS = -L../lib -ltess $(DIY_LIB) $(PNETCDF_LIB) $(DELAUNAY_LIB)
 
 ###########
 
@@ -23,7 +23,6 @@ ifeq ($(ARCH), MAC_OSX) # mac version
 CCFLAGS = -g
 CCFLAGS += -DMAC_OSX -fopenmp
 CCFLAGS += ${DELAUNAY_CCFLAGS}
-CXX=mpicxx
 
 endif
 
@@ -34,7 +33,6 @@ ifeq ($(ARCH), LINUX) # linux version
 CCFLAGS = -g
 CCFLAGS += -DLINUX
 CCFLAGS += ${DELAUNAY_CCFLAGS}
-CXX=mpicxx
 
 endif
 
@@ -46,8 +44,6 @@ CCFLAGS = -O3 -qarch=450d -qtune=450
 #CCFLAGS = -g
 CCFLAGS += -DBGP
 CCFLAGS += ${DELAUNAY_CCFLAGS}
-CXX=mpixlcxx_r
-#CXX=mpicxx
 
 endif
 
@@ -55,15 +51,12 @@ endif
 
 ifeq ($(ARCH), BGQ) # BG/Q version
 
+CCFLAGS = 
 CCFLAGS = -O3
 #CCFLAGS = -g
 CCFLAGS += -DBGQ $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS =
-CC=mpixlc_r
-CXX=mpixlcxx_r
-#CC=mpicxx
-#CXX=mpicxx
 
 endif
 

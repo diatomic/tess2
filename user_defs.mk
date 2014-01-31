@@ -35,7 +35,7 @@ CGAL_INC =-I/$(HOME)/software/CGAL-4.3/include -I/soft/libraries/boost/current/c
 PNETCDF_INC = -I$(HOME)/software/parallel-netcdf-1.3.0/include
 DIY_LIB = -L$(HOME)/diy-gcc/lib -ldiy
 QHULL_LIB = -L$(HOME)/software/qhull-2011.2/lib -lqhullstatic
-CGAL_LIB = -L$(HOME)/software/CGAL-4.3/lib -L$(HOME)/software/gmp-5.1.3/lib -lgmp -lCGAL -L$/soft/libraries/boost/current/cnk-gcc/current/lib
+CGAL_LIB = -L$(HOME)/software/CGAL-4.3-install/lib -L$(HOME)/software/gmp-5.1.3/lib -lgmp -dynamic -lCGAL -L/soft/libraries/boost/current/cnk-gcc/current/lib -lboost_system-mt -lboost_thread-mt
 PNETCDF_LIB = -L$(HOME)/software/parallel-netcdf-1.3.0/lib -lpnetcdf
 
 # 4. Set your build options here
