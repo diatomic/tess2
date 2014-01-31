@@ -20,16 +20,16 @@
 # without permission
 #
 #----------------------------------------------------------------------------
-ARCH=MAC_OSX
+#ARCH=MAC_OSX
 #ARCH=LINUX
 #ARCH=BGP
-#ARCH=BGQ
+ARCH=BGQ
 #ARCH=FUSION
 #ARCH=XT
 #ARCH=XE
 
 # number of procs
-num_procs=1
+num_procs=2
 
 # procs per node
 #ppn=4 # for BG/P
@@ -79,10 +79,10 @@ maxv=-1.0
 it=2
 
 #byte swapping
-swap=0
+swap=1
 
 # wrapped neihbors 0 or 1
-wrap=1
+wrap=0
 
 #------
 #

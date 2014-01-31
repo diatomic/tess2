@@ -40,7 +40,7 @@ if			    (use_cgal)
     add_definitions         (${CGAL_CXX_FLAGS_INIT})
     include_directories     (${CGAL_INCLUDE_DIRS})
     set			    (libraries ${libraries} ${CGAL_LIBRARY} ${CGAL_3RD_PARTY_LIBRARIES})
-
+    set 		    (CMAKE_EXE_LINKER_FLAGS "-dynamic ${CMAKE_EXE_LINKER_FLAGS}")
     # TODO: this should really be based on whether the compiler suffers from the bug in std::nth_element()
     add_definitions	    (-DTESS_CGAL_ALLOW_SPATIAL_SORT)
 else			    (use_cgal)

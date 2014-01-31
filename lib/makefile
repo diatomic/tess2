@@ -24,8 +24,6 @@ CCFLAGS = -g -Wall -Wextra
 CCFLAGS += -DMAC_OSX $(TIMING) -fopenmp
 CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS = -framework GLUT -framework OpenGL
-CC=mpicc
-CXX=mpicxx
 
 endif
 
@@ -37,8 +35,6 @@ CCFLAGS = -g
 CCFLAGS += -DLINUX $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS = -lglut -lGLU -lGL
-CC=mpicc
-CXX=mpicxx
 
 endif
 
@@ -51,25 +47,18 @@ CCFLAGS = -O3 -qarch=450d -qtune=450
 CCFLAGS += -DBGP $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS =
-CC=mpixlc_r
-CXX=mpixlcxx_r
-#CC=mpicxx
-#CXX=mpicxx
 
 endif
 
 ###########
 ifeq ($(ARCH), BGQ) # BG/Q version
 
-CCFLAGS = -O3
+CCFLAGS = 
+#CCFLAGS = -O3
 #CCFLAGS = -g
 CCFLAGS += -DBGQ $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS =
-CC=mpixlc_r
-CXX=mpixlcxx_r
-#CC=mpicxx
-#CXX=mpicxx
 
 endif
 
