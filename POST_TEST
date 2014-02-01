@@ -20,10 +20,10 @@
 # without permission
 #
 #----------------------------------------------------------------------------
-#ARCH=MAC_OSX
+ARCH=MAC_OSX
 #ARCH=LINUX
 #ARCH=BGP
-ARCH=BGQ
+#ARCH=BGQ
 #ARCH=FUSION
 #ARCH=XT
 #ARCH=XE
@@ -79,7 +79,7 @@ maxv=-1.0
 it=2
 
 #byte swapping
-swap=1
+swap=0
 
 # wrapped neihbors 0 or 1
 wrap=0
