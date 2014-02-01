@@ -68,7 +68,7 @@ minv=-1.0
 maxv=-1.0
 
 # wrapped neighbors 0 or 1
-wrap=1
+wrap=0
 
 #------
 #

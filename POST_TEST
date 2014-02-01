@@ -53,7 +53,7 @@ tb=$[$num_procs * 1]
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/6606356352.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/input-data/nfw_particles_1e5.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/input-data/cnfw_particles_2e5.dat"
-infile="${HOME}/tess/pts.out"
+infile="./pts.out"
 
 # output file
 #outfile="7445077095.out"
