@@ -38,20 +38,10 @@ endif
 
 ###########
 
-ifeq ($(ARCH), BGP) # BG/P version
-
-CCFLAGS = -O3 -qarch=450d -qtune=450
-#CCFLAGS = -g
-CCFLAGS += -DBGP
-
-endif
-
-###########
 
 ifeq ($(ARCH), BGQ) # BG/Q version
 
-CCFLAGS =
-#CCFLAGS = -O3
+CCFLAGS = -O3
 #CCFLAGS = -g
 CCFLAGS += -DBGQ $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}
