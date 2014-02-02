@@ -191,7 +191,7 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
     num_particles[i] = gen_particles(i, &particles[i], jitter);
 
   /* save particles in a separate file for future reference */
-  write_particles(nblocks, particles, num_particles, "pts.out");
+  /* write_particles(nblocks, particles, num_particles, "pts.out"); */
 
   /* compute tessellations */
   voronoi_delaunay(nblocks, particles, num_particles, times, "vor.out");
@@ -268,7 +268,6 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   times[LOCAL_TIME] = MPI_Wtime() - times[LOCAL_TIME];
   if (rank == 0)
     fprintf(stderr, "-----------------------------------\n");
-  MPI_Barrier(comm);
   times[EXCH_TIME] = MPI_Wtime();
 #endif
 
@@ -288,11 +287,6 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
-
-#ifdef TIMING
-  MPI_Barrier(comm);
-  times[EXCH_TIME] = MPI_Wtime() - times[EXCH_TIME];
-#endif
 
   /* Second, decisive phase */
 
@@ -323,9 +317,9 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
 #ifdef TIMING
   MPI_Barrier(comm);
+  times[EXCH_TIME] = MPI_Wtime() - times[EXCH_TIME];
   if (rank == 0)
     fprintf(stderr, "-----------------------------------\n");
-  MPI_Barrier(comm);
   times[CELL_TIME] = MPI_Wtime();
 #endif
 
@@ -345,10 +339,6 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   /* no barrier here; want min and max time */
   times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
   MPI_Barrier(comm);
-#endif
-
-#ifdef TIMING
-  MPI_Barrier(comm);
   times[VOL_TIME] = MPI_Wtime();
 #endif
 
@@ -358,15 +348,12 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #ifdef TIMING
   /* no barrier here; want min and max time */
   times[VOL_TIME] = MPI_Wtime() - times[VOL_TIME];
+  MPI_Barrier(comm);
+  times[OUT_TIME] = MPI_Wtime();
 #endif
 
   /* prepare for output */
   prep_out(nblocks, vblocks);
-
-#ifdef TIMING
-  MPI_Barrier(comm);
-  times[OUT_TIME] = MPI_Wtime();
-#endif
 
   /* save headers */
   save_headers(nblocks, vblocks, hdrs);

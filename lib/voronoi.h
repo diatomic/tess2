@@ -28,7 +28,7 @@
 #define NUM_FACES 7
 
 #define MAX_HIST_BINS 256 /* maximum number of bins in cell volume histogram */
-#define MAX_FACE_VERTS 24 /* maximum number of vertices per face */
+#define MAX_FACE_VERTS 32 /* maximum number of vertices per face */
 #define MAX_NEIGHBORS 27 /* maximum number of neighbor blocks */
 
 /* timing info */
