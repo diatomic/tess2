@@ -251,6 +251,14 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   /* create local voronoi cells */
   local_cells(nblocks, tblocks, dim, num_particles, particles);
 
+#ifdef TIMING
+  MPI_Barrier(comm);
+  times[LOCAL_TIME] = MPI_Wtime() - times[LOCAL_TIME];
+  if (rank == 0)
+    fprintf(stderr, "-----------------------------------\n");
+  times[EXCH_TIME] = MPI_Wtime();
+#endif
+
   /* keep track of which particles lie on the convex hull of the local points */
   int** convex_hull_particles	  = (int**) malloc(nblocks * sizeof(int*));
   int*  num_convex_hull_particles = (int*)  malloc(nblocks * sizeof(int));
@@ -262,14 +270,6 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
   /* cleanup local temporary blocks */
   destroy_blocks(nblocks, tblocks, NULL);
-
-#ifdef TIMING
-  MPI_Barrier(comm);
-  times[LOCAL_TIME] = MPI_Wtime() - times[LOCAL_TIME];
-  if (rank == 0)
-    fprintf(stderr, "-----------------------------------\n");
-  times[EXCH_TIME] = MPI_Wtime();
-#endif
 
   /* exchange particles with neighbors */
   int **gids; /* owner global block ids of received particles */
@@ -336,9 +336,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   free(nids);
 
 #ifdef TIMING
-  /* no barrier here; want min and max time */
-  times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
+  /* previously no barrier here; want min and max time;
+     changed to barrier and simple time now */
   MPI_Barrier(comm);
+  times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
+  /* MPI_Barrier(comm); */
   times[VOL_TIME] = MPI_Wtime();
 #endif
 
@@ -346,9 +348,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   cell_vols(nblocks, vblocks, particles);
 
 #ifdef TIMING
-  /* no barrier here; want min and max time */
-  times[VOL_TIME] = MPI_Wtime() - times[VOL_TIME];
+  /* previously no barrier here; want min and max time;
+     changed to barrier and simple time now */
   MPI_Barrier(comm);
+  times[VOL_TIME] = MPI_Wtime() - times[VOL_TIME];
+  /* MPI_Barrier(comm); */
   times[OUT_TIME] = MPI_Wtime();
 #endif
 
@@ -894,10 +898,12 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
     fprintf(stderr, "local voronoi / delaunay time = %.3lf s\n",
 	    times[LOCAL_TIME]);
     fprintf(stderr, "particle exchange time = %.3lf s\n", times[EXCH_TIME]);
-    fprintf(stderr, "[min, max] voronoi / delaunay time = [%.3lf, %.3lf] s\n",
-	    stats.min_cell_time, stats.max_cell_time);
-    fprintf(stderr, "[min, max] cell volume / area time = [%.3lf, %.3lf] s\n",
-	    stats.min_vol_time, stats.max_vol_time);
+    /* fprintf(stderr, "[min, max] voronoi / delaunay time = [%.3lf, %.3lf] s\n", */
+    /* 	    stats.min_cell_time, stats.max_cell_time); */
+    fprintf(stderr, "Voronoi / delaunay time = %.3lf s\n", times[CELL_TIME]);
+    /* fprintf(stderr, "[min, max] cell volume / area time = [%.3lf, %.3lf] s\n", */
+    /* 	    stats.min_vol_time, stats.max_vol_time); */
+    fprintf(stderr, "Cell volume / area time = %.3lf s\n", times[VOL_TIME]);
     fprintf(stderr, "output time = %.3lf s\n", times[OUT_TIME]);
     fprintf(stderr, "-----\n");
     fprintf(stderr, "total tets found = %d\n", stats.tot_tets);

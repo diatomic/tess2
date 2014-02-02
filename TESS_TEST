@@ -28,7 +28,7 @@ ARCH=BGQ
 #ARCH=XE
 
 # number of procs
-num_procs=8
+num_procs=128
 
 # procs per node
 #ppn=4 # for BG/P
