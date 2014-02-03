@@ -347,47 +347,23 @@ void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
 {
   int n = Dt.number_of_vertices();
 
-  if (n == 0)
-  {
 #ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
-    std::vector< std::pair<Point,unsigned> > points; points.reserve(num_particles);
-    for (unsigned j = 0; j < num_particles; j++)
-    {
-      Point p(particles[3*j],
-	      particles[3*j+1],
-	      particles[3*j+2]);
-      points.push_back(std::make_pair(p,j));
-    }
-    Dt.insert(points.begin(), points.end());
-#else
-    for (unsigned j = 0; j < num_particles; j++)
-    {
-      Point p(particles[3*j],
-	      particles[3*j+1],
-	      particles[3*j+2]);
-      Dt.insert(p)->info() = j;
-    }
-#endif
-  } else
+  std::vector< std::pair<Point,unsigned> > points; points.reserve(num_particles);
+  for (unsigned j = n; j < num_particles; j++)
   {
-#ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
-    std::vector< std::pair<Point,unsigned> > points; points.reserve(num_particles);
-    for (unsigned j = n; j < num_particles; j++)
-    {
-      Point p(particles[3*j],
-	      particles[3*j+1],
-	      particles[3*j+2]);
-      points.push_back(std::make_pair(p,j));
-    }
-    Dt.insert(points.begin(), points.end());
-#else
-    for (unsigned j = n; j < num_particles; j++)
-    {
-      Point p(particles[3*j],
-	      particles[3*j+1],
-	      particles[3*j+2]);
-      Dt.insert(p)->info() = j;
-    }
-#endif
+    Point p(particles[3*j],
+	    particles[3*j+1],
+	    particles[3*j+2]);
+    points.push_back(std::make_pair(p,j));
   }
+  Dt.insert(points.begin(), points.end());
+#else
+  for (unsigned j = n; j < num_particles; j++)
+  {
+    Point p(particles[3*j],
+	    particles[3*j+1],
+	    particles[3*j+2]);
+    Dt.insert(p)->info() = j;
+  }
+#endif
 }
