@@ -3,6 +3,21 @@
 #include <vector>
 
 /*--------------------------------------------------------------------------*/
+/* Initialize and destroy Delaunay data structures used by CGAL.
+ * We keep them persistent for later incremental insertion of additional points.
+ */
+void* init_delaunay_data_structures(int nblocks)
+{
+  return new Delaunay3D[nblocks];
+}
+
+void clean_delaunay_data_strucutres(void* ds)
+{
+  Delaunay3D* dds = (Delaunay3D*) ds;
+  delete[] dds;
+}
+
+/*--------------------------------------------------------------------------*/
 /*
   creates local voronoi cells
 
@@ -13,17 +28,19 @@
   particles: particles in each block, particles[block_num][particle]
   where each particle is 3 values, px, py, pz
   times: timing
+  ds: the delaunay data structures
 */
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
-		 int *num_particles, float **particles) {
+		 int *num_particles, float **particles, void* ds) {
 
   int i,j;
 
   unsigned total = 0;
+  Delaunay3D* Dts = (Delaunay3D*) ds;
 
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
-    Delaunay3D Dt;
+    Delaunay3D& Dt = Dts[i];
     construct_delaunay(Dt, num_particles[i], particles[i]);
     total += num_particles[i];
     std::cout << "Num particles (local): " << num_particles[i] << std::endl;
@@ -60,15 +77,18 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
   nids: native particle ids of received particles in each of my blocks
   dirs: wrapping directions of received particles in each of my blocks
   times: timing
+  ds: the delaunay data structures
 */
 void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 		int *num_particles, int *num_orig_particles, 
 		float **particles, int **gids, int **nids, 
-		unsigned char **dirs, double *times) {
+		unsigned char **dirs, double *times,
+		void* ds) {
 
   int num_recvd; /* number of received particles in current block */
   int i,j;
   unsigned total = 0;
+  Delaunay3D* Dts = (Delaunay3D*) ds;
 
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
@@ -76,7 +96,7 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
     /* number of received particles */
     num_recvd = num_particles[i] - num_orig_particles[i];
 
-    Delaunay3D Dt;
+    Delaunay3D& Dt = Dts[i];
     construct_delaunay(Dt, num_particles[i], particles[i]);
     std::cout << "Num particles (orig): " << num_particles[i] << std::endl;
     total += num_particles[i];
@@ -325,6 +345,10 @@ int gen_delaunay_output(Delaunay3D &Dt, struct vblock_t *vblock,
 */
 void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
 {
+  int n = Dt.number_of_vertices();
+
+  if (n == 0)
+  {
 #ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
     std::vector< std::pair<Point,unsigned> > points; points.reserve(num_particles);
     for (unsigned j = 0; j < num_particles; j++)
@@ -344,4 +368,26 @@ void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
       Dt.insert(p)->info() = j;
     }
 #endif
+  } else
+  {
+#ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
+    std::vector< std::pair<Point,unsigned> > points; points.reserve(num_particles);
+    for (unsigned j = n; j < num_particles; j++)
+    {
+      Point p(particles[3*j],
+	      particles[3*j+1],
+	      particles[3*j+2]);
+      points.push_back(std::make_pair(p,j));
+    }
+    Dt.insert(points.begin(), points.end());
+#else
+    for (unsigned j = n; j < num_particles; j++)
+    {
+      Point p(particles[3*j],
+	      particles[3*j+1],
+	      particles[3*j+2]);
+      Dt.insert(p)->info() = j;
+    }
+#endif
+  }
 }

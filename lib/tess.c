@@ -224,6 +224,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   int dim = 3; /* 3D */
   int rank; /* MPI rank */
   int i;
+  void* ds; // persistent delaunay data structures
 
   MPI_Comm_rank(comm, &rank);
 
@@ -239,6 +240,8 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   for (i = 0; i < nblocks; i++)
     num_orig_particles[i] = num_particles[i];
 
+  ds = init_delaunay_data_structures(nblocks);
+
   /* allocate and initialize blocks */
   create_blocks(nblocks, &vblocks, &hdrs); /* final */
   create_blocks(nblocks, &tblocks, NULL); /* temporary */
@@ -249,7 +252,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
   /* create local voronoi cells */
-  local_cells(nblocks, tblocks, dim, num_particles, particles);
+  local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
 
 #ifdef TIMING
   MPI_Barrier(comm);
@@ -297,7 +300,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   /* Recompute local cells
      TODO: here an later it's wasteful to recompute everything from scratch;
      it would be wiser to just insert new points. Current limitation: qhull */
-  local_cells(nblocks, tblocks, dim, num_particles, particles);
+  local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
 
   for (i = 0; i < nblocks; i++)
     incomplete_cells_final(&tblocks[i], &vblocks[i], i, convex_hull_particles[i], num_convex_hull_particles[i]);
@@ -325,7 +328,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
   /* create original voronoi cells */
   orig_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
-	     particles, gids, nids, dirs, times);
+	     particles, gids, nids, dirs, times, ds);
 
   /* cleanup */
   for (i = 0; i < nblocks; i++) {
@@ -334,6 +337,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   }
   free(gids);
   free(nids);
+  clean_delaunay_data_strucutres(ds);
 
 #ifdef TIMING
   /* previously no barrier here; want min and max time;

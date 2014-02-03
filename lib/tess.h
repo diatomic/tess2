@@ -87,12 +87,22 @@ extern "C"
 void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 		int *num_particles, int *num_orig_particles, 
 		float **particles, int **gids, int **nids, 
-		unsigned char **dirs, double *times);
+		unsigned char **dirs, double *times, void* ds);
 #ifdef __cplusplus
 extern "C"
 #endif
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
-		 int *num_particles, float **particles);
+		 int *num_particles, float **particles, void* ds);
+
+#ifdef __cplusplus
+extern "C"
+#endif
+void* init_delaunay_data_structures(int nblocks);
+#ifdef __cplusplus
+extern "C"
+#endif
+void clean_delaunay_data_strucutres(void* ds);
+
 void neighbor_particles(int nblocks, float **particles,
 			int *num_particles, int *num_orig_particles,
 			int **gids, int **nids, unsigned char **dirs);

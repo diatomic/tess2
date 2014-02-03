@@ -2,6 +2,18 @@
 #include "tess-qhull.h"
 
 /*--------------------------------------------------------------------------*/
+/* Initialization and destruction of Delaunay data structures is not used with
+ * qhull, since it doesn't support incremental updates.
+ */
+void* init_delaunay_data_structures(int nblocks)
+{
+  return 0;
+}
+
+void clean_delaunay_data_strucutres(void* ds)
+{}
+
+/*--------------------------------------------------------------------------*/
 /*
   creates local voronoi cells
 
@@ -12,9 +24,10 @@
   particles: particles in each block, particles[block_num][particle]
   where each particle is 3 values, px, py, pz
   times: timing
+  ds: the delaunay data structures; unused in qhull
 */
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
-		 int *num_particles, float **particles) {
+		 int *num_particles, float **particles, void* ds) {
 
   boolT ismalloc = False;    /* True if qhull should free points in
 				qh_freeqhull() or reallocation */
@@ -91,11 +104,12 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
   nids: native particle ids of received particles in each of my blocks
   dirs: wrapping directions of received particles in each of my blocks
   times: timing
+  ds: the delaunay data structures; unused in qhull
 */
 void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 		int *num_particles, int *num_orig_particles, 
 		float **particles, int **gids, int **nids, 
-		unsigned char **dirs, double *times) {
+		unsigned char **dirs, double *times, void* ds) {
 
   boolT ismalloc = False;    /* True if qhull should free points in
 				qh_freeqhull() or reallocation */
