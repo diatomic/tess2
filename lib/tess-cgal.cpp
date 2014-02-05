@@ -307,6 +307,8 @@ int gen_delaunay_output(Delaunay3D &Dt, int** tet_verts) {
   int numfacets = Dt.number_of_finite_cells();
   int v = 0; // index in tets
 
+  *tet_verts = (int *)malloc(numfacets * 4 * sizeof(int));
+
   // process the tets
   for(Cell_iterator cit = Dt.finite_cells_begin(); 
       cit != Dt.finite_cells_end(); ++cit) {

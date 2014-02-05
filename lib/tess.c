@@ -305,7 +305,9 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
 
   for (i = 0; i < nblocks; i++)
-    incomplete_cells_final(&tblocks[i], &vblocks[i], i, convex_hull_particles[i], num_convex_hull_particles[i]);
+    incomplete_cells_final(&tblocks[i], &vblocks[i], i, 
+			   convex_hull_particles[i], 
+			   num_convex_hull_particles[i]);
 
   /* cleanup local temporary blocks */
   destroy_blocks(nblocks, tblocks, NULL);

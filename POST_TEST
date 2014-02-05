@@ -29,7 +29,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=8
+num_procs=1
 
 # procs per node
 #ppn=4 # for BG/P
@@ -45,8 +45,8 @@ fi
 exe=./post-voronoi
 
 # total number of blocks in the domain
-tb=$[$num_procs * 1]
-#tb=1
+#tb=$[$num_procs * 1]
+tb=8
 
 # inout file
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"
