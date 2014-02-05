@@ -2,10 +2,10 @@
 #include "tess-cgal.h"
 #include <vector>
 
-/*--------------------------------------------------------------------------*/
-/* Initialize and destroy Delaunay data structures used by CGAL.
- * We keep them persistent for later incremental insertion of additional points.
- */
+//----------------------------------------------------------------------------
+// Initialize and destroy Delaunay data structures used by CGAL.
+// We keep them persistent for later incremental insertion of additional points.
+// 
 void* init_delaunay_data_structures(int nblocks)
 {
   return new Delaunay3D[nblocks];
@@ -17,19 +17,19 @@ void clean_delaunay_data_strucutres(void* ds)
   delete[] dds;
 }
 
-/*--------------------------------------------------------------------------*/
-/*
-  creates local voronoi cells
-
-  nblocks: number of blocks
-  tblocks: pointer to array of temporary vblocks
-  dim: number of dimensions (eg. 3)
-  num_particles: number of particles in each block
-  particles: particles in each block, particles[block_num][particle]
-  where each particle is 3 values, px, py, pz
-  times: timing
-  ds: the delaunay data structures
-*/
+//----------------------------------------------------------------------------
+//
+//   creates local voronoi cells
+//
+//   nblocks: number of blocks
+//   tblocks: pointer to array of temporary vblocks
+//   dim: number of dimensions (eg. 3)
+//   num_particles: number of particles in each block
+//   particles: particles in each block, particles[block_num][particle]
+//   where each particle is 3 values, px, py, pz
+//   times: timing
+//   ds: the delaunay data structures
+//
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 		 int *num_particles, float **particles, void* ds) {
 
@@ -61,39 +61,47 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 
   //std::cout << "Total particles in local_cells(): " << total << std::endl;
 }
-/*--------------------------------------------------------------------------*/
-/*
-  creates original voronoi cells
-
-  nblocks: number of blocks
-  vblocks: pointer to array of vblocks
-  dim: number of dimensions (eg. 3)
-  num_particles: number of particles in each block
-  num_orig_particles: number of original particles in each block, before any
-  neighbor exchange
-  particles: particles in each block, particles[block_num][particle]
-  where each particle is 3 values, px, py, pz
-  gids: global block ids of owners of received particles in each of my blocks
-  nids: native particle ids of received particles in each of my blocks
-  dirs: wrapping directions of received particles in each of my blocks
-  times: timing
-  ds: the delaunay data structures
-*/
+//----------------------------------------------------------------------------
+//
+//   creates original voronoi cells
+//
+//   nblocks: number of blocks
+//   vblocks: pointer to array of vblocks
+//   dim: number of dimensions (eg. 3)
+//   num_particles: number of particles in each block
+//   num_orig_particles: number of original particles in each block, before any
+//   neighbor exchange
+//   particles: particles in each block, particles[block_num][particle]
+//   where each particle is 3 values, px, py, pz
+//   gids: global block ids of owners of received particles in each of my blocks
+//   nids: native particle ids of received particles in each of my blocks
+//   dirs: wrapping directions of received particles in each of my blocks
+//   times: timing
+//   ds: the delaunay data structures
+//
 void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 		int *num_particles, int *num_orig_particles, 
 		float **particles, int **gids, int **nids, 
 		unsigned char **dirs, double *times,
 		void* ds) {
 
-  int num_recvd; /* number of received particles in current block */
+  int num_recvd; // number of received particles in current block
   int i,j;
   unsigned total = 0;
   Delaunay3D* Dts = (Delaunay3D*) ds;
 
-  /* for all blocks */
+  // is_complete status of received particles 
+  struct remote_ic_t **rics =
+    (struct remote_ic_t **)malloc(nblocks * 
+				  sizeof(struct remote_ic_t *));
+  // delaunay vertices
+  int **tet_verts = (int **)malloc(nblocks * sizeof(int *));
+  int *num_tets = (int *)malloc(nblocks * sizeof(int));
+
+  // for all blocks 
   for (i = 0; i < nblocks; i++) {
 
-    /* number of received particles */
+    // number of received particles
     num_recvd = num_particles[i] - num_orig_particles[i];
 
     Delaunay3D& Dt = Dts[i];
@@ -101,10 +109,10 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
     std::cout << "Num particles (orig): " << num_particles[i] << std::endl;
     total += num_particles[i];
 
-    /* process voronoi output */
+    // process voronoi output
     gen_voronoi_output(Dt, &vblocks[i], num_particles[i]);
 
-    /* allocate cell sites for original particles */
+    // allocate cell sites for original particles
     vblocks[i].num_orig_particles = num_orig_particles[i];
     vblocks[i].sites =
       (float *)malloc(3 * sizeof(float) * vblocks[i].num_orig_particles);
@@ -114,58 +122,52 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
       vblocks[i].sites[3 * j + 2] = particles[i][3 * j + 2];
     }
 
-    /* allocate lookup table for cells completion status */
+    // allocate lookup table for cells completion status
     vblocks[i].is_complete = 
       (unsigned char *)malloc(vblocks[i].num_orig_particles);
 
-    /* determine complete cells */
+    // determine complete cells
     complete_cells(&vblocks[i], i);
 
-    /* exchange complete cell status for exchanged particles */
-#ifdef TIMING
-    MPI_Barrier(comm);
-    double t0 = MPI_Wtime();
-#endif
-
-    struct remote_ic_t **rics; /* is_complete status of received particles */
-    rics = (struct remote_ic_t **)malloc(nblocks * 
-					 sizeof(struct remote_ic_t *));
-    neighbor_is_complete(nblocks, vblocks, rics);
-
-#ifdef TIMING
-    MPI_Barrier(comm);
-    times[EXCH_TIME] += (MPI_Wtime() - t0);
-#endif
-
-    /* process delaunay output */
-    gen_delaunay_output(Dt, &vblocks[i],
-			gids[i], nids[i], dirs[i], rics[i], i,
-			num_particles[i] - num_orig_particles[i]);
-
-    /* cleanup */
-    for (j = 0; j < nblocks; j++)
-      free(rics[j]);
-    free(rics);
+    // process delaunay output
+    num_tets[i] = gen_delaunay_output(Dt, &tet_verts[i]);
 
     // TODO: surely this can be optimized
-    /* connectivity of faces in voronoi cells */
+    // connectivity of faces in voronoi cells 
     cell_faces(&vblocks[i]);
 
-  } /* for all blocks */
-  //std::cout << "Total particles in orig_cells(): " << total << std::endl;
+  } // for all blocks 
+
+  // exchange complete cell status for exchanged particles
+  neighbor_is_complete(nblocks, vblocks, rics);
+
+  // convert delaunay output to vblock for all blocks
+  for (i = 0; i < nblocks; i++)
+    gen_tets(tet_verts[i], num_tets[i], &vblocks[i], gids[i], nids[i], 
+	     dirs[i], rics[i], i, num_particles[i] - num_orig_particles[i]);
+
+  // cleanup
+  for (i = 0; i < nblocks; i++) {
+    free(rics[i]);
+    free(tet_verts[i]);
+  }
+  free(rics);
+  free(tet_verts);
+  free(num_tets);
+
 }
-/*--------------------------------------------------------------------------*/
-/*
-  generates voronoi output from CGAL
-
-  Dt: CGAL's Delaunay3D structure
-  vblock: pointer to one voronoi block, allocated by caller
-  num_particles: number of particles used to generate the tessellation
-  side effects: allocates data structures inside of vblock, caller's
-  responsibility to free
-
-  returns: number of cells found (<= original number of particles)
-*/
+//----------------------------------------------------------------------------
+//
+//   generates voronoi output from CGAL
+//
+//   Dt: CGAL's Delaunay3D structure
+//   vblock: pointer to one voronoi block, allocated by caller
+//   num_particles: number of particles used to generate the tessellation
+//   side effects: allocates data structures inside of vblock, caller's
+//   responsibility to free
+//
+//   returns: number of cells found (<= original number of particles)
+//
 int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock, 
 		       int num_particles) {
 
@@ -291,58 +293,38 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
   return temp_num_cells;
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  generates delaunay output from qhull
-
-  facetlist: qhull list of convex hull facets
-  vblock: pointer to one voronoi block, allocated by caller
-  num_particles: number of input particles (voronoi sites) both complete and
-  incomplete, including any ghosted particles
-  gids: global block ids of owners of received particles
-  nids: native particle ids of received particles
-  dirs: wrap directions of received particles
-  rics: completion status of received particles
-  num_recvd: number of received particles, number of gids and nids
-  lid: current block local id
-  num_recvd: number of remote particles received
-  side effects: allocates data structures inside of vblock, caller's
-  responsibility to free
-
-  returns: number of tets found
-*/
-int gen_delaunay_output(Delaunay3D &Dt, struct vblock_t *vblock,
-			int *gids, int *nids, unsigned char *dirs,
-			struct remote_ic_t *rics, int lid, int num_recvd) {
-
-  int n = 0; /* number of vertices in strictly local final tets */
-  int m = 0; /* number of vertices in non strictly local final tets */
-  int tet_verts[4]; /* current tet verts */
+//----------------------------------------------------------------------------
+//
+// generates delaunay output from qhull
+//
+// facetlist: qhull list of convex hull facets
+// tet_verts: pointer to array of tet vertex indeices for this block
+//
+// returns: number of tets found
+//
+int gen_delaunay_output(Delaunay3D &Dt, int** tet_verts) {
 
   int numfacets = Dt.number_of_finite_cells();
-  vblock->loc_tets = (int *)malloc(numfacets * 4 * sizeof(int));
-  vblock->rem_tet_gids = (int *)malloc(numfacets * 4 * sizeof(int));
-  vblock->rem_tet_nids = (int *)malloc(numfacets * 4 * sizeof(int));
-  vblock->rem_tet_wrap_dirs = (unsigned char *)malloc(numfacets * 4);
+  int v = 0; // index in tets
 
   // process the tets
-  for(Cell_iterator cit = Dt.finite_cells_begin(); cit != Dt.finite_cells_end(); ++cit)
-  {
-    for (int i = 0; i < 4; ++i)
-      tet_verts[i] = cit->vertex(i)->info();
+  for(Cell_iterator cit = Dt.finite_cells_begin(); 
+      cit != Dt.finite_cells_end(); ++cit) {
 
-    gen_delaunay_tet(tet_verts, vblock, gids, nids, dirs, rics, lid, num_recvd, &n, &m);
+    for (int i = 0; i < 4; ++i)
+      (*tet_verts)[v++] = cit->vertex(i)->info();
+
   }
   
-  vblock->num_loc_tets = n / 4;
-  vblock->num_rem_tets = m / 4;
+  assert(numfacets == v / 4); // sanity
 
-  return (vblock->num_loc_tets + vblock->num_rem_tets);
+  return numfacets;
+
 }
-/*--------------------------------------------------------------------------*/
-/*
-   compute Delaunay
-*/
+//----------------------------------------------------------------------------
+//
+//    compute Delaunay
+//
 void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
 {
   int n = Dt.number_of_vertices();
@@ -367,3 +349,4 @@ void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
   }
 #endif
 }
+//----------------------------------------------------------------------------

@@ -26,8 +26,5 @@ typedef Delaunay3D::Facet_circulator                Facet_circulator;
 
 int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
 		       int num_particles);
-int gen_delaunay_output(Delaunay3D &Dt, struct vblock_t *vblock,
-                        int *gids, int *nids, unsigned char *dirs,
-                        struct remote_ic_t *rics, int lid, int num_recvd);
-
+int gen_delaunay_output(Delaunay3D &Dt, int **tet_verts);
 void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles);
