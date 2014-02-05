@@ -45,7 +45,7 @@ exe=./voronoi
 
 # total number of blocks in the domain
 #tb=$[$num_procs * 1]
-tb=2
+tb=8
 
 # data size x y z (always 3D)
 #dsize="3 3 3"
@@ -86,11 +86,11 @@ args="$tb $dsize $jitter $minv $maxv $wrap $outfile"
 
 if [ "$ARCH" = "MAC_OSX" ]; then
 
-#mpiexec -l -n $num_procs $exe $args
+mpiexec -l -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 
-dsymutil $exe ; mpiexec -l -n $num_procs valgrind -q $exe $args
+#dsymutil $exe ; mpiexec -l -n $num_procs valgrind -q $exe $args
 
 #dsymutil $exe ; mpiexec -n $num_procs valgrind -q --leak-check=yes $exe $args
 

@@ -141,8 +141,6 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
     
-    /* fprintf(stderr, "Num particles (orig): %d\n", num_particles[i]); */
-
     /* number of received particles */
     num_recvd = num_particles[i] - num_orig_particles[i];
 
