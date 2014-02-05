@@ -408,8 +408,8 @@ void SortParticles(vector <float> p, float *mins, float *maxs,
     particles[i] = (float *)malloc(num_particles[i] * 3 * sizeof(float));
 
     // debug
-    fprintf(stderr, "gid %d received %d particles from gid %d\n",
-	    DIY_Gid(0, i), num_particles[i], src_gids[0]);
+//     fprintf(stderr, "gid %d received %d particles from gid %d\n",
+// 	    DIY_Gid(0, i), num_particles[i], src_gids[0]);
 
     // copy received particles
     for (int j = 0; j < num_particles[i]; j++) {

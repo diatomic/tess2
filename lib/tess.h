@@ -29,7 +29,8 @@ extern MPI_Comm comm; /* MPI communicator */
 extern "C"
 #endif
 void tess_test(int tot_blocks, int *data_size, float jitter,
-	       float minvol, float maxvol, int wrap, double *all_times);
+	       float minvol, float maxvol, int wrap, double *all_times,
+	       char *outfile);
 
 #ifdef __cplusplus
 extern "C"
@@ -142,8 +143,8 @@ void handle_error(int errcode, MPI_Comm comm, char *str);
 #ifdef __cplusplus
 extern "C"
 #endif
-void gen_delaunay_tet(int tet_verts[4], struct vblock_t *vblock,
-		      int *gids, int *nids, unsigned char *dirs,
-		      struct remote_ic_t *rics, int lid, int num_recvd,
-		      int *n, int *m);
+void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
+	      int *gids, int *nids, unsigned char *dirs,
+	      struct remote_ic_t *rics, int lid, int num_recvd);
+
 #endif

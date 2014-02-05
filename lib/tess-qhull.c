@@ -5,13 +5,14 @@
 /* Initialization and destruction of Delaunay data structures is not used with
  * qhull, since it doesn't support incremental updates.
  */
-void* init_delaunay_data_structures(int nblocks)
-{
+void* init_delaunay_data_structures(int nblocks) {
+  nblocks = nblocks; /* quiet compiler warning about unused parameter */
   return 0;
 }
 
-void clean_delaunay_data_strucutres(void* ds)
-{}
+void clean_delaunay_data_strucutres(void* ds) {
+  ds = ds; /* quiet compiler warning about unused parameter */
+}
 
 /*--------------------------------------------------------------------------*/
 /*
@@ -36,6 +37,8 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
   int curlong, totlong;     /* memory remaining after qh_memfreeshort */
   FILE *dev_null; /* file descriptor for writing to /dev/null */
   int i, j;
+
+  ds = ds; /* quiet compiler warning about unused parameter */
 
   dev_null = fopen("/dev/null", "w");
   assert(dev_null != NULL);
@@ -120,8 +123,20 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
   int num_recvd; /* number of received particles in current block */
   int i, j;
 
+  /* quiet compiler warnings about unused parameters */
+  times = times;
+  ds = ds;
+
   dev_null = fopen("/dev/null", "w");
   assert(dev_null != NULL);
+
+  /* is_complete status of received particles */
+  struct remote_ic_t **rics =
+    (struct remote_ic_t **)malloc(nblocks * 
+				  sizeof(struct remote_ic_t *));
+  /* delaunay vertices */
+  int **tet_verts = (int **)malloc(nblocks * sizeof(int *));
+  int *num_tets = (int *)malloc(nblocks * sizeof(int));
 
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
@@ -170,32 +185,9 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
     /* determine complete cells */
     complete_cells(&vblocks[i], i);
 
-    /* exchange complete cell status for exchanged particles */
-#ifdef TIMING
-    MPI_Barrier(comm);
-    double t0 = MPI_Wtime();
-#endif
-
-    struct remote_ic_t **rics; /* is_complete status of received particles */
-    rics = (struct remote_ic_t **)malloc(nblocks * 
-					 sizeof(struct remote_ic_t *));
-    neighbor_is_complete(nblocks, vblocks, rics);
-
-#ifdef TIMING
-    MPI_Barrier(comm);
-    times[EXCH_TIME] += (MPI_Wtime() - t0);
-#endif
-
     /* process delaunay output */
     if (!exitcode)
-      gen_delaunay_output(qh facet_list, &vblocks[i],
-			  gids[i], nids[i], dirs[i], rics[i], i,
-			  num_particles[i] - num_orig_particles[i]);
-
-    /* cleanup */
-    for (j = 0; j < nblocks; j++)
-      free(rics[j]);
-    free(rics);
+      num_tets[i] = gen_delaunay_output(qh facet_list, &tet_verts[i]);
 
     /* clean up qhull */
     qh_freeqhull(!qh_ALL);                 /* free long memory */
@@ -209,6 +201,22 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 
   } /* for all blocks */
 
+  /* exchange complete cell status for exchanged particles */
+  neighbor_is_complete(nblocks, vblocks, rics);
+
+  /* convert delaunay output to vblock for all blocks*/
+  for (i = 0; i < nblocks; i++)
+    gen_tets(tet_verts[i], num_tets[i], &vblocks[i], gids[i], nids[i], 
+	     dirs[i], rics[i], i, num_particles[i] - num_orig_particles[i]);
+
+  /* cleanup */
+  for (i = 0; i < nblocks; i++) {
+    free(rics[i]);
+    free(tet_verts[i]);
+  }
+  free(rics);
+  free(tet_verts);
+  free(num_tets);
   fclose(dev_null);
 
 }
@@ -464,32 +472,17 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
   generates delaunay output from qhull
 
   facetlist: qhull list of convex hull facets
-  vblock: pointer to one voronoi block, allocated by caller
-  num_particles: number of input particles (voronoi sites) both complete and
-  incomplete, including any ghosted particles
-  gids: global block ids of owners of received particles
-  nids: native particle ids of received particles
-  dirs: wrap directions of received particles
-  rics: completion status of received particles
-  num_recvd: number of received particles, number of gids and nids
-  lid: current block local id
-  num_recvd: number of remote particles received
-  side effects: allocates data structures inside of vblock, caller's
-  responsibility to free
+  tet_verts: pointer to array of tet vertex indices for this block 
+  (allocated by this function, user's responsibility to free)
 
-  returns: number of tets found
+  returns: number of tets
 */
-int gen_delaunay_output(facetT *facetlist, struct vblock_t *vblock,
-			int *gids, int *nids, unsigned char *dirs,
-			struct remote_ic_t *rics, int lid, int num_recvd) {
+int gen_delaunay_output(facetT *facetlist, int **tet_verts) {
 
   facetT *facet;
   vertexT *vertex, **vertexp;
   int numfacets = 0;
-  int n = 0; /* number of vertices in strictly local final tets */
-  int m = 0; /* number of vertices in non strictly local final tets */
-  int v; /* vertex in current tet (0, 1, 2, 3) */
-  int tet_verts[4]; /* current tet verts */
+  int v = 0; /* index in tets */
 
   /* count number of facets */
   FORALLfacet_(facetlist) {
@@ -499,15 +492,7 @@ int gen_delaunay_output(facetT *facetlist, struct vblock_t *vblock,
       facet->visitid= ++numfacets;
   }
 
-  /* qhull lifts the 3d problem to a 4d convex hull
-     therefore, its definition of a facet (dim - 1) is exactly our
-     definition of a tet */
-  /* todo: static allocation wasteful; we don't know how many tets
-     are local and how many are remote; use add_int to groew arrays instead */
-  vblock->loc_tets = (int *)malloc(numfacets * 4 * sizeof(int));
-  vblock->rem_tet_gids = (int *)malloc(numfacets * 4 * sizeof(int));
-  vblock->rem_tet_nids = (int *)malloc(numfacets * 4 * sizeof(int));
-  vblock->rem_tet_wrap_dirs = (unsigned char *)malloc(numfacets * 4);
+  *tet_verts = (int *)malloc(numfacets * 4 * sizeof(int));
 
   /* for all tets (facets to qhull) */
   FORALLfacet_(facetlist) {
@@ -516,30 +501,25 @@ int gen_delaunay_output(facetT *facetlist, struct vblock_t *vblock,
       continue;
 
     if (qh_setsize(facet->vertices) != 4) {
-      fprintf(stderr, "tet %d has %d vertices; skipping.\n", n / 4,
+      fprintf(stderr, "tet has %d vertices; skipping.\n",
 	      qh_setsize(facet->vertices));
       continue;
     }
 
     if ((facet->toporient ^ qh_ORIENTclock)
 	|| (qh hull_dim > 2 && !facet->simplicial)) {
-      v = 0; /* vertex in tet (0, 1, 2, 3) */
       FOREACHvertex_(facet->vertices)
-	tet_verts[v++] = qh_pointid(vertex->point);
+	(*tet_verts)[v++] = qh_pointid(vertex->point);
     } else {
-      v = 0;
       FOREACHvertexreverse12_(facet->vertices)
-	tet_verts[v++] = qh_pointid(vertex->point);
+	(*tet_verts)[v++] = qh_pointid(vertex->point);
     }
-
-    gen_delaunay_tet(tet_verts, vblock, gids, nids, dirs, rics, lid, num_recvd, &n, &m);
 
   } /* for all tets */
 
-  /* adjust num_tets in case any facets were skipped */
-  vblock->num_loc_tets = n / 4;
-  vblock->num_rem_tets = m / 4;
+  assert(numfacets == v / 4); /* sanity */
 
-  return (vblock->num_loc_tets + vblock->num_rem_tets);
+  return numfacets;
 
 }
+/*--------------------------------------------------------------------------*/

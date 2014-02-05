@@ -155,9 +155,11 @@ void tess(float **particles, int *num_particles, char *out_file) {
   pass -1.0 to skip either or both bounds
   wrap: whether wraparound neighbors are used
   times: times for particle exchange, voronoi cells, convex hulls, and output
+  outfile: output file name
 */
 void tess_test(int tot_blocks, int *data_size, float jitter, 
-	       float minvol, float maxvol, int wrap, double *times) {
+	       float minvol, float maxvol, int wrap, double *times,
+	       char *outfile) {
 
   float **particles; /* particles[block_num][particle] 
 			 where each particle is 3 values, px, py, pz */
@@ -194,7 +196,7 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   /* write_particles(nblocks, particles, num_particles, "pts.out"); */
 
   /* compute tessellations */
-  voronoi_delaunay(nblocks, particles, num_particles, times, "vor.out");
+  voronoi_delaunay(nblocks, particles, num_particles, times, outfile);
 
   /* cleanup */
   for (i = 0; i < nblocks; i++)
@@ -2424,121 +2426,148 @@ void add_empty_int(int **vals, int index, int *numitems, int *maxitems,
 } 
 /*--------------------------------------------------------------------------*/
 /* 
-   determines if the tetrahedron is local, and records the necessary information in vblock
+   for all tets, determines local, and records the necessary 
+   information in vblock
   
-   tet_verts: vertices of the tetrahedron
-   n: number of vertices in strictly local final tets
-   m: number of vertices in non strictly local final tets
- */
-void gen_delaunay_tet(int tet_verts[4], struct vblock_t *vblock,
-		      int *gids, int *nids, unsigned char *dirs,
-		      struct remote_ic_t *rics, int lid, int num_recvd,
-		      int *n, int *m) {
+   tet_verts: vertices of the tetrahedra in the block
+   num_tets: number of tets in this block
+   vblock: local block
+   gids: global block ids of owners of received particles in each of my blocks
+   nids: native particle ids of received particles in each of my blocks
+   dirs: wrapping directions of received particles in each of my blocks
+   rics: is complete status of received particles
+   lid: local id of this block
+   num_recv: number of received particles
+*/
+void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
+	      int *gids, int *nids, unsigned char *dirs,
+	      struct remote_ic_t *rics, int lid, int num_recvd) {
 
   int v; /* vertex in current tet (0, 1, 2, 3) */
+  int t; /* current tet */
+  int n = 0; /* number of vertices in strictly local final tets */
+  int m = 0; /* number of vertices in non strictly local final tets */
   int i;
 
-  /* test whether tet is strictly local (all vertices are local) or not */
-  for (v = 0; v < 4; v++) {
-    if (tet_verts[v] >= vblock->num_orig_particles)
-        break;
-  }
-  if (v == 4) { /* local, store it */
-   /* filter out tets that touch local incomplete voronoi cells */
-    int v1;
-    for (v1 = 0; v1 < 4; v1++) {
-      if (!vblock->is_complete[tet_verts[v1]])
-        break;
-    }
-    if (v1 == 4) {
-      int v2;
-      for (v2 = 0; v2 < 4; v2++)
-        vblock->loc_tets[(*n)++] = tet_verts[v2];
-    }
-  }
-  /* not strictly local, at least one vertex is remote, and at least one
-     vertex is local */
-  else if (tet_verts[0] < vblock->num_orig_particles ||
-           tet_verts[1] < vblock->num_orig_particles ||
-           tet_verts[2] < vblock->num_orig_particles ||
-           tet_verts[3] < vblock->num_orig_particles) {
+  /* todo: static allocation wasteful; we don't know how many tets
+     are local and how many are remote; use add_int to groew arrays instead */
+  vblock->loc_tets = (int *)malloc(num_tets * 4 * sizeof(int));
+  vblock->rem_tet_gids = (int *)malloc(num_tets * 4 * sizeof(int));
+  vblock->rem_tet_nids = (int *)malloc(num_tets * 4 * sizeof(int));
+  vblock->rem_tet_wrap_dirs = (unsigned char *)malloc(num_tets * 4);
 
-    /* decide whether I should own this tet, owner will be minimum
-       block gid of all contributors to this tet */
-    int sort_gids[4]; /* gids of 4 vertices */
+  /* for all tets */
+  for (t = 0; t < num_tets; t++) {
+
+    /* test whether tet is strictly local (all vertices are local) or not */
     for (v = 0; v < 4; v++) {
-      if (tet_verts[v] < vblock->num_orig_particles)
-        sort_gids[v] = DIY_Gid(0, lid);
-      else
-        sort_gids[v] = gids[tet_verts[v] - vblock->num_orig_particles];
+      if (tet_verts[t * 4 + v] >= vblock->num_orig_particles)
+        break;
     }
-    qsort(sort_gids, 4, sizeof(int), &compare);
-
-    /* I will own the tet */
-    if (sort_gids[0] == DIY_Gid(0, lid)) {
-
+    if (v == 4) { /* local, store it */
       /* filter out tets that touch local incomplete voronoi cells */
+      int v1;
+      for (v1 = 0; v1 < 4; v1++) {
+	if (!vblock->is_complete[tet_verts[t * 4 + v1]])
+	  break;
+      }
+      if (v1 == 4) {
+	int v2;
+	for (v2 = 0; v2 < 4; v2++)
+	  vblock->loc_tets[n++] = tet_verts[t * 4 + v2];
+      }
+    }
+    /* not strictly local, at least one vertex is remote, and at least one
+       vertex is local */
+    else if (tet_verts[t * 4 + 0] < vblock->num_orig_particles ||
+	     tet_verts[t * 4 + 1] < vblock->num_orig_particles ||
+	     tet_verts[t * 4 + 2] < vblock->num_orig_particles ||
+	     tet_verts[t * 4 + 3] < vblock->num_orig_particles) {
+
+      /* decide whether I should own this tet, owner will be minimum
+	 block gid of all contributors to this tet */
+      int sort_gids[4]; /* gids of 4 vertices */
       for (v = 0; v < 4; v++) {
+	if (tet_verts[t * 4 + v] < vblock->num_orig_particles)
+	  sort_gids[v] = DIY_Gid(0, lid);
+	else
+	  sort_gids[v] = gids[tet_verts[t * 4 + v] - 
+			      vblock->num_orig_particles];
+      }
+      qsort(sort_gids, 4, sizeof(int), &compare);
 
-        /* if this vertex is local, check its completion status */
-        if (tet_verts[v] < vblock->num_orig_particles &&
-            !vblock->is_complete[tet_verts[v]])
-          break;
+      /* I will own the tet */
+      if (sort_gids[0] == DIY_Gid(0, lid)) {
 
-        /* if this vertex is remote, check its completion status */
-        if (tet_verts[v] >= vblock->num_orig_particles) {
+	/* filter out tets that touch local incomplete voronoi cells */
+	for (v = 0; v < 4; v++) {
 
-          /* find the correct entry in the completion status
-             todo: linear search for now, accelerate later */
-          for (i = 0; i < num_recvd; i++) {
-            if (rics[i].gid == 
-      	  gids[tet_verts[v] - vblock->num_orig_particles] &&
-      	  rics[i].nid == 
-      	  nids[tet_verts[v] - vblock->num_orig_particles])
-      	break;
-          }
-          assert(i < num_recvd); /* sanity */
-          if (!rics[i].is_complete)
-            break;
-        } /* if vertex is remote */
+	  /* if this vertex is local, check its completion status */
+	  if (tet_verts[t * 4 + v] < vblock->num_orig_particles &&
+	      !vblock->is_complete[tet_verts[t * 4 + v]])
+	    break;
 
-      } /* for four vertices */
+	  /* if this vertex is remote, check its completion status */
+	  if (tet_verts[t * 4 + v] >= vblock->num_orig_particles) {
 
-      if (v == 4) { /* complete */
+	    /* find the correct entry in the completion status
+	       todo: linear search for now, accelerate later */
+	    for (i = 0; i < num_recvd; i++) {
+	      if (rics[i].gid == 
+		  gids[tet_verts[t * 4 + v] - vblock->num_orig_particles] &&
+		  rics[i].nid == 
+		  nids[tet_verts[t * 4 + v] - vblock->num_orig_particles])
+		break;
+	    }
+	    assert(i < num_recvd); /* sanity */
+	    if (!rics[i].is_complete)
+	      break;
+	  } /* if vertex is remote */
 
-        int v1;
-        /* save four remote verts */
-        for (v1 = 0; v1 < 4; v1++) {
+	} /* for four vertices */
 
-          /* this vertex is local */
-          if (tet_verts[v1] < vblock->num_orig_particles) {
-            vblock->rem_tet_gids[*m] = DIY_Gid(0, lid);
-            vblock->rem_tet_nids[*m] = tet_verts[v1];
-            vblock->rem_tet_wrap_dirs[*m] = 0x00;
-          }
-          /* this vertex is remote */
-          else {
-            /* need to subtract number of original (local) particles 
-      	 from vertex to index into gids and nids; 
-      	 they are only for remote particles but tet verts
-      	 are for all particles, local + remote */
-            vblock->rem_tet_gids[*m] =
-      	gids[tet_verts[v1] - vblock->num_orig_particles];
-            vblock->rem_tet_nids[*m] = 
-      	nids[tet_verts[v1] - vblock->num_orig_particles];
-            vblock->rem_tet_wrap_dirs[*m] = 
-      	dirs[tet_verts[v1] - vblock->num_orig_particles];
-          }
+	if (v == 4) { /* complete */
 
-          (*m)++;
+	  int v1;
+	  /* save four remote verts */
+	  for (v1 = 0; v1 < 4; v1++) {
 
-        } /* same four remote verts */
+	    /* this vertex is local */
+	    if (tet_verts[t * 4 + v1] < vblock->num_orig_particles) {
+	      vblock->rem_tet_gids[m] = DIY_Gid(0, lid);
+	      vblock->rem_tet_nids[m] = tet_verts[t * 4 + v1];
+	      vblock->rem_tet_wrap_dirs[m] = 0x00;
+	    }
+	    /* this vertex is remote */
+	    else {
+	      /* need to subtract number of original (local) particles 
+		 from vertex to index into gids and nids; 
+		 they are only for remote particles but tet verts
+		 are for all particles, local + remote */
+	      vblock->rem_tet_gids[m] =
+		gids[tet_verts[t * 4 + v1] - vblock->num_orig_particles];
+	      vblock->rem_tet_nids[m] = 
+		nids[tet_verts[t * 4 + v1] - vblock->num_orig_particles];
+	      vblock->rem_tet_wrap_dirs[m] = 
+		dirs[tet_verts[t * 4 + v1] - vblock->num_orig_particles];
+	    }
 
-      } /* complete */
+	    m++;
 
-    } /* I will own this tet */
+	  } /* same four remote verts */
 
-  } /* not strictly local */
+	} /* complete */
+
+      } /* I will own this tet */
+
+    } /* not strictly local */
+
+  } /* for all tets */
+
+  /* store quantities of local and nonlocal tets */
+  vblock->num_loc_tets = n / 4;
+  vblock->num_rem_tets = m / 4;
+
 }
 /*--------------------------------------------------------------------------*/
 /*
