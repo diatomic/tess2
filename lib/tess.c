@@ -29,6 +29,9 @@ static float min_vol, max_vol; /* cell volume range */
 static int nblocks; /* number of blocks per process */
 static double *times; /* timing info */
 static int wrap_neighbors; /* whether wraparound neighbors are used */
+/* CLP - if wrap_neighbors is 0 then check this condition. */
+static int walls_on;
+
 
 /* pnetcdf output */
 #define PNETCDF_IO
@@ -54,7 +57,7 @@ static int wrap_neighbors; /* whether wraparound neighbors are used */
 void tess_init(int num_blocks, int *gids, 
 	       struct bb_t *bounds, struct gb_t **neighbors, 
 	       int *num_neighbors, float *global_mins, float *global_maxs, 
-	       int wrap, float minvol, float maxvol, MPI_Comm mpi_comm,
+	       int wrap, int twalls_on, float minvol, float maxvol, MPI_Comm mpi_comm,
 	       double *all_times) {
 
   int i;
@@ -66,6 +69,7 @@ void tess_init(int num_blocks, int *gids,
   max_vol = maxvol;
   times = all_times;
   wrap_neighbors = wrap;
+  walls_on = twalls_on;
 
   /* data extents */
   for(i = 0; i < 3; i++) {
@@ -97,7 +101,7 @@ void tess_init(int num_blocks, int *gids,
   all_times: times for particle exchange, voronoi cells, convex hulls, and output
 */
 void tess_init_diy_exist(int num_blocks, float *global_mins, 
-			 float *global_maxs, int wrap, float minvol,
+			 float *global_maxs, int wrap, int twalls_on, float minvol,
 			 float maxvol, MPI_Comm mpi_comm, double *all_times) {
 
   int i;
@@ -109,6 +113,7 @@ void tess_init_diy_exist(int num_blocks, float *global_mins,
   max_vol = maxvol;
   times = all_times;
   wrap_neighbors = wrap;
+  walls_on = twalls_on;
 
   /* data extents */
   for(i = 0; i < 3; i++) {
@@ -158,7 +163,7 @@ void tess(float **particles, int *num_particles, char *out_file) {
   outfile: output file name
 */
 void tess_test(int tot_blocks, int *data_size, float jitter, 
-	       float minvol, float maxvol, int wrap, double *times,
+	       float minvol, float maxvol, int wrap, int twalls_on, double *times,
 	       char *outfile) {
 
   float **particles; /* particles[block_num][particle] 
@@ -174,6 +179,9 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   min_vol = minvol;
   max_vol = maxvol;
   wrap_neighbors = wrap;
+  walls_on = twalls_on;
+  
+  fprintf(stderr, "Wrap %d, Walls %d\n", wrap_neighbors,walls_on);
 
   /* data extents */
   for(i = 0; i < 3; i++) {
@@ -236,7 +244,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
   int **hdrs; /* headers */
   struct vblock_t *vblocks; /* voronoi blocks */
-  struct vblock_t *tblocks; /* remporary voronoi blocks */
+  struct vblock_t *tblocks; /* temporary voronoi blocks */
 
   num_orig_particles = (int *)malloc(nblocks * sizeof(int));
   for (i = 0; i < nblocks; i++)
@@ -247,6 +255,15 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   /* allocate and initialize blocks */
   create_blocks(nblocks, &vblocks, &hdrs); /* final */
   create_blocks(nblocks, &tblocks, NULL); /* temporary */
+  
+  /*CLP - if !wrap_neighbors && walls, then initialize wall structure using data_mins and data_maxs
+    CLP  - Currently assuimg walls on all sides, but format can easily be modified to be ANY set of walls */
+ struct wall_t *walls;
+ int num_walls = 0;
+ if (!wrap_neighbors && walls_on)
+    {
+    create_walls(&num_walls,&walls);
+    }
 
 #ifdef TIMING
   MPI_Barrier(comm);
@@ -255,8 +272,8 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
   /* create local voronoi cells */
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
-
-#ifdef TIMING
+  
+  #ifdef TIMING
   MPI_Barrier(comm);
   times[LOCAL_TIME] = MPI_Wtime() - times[LOCAL_TIME];
   if (rank == 0)
@@ -304,10 +321,16 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
      it would be wiser to just insert new points. Current limitation: qhull */
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
 
+  /* CLP - Create  pointers to wall-mirror particles for each block */
+  float** mirror_particles;
+  int *num_mirror_particles; /* number of received particles for each block */
+  mirror_particles = (float **)malloc(nblocks * sizeof(float *));
+  num_mirror_particles = (int *)malloc(nblocks * sizeof(int));
+  
+  /* CLP - give walls and pointer for creating wall-mirror particles to function call*/
   for (i = 0; i < nblocks; i++)
-    incomplete_cells_final(&tblocks[i], &vblocks[i], i, 
-			   convex_hull_particles[i], 
-			   num_convex_hull_particles[i]);
+    incomplete_cells_final(&tblocks[i], &vblocks[i], i, convex_hull_particles[i], num_convex_hull_particles[i], walls, num_walls, &mirror_particles[i],&num_mirror_particles[i]);
+
 
   /* cleanup local temporary blocks */
   destroy_blocks(nblocks, tblocks, NULL);
@@ -315,12 +338,22 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   /* exchange particles with neighbors */
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
-
+    
+  /* CLP - Function to add wall-mirror particles to particles (see neighbor_particles())*/
+  add_mirror_particles(nblocks,mirror_particles,num_mirror_particles,particles,num_particles,num_orig_particles,
+		     gids, nids, dirs);
+  
   /* cleanup convex_hull_particles */
   for (i = 0; i < nblocks; ++i)
     free(convex_hull_particles[i]);
   free(convex_hull_particles);
   free(num_convex_hull_particles);
+
+  /* CLP cleanup */
+  destroy_walls(num_walls, walls);
+  for (i = 0; i < nblocks; ++i)
+    free(mirror_particles[i]);
+  free(num_mirror_particles);
 
 #ifdef TIMING
   MPI_Barrier(comm);
@@ -384,13 +417,14 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   MPI_Barrier(comm);
   times[OUT_TIME] = MPI_Wtime() - times[OUT_TIME];
 #endif
-
+ 
   /* collect stats */
   collect_stats(nblocks, vblocks, times);
 
   /* cleanup */
   destroy_blocks(nblocks, vblocks, hdrs);
   free(num_orig_particles);
+  
 
 }
 /*--------------------------------------------------------------------------*/
@@ -1631,6 +1665,7 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
     sent.num_gbs = 0;
 
     /* for all vertex indices in the current cell */
+    
     for (k = 0; k < tblock->num_cell_verts[j]; k++) {
 
       vid = tblock->cells[n];
@@ -1647,8 +1682,11 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 	float sph_rad = distance(pt, &tblock->sites[3 * j]);
 	DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
 			     MAX_NEIGHBORS, pt, sph_rad);
+
+          
       }
       else {
+      
 	/* should do this at most once per cell because at most
 	   one infinite vertex */
 	complete = 0;
@@ -1661,10 +1699,11 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 			    allocated_convex_hull * sizeof(int));
 	}
       }
-
+      
       n++;
 
     } /* for all vertex indices in this cell */
+    
 
     rp.x = tblock->sites[3 * j];
     rp.y = tblock->sites[3 * j + 1];
@@ -1672,6 +1711,7 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
     rp.gid = DIY_Gid(0, lid);
     rp.nid = j;
     rp.dir = 0x00;
+    
 
     /* particle needs to be sent either to particular neighbors or to all */
     if (!complete || sent.num_gbs) {
@@ -1726,11 +1766,21 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
    lid: local id of block
    convex_hull_particles: convex hull particles to check
    num_convex_hull_particles: number of particles
+   CLP - Recieve List of Planar Walls
+   walls: walls
+   num_walls: number of walls
+   CLP - Return List of Mirror Points
+   mirror_particles: sites reflected across walls
+   num_mirror_particles: the number of mirror particles
 */
 void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 			    int lid,
 			    int* convex_hull_particles,
-			    int  num_convex_hull_particles) {
+			    int  num_convex_hull_particles,
+                struct wall_t *walls,
+                int num_walls,
+                float** mirror_particles,
+                int*  num_mirror_particles) {
   int i, j, k, l, n;
   int vid; /* vertex id */
   struct bb_t bounds; /* local block bounds */
@@ -1749,19 +1799,30 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
   DIY_Get_neighbors(0, lid, all_neigh_gbs);
 
   /* We must go through all the particles to maintain n
-     (the index into the vetices array) */
+     (the index into the vertices array) */
+  /*CLP*/
+  int* wall_cut = (int *)malloc(num_walls * sizeof(int));
+  int allocated_mirror_particles = 8;
+  *mirror_particles = (float*)malloc(8 * 3* sizeof(float));
+  *num_mirror_particles = 0;
+  
+    
   i = 0; n = 0;
   for (j = 0; j < tblock->num_orig_particles; j++) {
 
     sent.num_gbs = 0;
 
+    /* CLP - zero generate-wall-point array (length of number of walls) */
+    for (int wi = 0; wi < num_walls; wi++)
+        wall_cut[wi] = 0;
+
     if (j == convex_hull_particles[i]) {
       
       /* direction of closest neighbor */
       unsigned char nearest_dir = 
-	nearest_neighbor(&(tblock->sites[3*j]), &bounds);
+    nearest_neighbor(&(tblock->sites[3*j]), &bounds);
 
-      for (k = 0; k < tblock->num_cell_verts[j]; ++k) {
+    for (k = 0; k < tblock->num_cell_verts[j]; ++k) {
 
 	vid = tblock->cells[n + k];
 
@@ -1780,6 +1841,11 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	      sent.num_gbs++;
 	    }
 	  }
+ 
+       /* CLP - set the mirror-generate array to all ones  (extra calculations but simpler to assume!) */
+        for (int wi = 0; wi < num_walls; wi++)
+            wall_cut[wi] = 1;
+      
 	} 
 	else { /* vid */
 
@@ -1803,7 +1869,18 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	      sent.num_gbs--;
 	    }
 	  }
-
+     
+    /* CLP - for each wall */
+    for (int wi = 0; wi < num_walls; wi++)
+            {
+            /* CLP - If the mirror-generate[wall-index] is not 1 */
+            if (!wall_cut[wi])
+                {
+                /* CLP - generate the sign of pt relative to the wall.  If it is not positive (wall vectors must point inward!) then set the mirror-generate[wall-index] to one  */
+                wall_cut[wi] += test_outside(pt,&walls[wi]);
+                //if (wall_cut[wi]) fprintf(stderr, "Point %f, %f, %f is outside wall %d\n",pt[0],pt[1],pt[2],wi);
+                }
+            }
 	} /* vid */
 
       } /* for k = 0; k < tblock->num_cell_verts[j] */
@@ -1830,14 +1907,66 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
       }
 
       ++i;
-      if (i >= num_convex_hull_particles)
-	break;
+    /* CLP disabling this break when there are walls because I need to complete. */
+      if (!num_walls && i >= num_convex_hull_particles)
+        break;
 
     } /* if (j == convex_hull_particles[i]) */
-
+    /* CLP - else { add my test, (loop through vids, test looks like above }*/
+    else {
+          for (k = 0; k < tblock->num_cell_verts[j]; ++k) {
+              vid = tblock->cells[n + k];
+              float pt[3]; /* target point as a float (verts are double) */
+              pt[0] = tblock->verts[3 * vid];
+              pt[1] = tblock->verts[3 * vid + 1];
+              pt[2] = tblock->verts[3 * vid + 2];
+              /* CLP - for each wall */
+              for (int wi = 0; wi < num_walls; wi++)
+                {
+                /* CLP - If the mirror-generate[wall-index] is not 1 */
+                if (!wall_cut[wi])
+                    {
+                    /* CLP - generate the sign of pt relative to the wall.  If it is not positive (wall vectors must point inward!) then set the mirror-generate[wall-index] to one  */
+                    wall_cut[wi] += test_outside(pt,&walls[wi]);
+                    }
+                }
+            }
+    
+    }
+    
+        
+    /* CLP - for each mirror-generate index that is 1, generate the mirror point given site rp and the wall */
+        /* CLP - Here I am building a list of points.  Where do they go? Return as pointer */
+    for (int wi =0; wi < num_walls; wi++)
+        if (wall_cut[wi]) {
+            float rpt[3];
+            float spt[3];
+            spt[0] = tblock->sites[3 * j];
+            spt[1] = tblock->sites[3 * j + 1];
+            spt[2] = tblock->sites[3 * j + 2];
+            generate_mirror(rpt,spt,&walls[wi]);
+            
+            (*mirror_particles)[*num_mirror_particles*3] = rpt[0];
+            (*mirror_particles)[*num_mirror_particles*3 +1] = rpt[1];
+            (*mirror_particles)[*num_mirror_particles*3 +2] = rpt[2];
+            ++(*num_mirror_particles);
+            
+            if (*num_mirror_particles >= allocated_mirror_particles) {
+                allocated_mirror_particles *= 2;
+                *mirror_particles =
+                (float*)realloc(*mirror_particles,
+			    allocated_mirror_particles * 3 * sizeof(float));
+                }
+        }
+      
+    
     n += tblock->num_cell_verts[j];
-
+    
   }
+  
+  /*CLP cleanup*/
+  free(wall_cut);
+
 
 }
 /*--------------------------------------------------------------------------*/
@@ -1960,6 +2089,7 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 
   /* for all cells up to original number of input particles (each block 
      retains only those cells whose particles it originally had) */
+    
   for (j = 0; j < vblock->num_orig_particles; j++) {
 
     /* init */
@@ -1968,6 +2098,8 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 
     int complete = 1;
     too_small = (min_vol > 0.0 ? 1 : 0);
+    
+
 
     /* debug */
 /*     fprintf(stderr, "cell %d has %d verts: ", j, vblock->num_cell_verts[j]); */
@@ -1976,7 +2108,7 @@ void complete_cells(struct vblock_t *vblock, int lid) {
     for (k = 0; k < vblock->num_cell_verts[j]; k++) {
 
       if (k == 0)
-	start_n = n;
+        start_n = n;
 
       vid = vblock->cells[n];
 
@@ -1992,17 +2124,40 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 	   fabs(vblock->verts[3 * vid + 2] - vblock->verts[2]) < eps) ||
 
 	  /* out of overall data bounds when wrapping is off */
-	  (!wrap_neighbors &&
-	   (vblock->verts[3 * vid]     < data_mins[0] ||
-	    vblock->verts[3 * vid]     > data_maxs[0] ||
-	    vblock->verts[3 * vid + 1] < data_mins[1] ||
-	    vblock->verts[3 * vid + 1] > data_maxs[1] ||
-	    vblock->verts[3 * vid + 2] < data_mins[2] ||
-	    vblock->verts[3 * vid + 2] > data_maxs[2]) ) ) {
+        (!wrap_neighbors &&
+	   (vblock->verts[3 * vid]     < (data_mins[0] - eps) ||
+	    vblock->verts[3 * vid]     > (data_maxs[0] + eps) ||
+	    vblock->verts[3 * vid + 1] < (data_mins[1] - eps) ||
+	    vblock->verts[3 * vid + 1] > (data_maxs[1] + eps) ||
+	    vblock->verts[3 * vid + 2] < (data_mins[2] - eps) ||
+	    vblock->verts[3 * vid + 2] > (data_maxs[2] + eps) ) ) ) {
 
-	complete = 0;
+        complete = 0;
+        
+        /*CLP -debug */
+        
+        if (fabs(vblock->verts[3 * vid] - vblock->verts[0]) < eps &&
+	   fabs(vblock->verts[3 * vid + 1] - vblock->verts[1]) < eps &&
+	   fabs(vblock->verts[3 * vid + 2] - vblock->verts[2]) < eps)
+               //fprintf(stderr, "cell %d failed because failed because infinite\n",j);
+           
+        if   (!wrap_neighbors &&
+	   (vblock->verts[3 * vid]     < (data_mins[0] - eps) ||
+	    vblock->verts[3 * vid]     > (data_maxs[0] + eps) ||
+	    vblock->verts[3 * vid + 1] < (data_mins[1] - eps) ||
+	    vblock->verts[3 * vid + 1] > (data_maxs[1] + eps) ||
+	    vblock->verts[3 * vid + 2] < (data_mins[2] - eps) ||
+	    vblock->verts[3 * vid + 2] > (data_maxs[2] + eps) ) )
+            {
+           // fprintf(stderr, "cell %d failed because vertex out of bounds, (%f, %f, %f) \n",j, vblock->verts[3 * vid],vblock->verts[3 * vid + 1], vblock->verts[3 * vid + 2] );
+           // fprintf(stderr,"%d%d%d%d%d%d",)
+            }
+
+
+
 	n += (vblock->num_cell_verts[j] - k); /* skip rest of this cell */
 	break;
+    
 
       } /* if */
 
@@ -2030,7 +2185,10 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 
       /* check if volume is too small at the end of the cell */
       if (k == vblock->num_cell_verts[j] - 1 && too_small)
-	complete = 0;
+        {
+        complete = 0;
+        //fprintf(stderr, "cell %d failed because too small\n",j);
+        }
       n++;
 
     } /* for all vertex indices in this cell */
@@ -2041,7 +2199,14 @@ void complete_cells(struct vblock_t *vblock, int lid) {
       vblock->is_complete[j] = 1;
     }
     else
+      {
+      /*
+      if (!cell_bounds(vblock, j, start_n))
+            fprintf(stderr, "cell %d failed because site not in bounds\n",j);
+      */
+          
       vblock->is_complete[j] = 0;
+      }
 
   } /* for all cells */
 
@@ -2122,8 +2287,7 @@ int gen_particles(int lid, float **particles, float jitter) {
 	else if ((*particles)[3 * n + 2] + jit >= bounds.min[2] &&
 		 (*particles)[3 * n + 2] + jit <= bounds.max[2])
 	  (*particles)[3 * n + 2] += jit;
-
-
+  
 	n++;
 
       }
@@ -2646,3 +2810,169 @@ void handle_error(int errcode, MPI_Comm comm, char *str) {
 
 }
 /*--------------------------------------------------------------------------*/
+/* CLP
+  creates and initializes walls
+
+  walls: pointer to array of walls
+   
+  Important!  [a,b,c] must be a unit length vector!
+
+*/
+
+/* allocate blocks and headers */
+
+void create_walls(int *num_walls, struct wall_t **walls) {
+
+  int i, j;
+
+  (*num_walls) = 6;
+  *walls = (struct wall_t*)malloc(sizeof(struct wall_t) * (*num_walls));
+  
+  // bottom xy wall
+  (*walls)[0].a = 0;
+  (*walls)[0].b = 0;
+  (*walls)[0].c = 1;
+  (*walls)[0].d = -data_mins[2];
+  
+  // forward xz wall
+  (*walls)[1].a = 0;
+  (*walls)[1].b = 1;
+  (*walls)[1].c = 0;
+  (*walls)[1].d = -data_mins[1];
+  
+  // left yz wall
+  (*walls)[2].a = 1;
+  (*walls)[2].b = 0;
+  (*walls)[2].c = 0;
+  (*walls)[2].d = -data_mins[0];
+  
+  // top xy wall
+  (*walls)[3].a = 0;
+  (*walls)[3].b = 0;
+  (*walls)[3].c = -1;
+  (*walls)[3].d = data_maxs[2];
+  
+  // back xz wall
+  (*walls)[4].a = 0;
+  (*walls)[4].b = -1;
+  (*walls)[4].c = 0;
+  (*walls)[4].d = data_maxs[1];
+  
+  // right yz wall
+  (*walls)[5].a = -1;
+  (*walls)[5].b = 0;
+  (*walls)[5].c = 0;
+  (*walls)[5].d = data_maxs[0];
+  
+  
+  }
+/*---------------------------------------------------------------------------*/
+/* CLP
+  frees walls
+
+  num_walls: number of walls
+  walls: array of walls
+*/
+void destroy_walls(int num_walls, struct wall_t *walls) {
+
+  if (num_walls) {
+    free(walls);
+    //fprintf(stderr, "freed walls\n");
+
+    }
+
+ }
+
+ /*---------------------------------------------------------------------------*/
+/* CLP
+  determines if point is inside or outside wall
+  http://mathworld.wolfram.com/Plane.html Equation (24) Signed point-plane distance, ignoring positive denominator
+  pt: point
+  wall: wall
+*/
+
+int test_outside(const float *pt,const struct wall_t *wall)
+{
+    float D = pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + wall->d;
+    if (D > 0)
+        return 0;
+    else {
+       // fprintf(stderr, "Out of Bounds (%f,%f,%f)\n",pt[0],pt[1],pt[2]);
+        return 1;
+        }
+}
+
+/*---------------------------------------------------------------------------*/
+/* CLP
+  returns point reflected across wall
+  http://mathworld.wolfram.com/Plane.html Equation (24) Signed point-plane distance, including denominator
+  rpt
+  pt: site-point
+  wall: wall
+*/
+void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall)
+{
+
+    /*signed distance from wall to site point */
+    float D = (pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + wall->d)/sqrt(wall->a*wall->a + wall->b*wall->b + wall->c*wall->c);
+    
+    rpt[0] = pt[0] - 2*D*wall->a;
+    rpt[1] = pt[1] - 2*D*wall->b;
+    rpt[2] = pt[2] - 2*D*wall->c;
+
+
+}
+
+/*---------------------------------------------------------------------------*/
+/* CLP
+ Adds mirror particles to list
+*/
+void add_mirror_particles(int nblocks, float **mirror_particles, int *num_mirror_particles, float **particles,
+			int *num_particles, int *num_orig_particles,
+			int **gids, int **nids, unsigned char **dirs)
+{
+  int i,j;
+    
+  /* copy mirror particles to particles */
+  for (i = 0; i < nblocks; i++) {
+
+    /* debug */
+/*     fprintf(stderr, "num_particles in gid %d before exchange is %d\n", */
+/* 	    DIY_Gid(0, i), num_particles[i]); */
+
+    int n = (num_particles[i] - num_orig_particles[i]);
+    int new_remote_particles = num_mirror_particles[i] + n;
+
+    gids[i] = (int *)realloc(gids[i], new_remote_particles * sizeof(int));
+    nids[i] = (int *)realloc(nids[i], new_remote_particles * sizeof(int));
+    dirs[i] = (unsigned char *)realloc(dirs[i], new_remote_particles);
+    if (num_mirror_particles[i]) {
+
+      /* grow space */
+      particles[i] = 
+	(float *)realloc(particles[i], 
+			 (num_particles[i] + num_mirror_particles[i]) *
+			 3 * sizeof(float));
+
+      /* copy mirror particles */
+      for (j = 0; j < num_mirror_particles[i]; j++) {
+
+            particles[i][3 * num_particles[i]] = mirror_particles[i][3*j];
+            particles[i][3 * num_particles[i] + 1] = mirror_particles[i][3*j+1];
+            particles[i][3 * num_particles[i] + 2] = mirror_particles[i][3*j+2];
+            gids[i][n] = -1;
+            nids[i][n] = -1;
+            dirs[i][n] = 0x00;
+
+            num_particles[i]++;
+            n++;
+
+      } /* copy mirror particles */
+
+    } /* if num_mirror_particles */
+  }
+
+}
+
+
+

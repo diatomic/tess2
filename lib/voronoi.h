@@ -155,4 +155,14 @@ struct stats_t {
   int dense_hist[MAX_HIST_BINS]; /* cell density histogram */
 };
 
+/*CLP  - struct walls - using general equation of plane per http://mathworld.wolfram.com/Plane.html */
+struct wall_t {
+float a;
+float b;
+float c;
+float d;
+};
+
+
+
 #endif

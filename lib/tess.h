@@ -29,7 +29,7 @@ extern MPI_Comm comm; /* MPI communicator */
 extern "C"
 #endif
 void tess_test(int tot_blocks, int *data_size, float jitter,
-	       float minvol, float maxvol, int wrap, double *all_times,
+	       float minvol, float maxvol, int wrap, int twalls_on, double *all_times,
 	       char *outfile);
 
 #ifdef __cplusplus
@@ -38,14 +38,14 @@ extern "C"
 void tess_init(int num_blocks, int *gids, 
 	       struct bb_t *bounds, struct gb_t **neighbors, 
 	       int *num_neighbors, float *global_mins, float *global_maxs, 
-	       int wrap, float minvol, float maxvol, MPI_Comm mpi_comm,
+	       int wrap, int twalls_on, float minvol, float maxvol, MPI_Comm mpi_comm,
 	       double *times);
 
 #ifdef __cplusplus
 extern "C"
 #endif
 void tess_init_diy_exist(int num_blocks, float *global_mins, 
-			 float *global_maxs, int wrap,
+			 float *global_maxs, int wrap, int twalls_on,
 			 float minvol, float maxvol, 
 			 MPI_Comm mpi_comm, double *all_times);
 
@@ -76,7 +76,11 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 			      int** convex_hull_particles, int* num_convex_hull_particles);
 void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock, 
 			    int lid,
-			    int* convex_hull_particles, int num_convex_hull_particles);
+			    int* convex_hull_particles, int num_convex_hull_particles,
+                struct wall_t *walls,
+                int num_walls,
+                float** mirror_particles,
+                int*  num_mirror_particles);
 #ifdef __cplusplus
 extern "C"
 #endif
@@ -147,4 +151,11 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 	      int *gids, int *nids, unsigned char *dirs,
 	      struct remote_ic_t *rics, int lid, int num_recvd);
 
+void create_walls(int *num_walls, struct wall_t **walls);
+void destroy_walls(int num_walls, struct wall_t *walls);
+int test_outside(const float * pt, const struct wall_t *wall);
+void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall);
+void add_mirror_particles(int nblocks, float **mirror_particles, int *num_mirror_particles, float **particles,
+			int *num_particles, int *num_orig_particles,
+			int **gids, int **nids, unsigned char **dirs);
 #endif

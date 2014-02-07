@@ -3,7 +3,7 @@
 #include "tess.h"
 
 void GetArgs(int argc, char **argv, int &tb, int *dsize, float *jitter,
-	     float *minvol, float *maxvol, int *wrap, char *outfile);
+	     float *minvol, float *maxvol, int *wrap, int *walls, char *outfile);
 
 int main(int argc, char *argv[]) {
 
@@ -13,13 +13,14 @@ int main(int argc, char *argv[]) {
   float minvol, maxvol; // volume range, -1.0 = unused
   double times[MAX_TIMES]; // timing
   int wrap; // wraparound neighbors flag
+  int walls; // apply walls to simulation (wrap must be off)
   char outfile[256]; // output file name
 
   MPI_Init(&argc, &argv);
 
-  GetArgs(argc, argv, tb, dsize, &jitter, &minvol, &maxvol, &wrap, outfile);
+  GetArgs(argc, argv, tb, dsize, &jitter, &minvol, &maxvol, &wrap, &walls, outfile);
 
-  tess_test(tb, dsize, jitter, minvol, maxvol, wrap, times, outfile);
+  tess_test(tb, dsize, jitter, minvol, maxvol, wrap, walls, times, outfile);
 
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -33,9 +34,9 @@ int main(int argc, char *argv[]) {
 // gets command line args
 //
 void GetArgs(int argc, char **argv, int &tb, int *dsize, float *jitter,
-	     float *minvol, float *maxvol, int *wrap, char *outfile) {
+	     float *minvol, float *maxvol, int *wrap, int *walls, char *outfile) {
 
-  assert(argc >= 10);
+  assert(argc >= 11);
 
   tb = atoi(argv[1]);
   dsize[0] = atoi(argv[2]);
@@ -45,7 +46,8 @@ void GetArgs(int argc, char **argv, int &tb, int *dsize, float *jitter,
   *minvol = atof(argv[6]);
   *maxvol = atof(argv[7]);
   *wrap = atoi(argv[8]);
-  strcpy(outfile, argv[9]);
+  *walls = atoi(argv[9]);
+  strcpy(outfile, argv[10]);
 
 }
 //----------------------------------------------------------------------------

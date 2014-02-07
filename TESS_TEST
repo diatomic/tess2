@@ -28,7 +28,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=1
+num_procs=2
 
 # procs per node
 #ppn=4 # for BG/P
@@ -67,7 +67,10 @@ minv=-1.0
 maxv=-1.0
 
 # wrapped neighbors 0 or 1
-wrap=1
+wrap=0
+
+# walls 0 or 1 (wrap should be 0)
+walls=1
 
 # output file name
 outfile="vor.out"
@@ -77,7 +80,7 @@ outfile="vor.out"
 # program arguments
 #
 
-args="$tb $dsize $jitter $minv $maxv $wrap $outfile"
+args="$tb $dsize $jitter $minv $maxv $wrap $walls $outfile"
 
 #------
 #
