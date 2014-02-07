@@ -89,3 +89,4 @@ set			    (libraries
 add_subdirectory	    (lib)
 add_subdirectory	    (driver)
 add_subdirectory	    (postprocessor)
+add_subdirectory	    (pread-voronoi)
