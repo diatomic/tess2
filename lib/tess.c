@@ -1781,7 +1781,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
                 int num_walls,
                 float** mirror_particles,
                 int*  num_mirror_particles) {
-  int i, j, k, l, n;
+  int i, j, k, l, n, wi;
   int vid; /* vertex id */
   struct bb_t bounds; /* local block bounds */
   struct remote_particle_t rp; /* particle being sent or received */
@@ -1813,7 +1813,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
     sent.num_gbs = 0;
 
     /* CLP - zero generate-wall-point array (length of number of walls) */
-    for (int wi = 0; wi < num_walls; wi++)
+    for (wi = 0; wi < num_walls; wi++)
         wall_cut[wi] = 0;
 
     if (j == convex_hull_particles[i]) {
@@ -1843,7 +1843,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	  }
  
        /* CLP - set the mirror-generate array to all ones  (extra calculations but simpler to assume!) */
-        for (int wi = 0; wi < num_walls; wi++)
+        for (wi = 0; wi < num_walls; wi++)
             wall_cut[wi] = 1;
       
 	} 
@@ -1871,7 +1871,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	  }
      
     /* CLP - for each wall */
-    for (int wi = 0; wi < num_walls; wi++)
+    for (wi = 0; wi < num_walls; wi++)
             {
             /* CLP - If the mirror-generate[wall-index] is not 1 */
             if (!wall_cut[wi])
@@ -1921,7 +1921,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
               pt[1] = tblock->verts[3 * vid + 1];
               pt[2] = tblock->verts[3 * vid + 2];
               /* CLP - for each wall */
-              for (int wi = 0; wi < num_walls; wi++)
+              for (wi = 0; wi < num_walls; wi++)
                 {
                 /* CLP - If the mirror-generate[wall-index] is not 1 */
                 if (!wall_cut[wi])
@@ -1937,7 +1937,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
         
     /* CLP - for each mirror-generate index that is 1, generate the mirror point given site rp and the wall */
         /* CLP - Here I am building a list of points.  Where do they go? Return as pointer */
-    for (int wi =0; wi < num_walls; wi++)
+    for (wi =0; wi < num_walls; wi++)
         if (wall_cut[wi]) {
             float rpt[3];
             float spt[3];
