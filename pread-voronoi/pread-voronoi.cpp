@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
   //}
 
   // run tess in post processing mode
-  tess_init_diy_exist(nblocks, mins, maxs, wrap, minvol, maxvol, 
+  tess_init_diy_exist(nblocks, mins, maxs, wrap, 0, minvol, maxvol,
 		      MPI_COMM_WORLD, times);
   tess(particles, num_particles, outfile);
 
