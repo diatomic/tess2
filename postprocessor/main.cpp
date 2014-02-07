@@ -94,6 +94,8 @@ int main(int argc, char *argv[]) {
   // sort and distribute particles to all blocks
   SortParticles(p, mins, maxs, particles, num_particles);
 
+  printf("%d: %d\n", rank, num_particles[0]);
+
   // run tess in post processing mode
   tess_init_diy_exist(nblocks, mins, maxs, wrap,0, minvol, maxvol,
 		      MPI_COMM_WORLD, times);

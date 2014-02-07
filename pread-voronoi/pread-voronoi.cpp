@@ -53,6 +53,10 @@ int main(int argc, char *argv[]) {
 
   AllReduceMinsMaxs(p, mins, maxs);
 
+  if (rank == 0) {
+    fprintf(stderr, "mins = [%.3f %.3f %.3f] maxs = [%.3f %.3f %.3f]\n",
+	    mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2]);
+  }
   //std::cout << rank << ": " << p.size()/3 << std::endl;
   //std::cout << "Mins: " << mins[0] << "," << mins[1] << "," << mins[2] << std::endl;
   //std::cout << "Maxs: " << maxs[0] << "," << maxs[1] << "," << maxs[2] << std::endl;
@@ -69,6 +73,8 @@ int main(int argc, char *argv[]) {
 
   // sort and distribute particles to all blocks
   ExchangeParticles(p, mins, maxs, particles, num_particles, rank, size);
+  
+  printf("%d: %d\n", rank, num_particles[0]);
   
   //for (int i = 0; i < nblocks; ++i) {
   //  std::cout << rank << ": " << num_particles[i] << std::endl;
@@ -111,7 +117,7 @@ void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
   *minvol = atof(argv[7]);
   *maxvol = atof(argv[8]);
   *swap = atoi(argv[9]);
-  *wrap = atoi(argv[7]);
+  *wrap = atoi(argv[10]);
 
 }
 //----------------------------------------------------------------------------
