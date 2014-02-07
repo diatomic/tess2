@@ -2136,10 +2136,11 @@ void complete_cells(struct vblock_t *vblock, int lid) {
         
         /*CLP -debug */
         
+        /*
         if (fabs(vblock->verts[3 * vid] - vblock->verts[0]) < eps &&
 	   fabs(vblock->verts[3 * vid + 1] - vblock->verts[1]) < eps &&
 	   fabs(vblock->verts[3 * vid + 2] - vblock->verts[2]) < eps)
-               //fprintf(stderr, "cell %d failed because failed because infinite\n",j);
+               fprintf(stderr, "cell %d failed because failed because infinite\n",j);
            
         if   (!wrap_neighbors &&
 	   (vblock->verts[3 * vid]     < (data_mins[0] - eps) ||
@@ -2149,10 +2150,9 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 	    vblock->verts[3 * vid + 2] < (data_mins[2] - eps) ||
 	    vblock->verts[3 * vid + 2] > (data_maxs[2] + eps) ) )
             {
-           // fprintf(stderr, "cell %d failed because vertex out of bounds, (%f, %f, %f) \n",j, vblock->verts[3 * vid],vblock->verts[3 * vid + 1], vblock->verts[3 * vid + 2] );
-           // fprintf(stderr,"%d%d%d%d%d%d",)
+            fprintf(stderr, "cell %d failed because vertex out of bounds, (%f, %f, %f) \n",j, vblock->verts[3 * vid],vblock->verts[3 * vid + 1], vblock->verts[3 * vid + 2] );
             }
-
+        */
 
 
 	n += (vblock->num_cell_verts[j] - k); /* skip rest of this cell */
