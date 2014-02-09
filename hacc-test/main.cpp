@@ -38,6 +38,7 @@ void GetNeighbors(gio::GenericIOReader *reader, bool wrap, int nblocks,
 		  gb_t** &neighbors, int* &num_neighbors, int rank,
 		  int grooupsize);
 void ijk2gid(int *ijk, int& gid, int *block_dims, bool wrap);
+
 // DEPRECATED
 // void gid2ijk(int gid, int *ijk, int *block_dims);
 
@@ -97,7 +98,7 @@ int main(int argc, char *argv[]) {
 
   // initialize, run, cleanup tess
   tess_init(nblocks, gids, bb, neighbors, num_neighbors, data_mins, data_maxs, 
-	    wrap, minvol, maxvol, 0, MPI_COMM_WORLD, times);
+	    wrap, 0, minvol, maxvol, MPI_COMM_WORLD, times);
   tess(particles, num_particles, outfile);
   tess_finalize();
 

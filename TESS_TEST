@@ -52,9 +52,9 @@ tb=$[$num_procs * 1]
 #dsize="4 4 4"
 #dsize="5 5 5"
 #dsize="6 6 6"
-#dsize="8 8 8"
+dsize="8 8 8"
 #dsize="10 10 10"
-dsize="16 16 16"
+#dsize="16 16 16"
 #dsize="32 32 32"
 #dsize="64 64 64"
 #dsize="128 128 128"
@@ -79,7 +79,6 @@ outfile="vor.out"
 #
 # program arguments
 #
-
 args="$tb $dsize $jitter $minv $maxv $wrap $walls $outfile"
 
 #------
