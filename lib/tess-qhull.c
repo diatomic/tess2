@@ -202,7 +202,7 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
   /* exchange complete cell status for exchanged particles */
   neighbor_is_complete(nblocks, vblocks, rics);
 
-  /* convert delaunay output to vblock for all blocks*/
+  /* convert delaunay output to vblock for all blocks */
   for (i = 0; i < nblocks; i++)
     gen_tets(tet_verts[i], num_tets[i], &vblocks[i], gids[i], nids[i], 
 	     dirs[i], rics[i], i, num_particles[i] - num_orig_particles[i]);

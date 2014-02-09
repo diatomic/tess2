@@ -28,7 +28,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=2
+num_procs=8
 
 # procs per node
 #ppn=4 # for BG/P
@@ -44,8 +44,8 @@ fi
 exe=./voronoi
 
 # total number of blocks in the domain
-#tb=$[$num_procs * 1]
-tb=8
+tb=$[$num_procs * 1]
+#tb=8
 
 # data size x y z (always 3D)
 #dsize="3 3 3"
@@ -70,7 +70,7 @@ maxv=-1.0
 wrap=0
 
 # walls 0 or 1 (wrap should be 0)
-walls=1
+walls=0
 
 # output file name
 outfile="vor.out"

@@ -28,8 +28,8 @@
 #include <GL/gl.h>
 #endif
 
-#define SPHERE_RAD_FACTOR .005 // used to compute sphere radius
-
+#define SPHERE_RAD_FACTOR .002 // used to compute sphere radius
+// #define PAPER // color scheme for paper (white backgound)
 #define PNETCDF_IO
 
 #ifndef SERIAL_IO
@@ -174,10 +174,10 @@ void filter_volume(float min_vol, float max_vol);
 void clip_cells(float z_clip);
 void CellBounds(vblock_t *vblock, int cell,
 		float *cell_min, float *cell_max, float *centroid);
-void PrepRenderingData();
+void PrepRenderingData(int *gid2lid);
 void PrepSiteRendering(int &num_sites);
 void PrepCellRendering(int &num_visible_cells);
-void PrepTetRendering(int &num_loc_tets, int &num_rem_tets);
+void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int* gid2lid);
 int compare(const void *a, const void *b);
 
 //--------------------------------------------------------------------------
@@ -212,11 +212,26 @@ int main(int argc, char** argv) {
   pnetcdf_read(&nblocks, &tot_blocks, &vblocks, argv[1], MPI_COMM_WORLD,
 	       &gids, &num_neighbors, &neighbors, &neigh_procs);
   MPI_Finalize();
+  // mapping of gid to lid
+  int gid2lid[nblocks]; 
+  for (int b = 0; b < nblocks; b++) {
+    for (int g = 0; g < nblocks; g++) {
+      if (gids[g] == b) {
+	gid2lid[b] = g;
+	break;
+      }
+      assert(g < nblocks); // sanity
+    }
+  }
 
 #else
 
   SER_IO *io = new SER_IO(swap_bytes); // io object
   nblocks = io->ReadAllBlocks(argv[1], vblocks, false);
+  // mapping of gid to lid
+  int gid2lid[nblocks]; 
+  for (int b = 0; b < nblocks; b++)
+    gid2lid[b] = b;
 
 #endif
 
@@ -248,8 +263,9 @@ int main(int argc, char** argv) {
   fprintf(stderr, "data sizes mins[%.3f %.3f %.3f] maxs[%.3f %.3f %.3f]\n",
 	  data_min.x, data_min.y, data_min.z, 
 	  data_max.x, data_max.y, data_max.z);
+
   // package rendering data
-  PrepRenderingData();
+  PrepRenderingData(gid2lid);
 
   // start glut
   glutInit(&argc, argv); 
@@ -321,7 +337,7 @@ void display() {
     glDisable(GL_LIGHTING);
     glColor4f(0.7, 0.7, 0.7, 1.0);
     if (draw_fancy)
-      glLineWidth(3.0);
+      glLineWidth(2.0);
     else
       glLineWidth(1.0);
     n = 0;
@@ -563,7 +579,11 @@ void init_display() {
   init_viewport(true);
 
   // background
+#ifdef PAPER
+  glClearColor(1.0, 1.0, 1.0, 1.0); 
+#else
   glClearColor(0.0, 0.0, 0.0, 1.0); 
+#endif
 
   // gl state
 //   glEnable(GL_COLOR_MATERIAL);
@@ -611,7 +631,7 @@ void draw_tets() {
   glDisable(GL_LIGHTING);
   glColor4f(0.7, 0.7, 0.7, 1.0);
   if (draw_fancy)
-    glLineWidth(3.0);
+    glLineWidth(2.0);
   else
     glLineWidth(1.0);
 
@@ -1358,8 +1378,9 @@ int compare(const void *a, const void *b) {
 //--------------------------------------------------------------------------
 //
 // package rendering data
+// gid2lid: mapping of gids to lids
 //
-void PrepRenderingData() {
+void PrepRenderingData(int *gid2lid) {
 
   // number of sites, cells and tets
   int num_sites;
@@ -1374,7 +1395,7 @@ void PrepRenderingData() {
   PrepCellRendering(num_vis_cells);
 
   // delauany tets
-  PrepTetRendering(num_loc_tets, num_rem_tets);
+  PrepTetRendering(num_loc_tets, num_rem_tets, gid2lid);
 
   if (min_vol_act < min_vol_clamp)
     min_vol_act = min_vol_clamp;
@@ -1488,8 +1509,9 @@ void PrepCellRendering(int &num_vis_cells) {
 //
 // num_loc_tets: (output) number of local tets
 // num_rem_tets: (output) number of remote tets
+// gid2lid: mapping of gids to lids
 //
-void PrepTetRendering(int &num_loc_tets, int &num_rem_tets) {
+void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
 
   num_loc_tets = 0;
   num_rem_tets = 0;
@@ -1550,9 +1572,9 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets) {
       vec3d p0, p1, p2, p3;
 
       // p0
-      p0.x = vblocks[g0]->sites[3 * s0];
-      p0.y = vblocks[g0]->sites[3 * s0 + 1];
-      p0.z = vblocks[g0]->sites[3 * s0 + 2];
+      p0.x = vblocks[gid2lid[g0]]->sites[3 * s0];
+      p0.y = vblocks[gid2lid[g0]]->sites[3 * s0 + 1];
+      p0.z = vblocks[gid2lid[g0]]->sites[3 * s0 + 2];
 
       // wraparound transform
       if ((vblocks[i]->rem_tet_wrap_dirs[4 * j] & DIY_X0) == DIY_X0)
@@ -1569,9 +1591,9 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets) {
 	p0.z -= (data_max.z - data_min.z);
 
       // p1
-      p1.x = vblocks[g1]->sites[3 * s1];
-      p1.y = vblocks[g1]->sites[3 * s1 + 1];
-      p1.z = vblocks[g1]->sites[3 * s1 + 2];
+      p1.x = vblocks[gid2lid[g1]]->sites[3 * s1];
+      p1.y = vblocks[gid2lid[g1]]->sites[3 * s1 + 1];
+      p1.z = vblocks[gid2lid[g1]]->sites[3 * s1 + 2];
 
       // wraparound transform
       if ((vblocks[i]->rem_tet_wrap_dirs[4 * j + 1] & DIY_X0) == DIY_X0)
@@ -1588,9 +1610,9 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets) {
 	p1.z -= (data_max.z - data_min.z);
 
       // p2
-      p2.x = vblocks[g2]->sites[3 * s2];
-      p2.y = vblocks[g2]->sites[3 * s2 + 1];
-      p2.z = vblocks[g2]->sites[3 * s2 + 2];
+      p2.x = vblocks[gid2lid[g2]]->sites[3 * s2];
+      p2.y = vblocks[gid2lid[g2]]->sites[3 * s2 + 1];
+      p2.z = vblocks[gid2lid[g2]]->sites[3 * s2 + 2];
 
       // wraparound transform
       if ((vblocks[i]->rem_tet_wrap_dirs[4 * j + 2] & DIY_X0) == DIY_X0)
@@ -1607,9 +1629,9 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets) {
 	p2.z -= (data_max.z - data_min.z);
 
       // p3
-      p3.x = vblocks[g3]->sites[3 * s3];
-      p3.y = vblocks[g3]->sites[3 * s3 + 1];
-      p3.z = vblocks[g3]->sites[3 * s3 + 2];
+      p3.x = vblocks[gid2lid[g3]]->sites[3 * s3];
+      p3.y = vblocks[gid2lid[g3]]->sites[3 * s3 + 1];
+      p3.z = vblocks[gid2lid[g3]]->sites[3 * s3 + 2];
 
       // wraparaound transform
       if ((vblocks[i]->rem_tet_wrap_dirs[4 * j + 3] & DIY_X0) == DIY_X0)

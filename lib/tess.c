@@ -2630,6 +2630,7 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
       if (tet_verts[t * 4 + v] >= vblock->num_orig_particles)
         break;
     }
+
     if (v == 4) { /* local, store it */
       /* filter out tets that touch local incomplete voronoi cells */
       int v1;
@@ -2643,6 +2644,7 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 	  vblock->loc_tets[n++] = tet_verts[t * 4 + v2];
       }
     }
+
     /* not strictly local, at least one vertex is remote, and at least one
        vertex is local */
     else if (tet_verts[t * 4 + 0] < vblock->num_orig_particles ||
@@ -2657,7 +2659,7 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 	if (tet_verts[t * 4 + v] < vblock->num_orig_particles)
 	  sort_gids[v] = DIY_Gid(0, lid);
 	else
-	  sort_gids[v] = gids[tet_verts[t * 4 + v] - 
+	  sort_gids[v] = gids[tet_verts[t * 4 + v] -
 			      vblock->num_orig_particles];
       }
       qsort(sort_gids, 4, sizeof(int), &compare);
@@ -2679,9 +2681,9 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 	    /* find the correct entry in the completion status
 	       todo: linear search for now, accelerate later */
 	    for (i = 0; i < num_recvd; i++) {
-	      if (rics[i].gid == 
+	      if (rics[i].gid ==
 		  gids[tet_verts[t * 4 + v] - vblock->num_orig_particles] &&
-		  rics[i].nid == 
+		  rics[i].nid ==
 		  nids[tet_verts[t * 4 + v] - vblock->num_orig_particles])
 		break;
 	    }
@@ -2706,16 +2708,22 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 	    }
 	    /* this vertex is remote */
 	    else {
-	      /* need to subtract number of original (local) particles 
-		 from vertex to index into gids and nids; 
+	      /* need to subtract number of original (local) particles
+		 from vertex to index into gids and nids;
 		 they are only for remote particles but tet verts
 		 are for all particles, local + remote */
 	      vblock->rem_tet_gids[m] =
 		gids[tet_verts[t * 4 + v1] - vblock->num_orig_particles];
-	      vblock->rem_tet_nids[m] = 
+	      vblock->rem_tet_nids[m] =
 		nids[tet_verts[t * 4 + v1] - vblock->num_orig_particles];
-	      vblock->rem_tet_wrap_dirs[m] = 
+	      vblock->rem_tet_wrap_dirs[m] =
 		dirs[tet_verts[t * 4 + v1] - vblock->num_orig_particles];
+
+	      /* debug */
+/* 	      fprintf(stderr, "gid %d nid %d dir %0x\n",  */
+/* 		      vblock->rem_tet_gids[m], vblock->rem_tet_nids[m], */
+/* 		      vblock->rem_tet_wrap_dirs[m]); */
+
 	    }
 
 	    m++;
