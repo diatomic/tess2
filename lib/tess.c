@@ -96,14 +96,16 @@ void tess_init(int num_blocks, int *gids,
   num_blocks: local number of blocks in my process
   global_mins, global_maxs: overall data extents
   wrap: whether wraparound neighbors are used
+  twalls_on: whether walls boundaries are used
   minvol, maxvol: filter range for which cells to keep
   pass -1.0 to skip either or both bounds
   mpi_comm: MPI communicator
   all_times: times for particle exchange, voronoi cells, convex hulls, and output
 */
 void tess_init_diy_exist(int num_blocks, float *global_mins, 
-			 float *global_maxs, int wrap, int twalls_on, float minvol,
-			 float maxvol, MPI_Comm mpi_comm, double *all_times) {
+			 float *global_maxs, int wrap, int twalls_on, 
+			 float minvol, float maxvol, MPI_Comm mpi_comm, 
+			 double *all_times) {
 
   int i;
 
@@ -160,12 +162,13 @@ void tess(float **particles, int *num_particles, char *out_file) {
   minvol, maxvol: filter range for which cells to keep
   pass -1.0 to skip either or both bounds
   wrap: whether wraparound neighbors are used
+  twalls_on: whether walls boundaries are used
   times: times for particle exchange, voronoi cells, convex hulls, and output
   outfile: output file name
 */
 void tess_test(int tot_blocks, int *data_size, float jitter, 
-	       float minvol, float maxvol, int wrap, int twalls_on, double *times,
-	       char *outfile) {
+	       float minvol, float maxvol, int wrap, int twalls_on, 
+	       double *times, char *outfile) {
 
   float **particles; /* particles[block_num][particle] 
 			 where each particle is 3 values, px, py, pz */
@@ -182,7 +185,8 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   wrap_neighbors = wrap;
   walls_on = twalls_on;
   
-  fprintf(stderr, "Wrap %d, Walls %d\n", wrap_neighbors,walls_on);
+  /* debug */
+/*   fprintf(stderr, "Wrap %d, Walls %d\n", wrap_neighbors,walls_on); */
 
   /* data extents */
   for(i = 0; i < 3; i++) {
@@ -257,14 +261,14 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   create_blocks(nblocks, &vblocks, &hdrs); /* final */
   create_blocks(nblocks, &tblocks, NULL); /* temporary */
   
-  /*CLP - if !wrap_neighbors && walls, then initialize wall structure using data_mins and data_maxs
-    CLP  - Currently assuimg walls on all sides, but format can easily be modified to be ANY set of walls */
- struct wall_t *walls;
- int num_walls = 0;
- if (!wrap_neighbors && walls_on)
-    {
+  /* CLP - if !wrap_neighbors && walls, then initialize wall structure 
+     using data_mins and data_maxs
+     Currently assuimg walls on all sides, but format can easily be 
+     modified to be ANY set of walls */
+  struct wall_t *walls;
+  int num_walls = 0;
+  if (!wrap_neighbors && walls_on)
     create_walls(&num_walls,&walls);
-    }
 
 #ifdef TIMING
   MPI_Barrier(comm);

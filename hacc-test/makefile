@@ -42,8 +42,7 @@ endif
 
 ifeq ($(ARCH), BGQ) # BG/Q version
 
-CCFLAGS =
-#CCFLAGS = -O3
+CCFLAGS = -O3
 #CCFLAGS = -g
 CCFLAGS += -DBGQ $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}

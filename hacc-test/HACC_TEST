@@ -28,7 +28,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=8
+num_procs=1
 
 # procs per node
 #ppn=4 # for BG/P
@@ -54,7 +54,7 @@ minv=-1.0
 maxv=-1.0
 
 # wrapped neihbors 0 or 1
-wrap=1
+wrap=0
 
 #------
 #
