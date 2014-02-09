@@ -49,6 +49,7 @@ static int walls_on;
   num_neighbors: number of neighbors for each of my local blocks, in lid order
   global_mins, global_maxs: overall data extents
   wrap: whether wraparound neighbors are used
+  twalls_on: whether walls boundaries are used
   minvol, maxvol: filter range for which cells to keep
   pass -1.0 to skip either or both bounds
   mpi_comm: MPI communicator
@@ -57,8 +58,8 @@ static int walls_on;
 void tess_init(int num_blocks, int *gids, 
 	       struct bb_t *bounds, struct gb_t **neighbors, 
 	       int *num_neighbors, float *global_mins, float *global_maxs, 
-	       int wrap, int twalls_on, float minvol, float maxvol, MPI_Comm mpi_comm,
-	       double *all_times) {
+	       int wrap, int twalls_on, float minvol, float maxvol, 
+	       MPI_Comm mpi_comm, double *all_times) {
 
   int i;
 

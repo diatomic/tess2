@@ -38,8 +38,8 @@ extern "C"
 void tess_init(int num_blocks, int *gids, 
 	       struct bb_t *bounds, struct gb_t **neighbors, 
 	       int *num_neighbors, float *global_mins, float *global_maxs, 
-	       int wrap, int twalls_on, float minvol, float maxvol, MPI_Comm mpi_comm,
-	       double *times);
+	       int wrap, int twalls_on, float minvol, float maxvol, 
+	       MPI_Comm mpi_comm, double *times);
 
 #ifdef __cplusplus
 extern "C"
