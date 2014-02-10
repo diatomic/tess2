@@ -1817,11 +1817,13 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 
     sent.num_gbs = 0;
 
+
     /* CLP - zero generate-wall-point array (length of number of walls) */
     for (wi = 0; wi < num_walls; wi++)
         wall_cut[wi] = 0;
 
-    if (j == convex_hull_particles[i]) {
+    /* CLP - adding a check so that the array convex_hull_particles is not accessed where it is uninitialized */
+    if (i < num_convex_hull_particles & j == convex_hull_particles[i]) {
       
       /* direction of closest neighbor */
       unsigned char nearest_dir = 
@@ -1912,7 +1914,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
       }
 
       ++i;
-    /* CLP disabling this break when there are walls because I need to complete. */
+    /* CLP disabling this break when there are walls because I need to iterate through all the particles. */
       if (!num_walls && i >= num_convex_hull_particles)
         break;
 
