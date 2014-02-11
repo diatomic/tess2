@@ -20,19 +20,18 @@
 # without permission
 #
 #----------------------------------------------------------------------------
-ARCH=MAC_OSX
+#ARCH=MAC_OSX
 #ARCH=LINUX
-#ARCH=BGQ
+ARCH=BGQ
 #ARCH=FUSION
 #ARCH=XT
 #ARCH=XE
 
 # number of procs
-num_procs=2
+num_procs=4
 
 # procs per node
-#ppn=4 # for BG/P
-ppn=1 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
+ppn=8 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
 
 # number of BG/Q nodes
 num_nodes=$[$num_procs / $ppn]
@@ -53,7 +52,7 @@ outfile="hacc-vor.out"
 minv=-1.0
 maxv=-1.0
 
-# wrapped neihbors 0 or 1
+# wrapped neighbors 0 or 1
 wrap=0
 
 #------

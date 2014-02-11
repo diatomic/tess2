@@ -10,10 +10,20 @@
 # See COPYRIGHT in top-level directory.
 #
 #----------------------------------------------------------------------------
-TESS = $(HOME)/tess
-GENERICIO = $(HOME)/software/genericio/
+#TESS = $(HOME)/tess
+TESS = $(HOME)/tess-qhull
 
 include $(TESS)/user_defs.mk
+
+ifeq ($(ARCH), MAC_OSX) # mac version
+GENERICIO = $(HOME)/software/genericio/
+endif
+ifeq ($(ARCH), LINUX) # linux version
+GENERICIO = $(HOME)/software/genericio/
+endif
+ifeq ($(ARCH), BGQ) # BG/Q version
+GENERICIO = $(HOME)/software/genericio-gcc/
+endif
 
 INCLUDES = $(DIY_INC) $(DELAUANAY_INC) $(PNETCDF_INC) -I$(TESS)/lib -I$(GENERICIO)
 LIBS = -L$(TESS)/lib -ltess $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB) -L$(GENERICIO)/genericio.build/libs -lGenericIO
