@@ -15,6 +15,7 @@
 #ifndef _VORONOI_H
 #define _VORONOI_H
 
+#include <stddef.h>
 #include "diy.h"
 
 /* header */

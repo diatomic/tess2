@@ -45,6 +45,10 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
     total += num_particles[i];
     std::cout << "Num particles (local): " << num_particles[i] << std::endl;
 
+    /* allocate number of verts for original particles */
+    tblocks[i].num_cell_verts = (int *)malloc(sizeof(int) * num_particles[i]);
+    memset(tblocks[i].num_cell_verts, 0, sizeof(int) * num_particles[i]);
+
     /* process voronoi output */
     gen_voronoi_output(Dt, &tblocks[i], num_particles[i]);
 
@@ -108,6 +112,10 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
     construct_delaunay(Dt, num_particles[i], particles[i]);
     std::cout << "Num particles (orig): " << num_particles[i] << std::endl;
     total += num_particles[i];
+
+    /* allocate number of verts for original particles */
+    vblocks[i].num_cell_verts = (int *)malloc(sizeof(int) * num_particles[i]);
+    memset(vblocks[i].num_cell_verts, 0, sizeof(int) * num_particles[i]);
 
     // process voronoi output
     gen_voronoi_output(Dt, &vblocks[i], num_particles[i]);
@@ -200,10 +208,12 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
       vertices.push_back(std::make_pair(vit->info(), vit));
   std::sort(vertices.begin(), vertices.end());
 
+  // DEPRECATED, malloc moved to calling function instead TP
+//   vblock->num_cell_verts = (int *)malloc(sizeof(int) * num_particles);
+//   memset(vblock->num_cell_verts, 0, sizeof(int) * num_particles);
+
   /* number of vertices in each cell; size is number of particles; 
-     if a cell is skipped, the number of vertices will be 0*/
-  vblock->num_cell_verts = (int *)malloc(sizeof(int) * num_particles);
-  memset(vblock->num_cell_verts, 0, sizeof(int) * num_particles);
+     if a cell is skipped, the number of vertices will be 0 */
   int cell = 0; /* index of cell being processed */
   for(unsigned k = 0; k < vertices.size(); ++k)
   {

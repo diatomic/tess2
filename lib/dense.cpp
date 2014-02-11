@@ -204,18 +204,18 @@ int main(int argc, char** argv) {
     memset(density[block], 0 , npts * sizeof(float));
 
     // debug
-    float min_pos[3], max_pos[3];
-    idx2phys(block_min_idx, min_pos);
-    idx2phys(block_max_idx, max_pos);
-    fprintf(stderr, "The grid in gid %d extends from [%d %d %d] "
-	    "(%.3f %.3f %.3f) to "
-	    "[%d %d %d] (%.3f %.3f %.3f) and is [%d %d %d] in size.\n",
-	    DIY_Gid(did,block), 
-	    block_min_idx[0], block_min_idx[1], block_min_idx[2],
-	    min_pos[0], min_pos[1], min_pos[2],
-	    block_max_idx[0], block_max_idx[1], block_max_idx[2],
-	    max_pos[0], max_pos[1], max_pos[2],
-	    block_num_idx[0], block_num_idx[1], block_num_idx[2]);
+//     float min_pos[3], max_pos[3];
+//     idx2phys(block_min_idx, min_pos);
+//     idx2phys(block_max_idx, max_pos);
+//     fprintf(stderr, "The grid in gid %d extends from [%d %d %d] "
+// 	    "(%.3f %.3f %.3f) to "
+// 	    "[%d %d %d] (%.3f %.3f %.3f) and is [%d %d %d] in size.\n",
+// 	    DIY_Gid(did,block), 
+// 	    block_min_idx[0], block_min_idx[1], block_min_idx[2],
+// 	    min_pos[0], min_pos[1], min_pos[2],
+// 	    block_max_idx[0], block_max_idx[1], block_max_idx[2],
+// 	    max_pos[0], max_pos[1], max_pos[2],
+// 	    block_num_idx[0], block_num_idx[1], block_num_idx[2]);
 
   }
 
@@ -329,8 +329,8 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
   int num_grid_pts; // number of grid points    
 
   // debug
-  fprintf(stderr, "gid %d has %d complete cells\n", DIY_Gid(0, block),
-	  vblocks[block]->num_complete_cells);
+//   fprintf(stderr, "gid %d has %d complete cells\n", DIY_Gid(0, block),
+// 	  vblocks[block]->num_complete_cells);
 
   // divisor for volume (3d density) or area (2d density)
   // assumes projection is to x-y plane
@@ -1170,6 +1170,9 @@ void DataBounds(int nblocks, MPI_Comm comm) {
 
   float block_mins[3]; // mins of all local blocks
   float block_maxs[3]; // maxs of all local blocks
+  int rank;
+
+  MPI_Comm_rank(comm, &rank);
 
   for (int i = 0; i < nblocks; i++) {
     bb_t bb; // block bounds
@@ -1201,9 +1204,10 @@ void DataBounds(int nblocks, MPI_Comm comm) {
   MPI_Allreduce(block_mins, data_mins, 3, MPI_FLOAT, MPI_MIN, comm);
   MPI_Allreduce(block_maxs, data_maxs, 3, MPI_FLOAT, MPI_MAX, comm);
 
-  fprintf(stderr, "data bounds: min = [%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
-	  data_mins[0], data_mins[1], data_mins[2],
-	  data_maxs[0], data_maxs[1], data_maxs[2]);
+  if (rank == 0)
+    fprintf(stderr, "data bounds: min = [%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
+	    data_mins[0], data_mins[1], data_mins[2],
+	    data_maxs[0], data_maxs[1], data_maxs[2]);
 
 }
 //--------------------------------------------------------------------------

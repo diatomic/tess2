@@ -65,6 +65,10 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 
     free(pts);
 
+    /* allocate number of verts for original particles */
+    tblocks[i].num_cell_verts = (int *)malloc(sizeof(int) * num_particles[i]);
+    memset(tblocks[i].num_cell_verts, 0, sizeof(int) * num_particles[i]);
+
     /* process voronoi output */
     if (!exitcode)
       gen_voronoi_output(qh facet_list, &tblocks[i], num_particles[i]);
@@ -161,6 +165,10 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 			    flags, dev_null, stderr);
 
     free(pts);
+
+    /* allocate number of verts for original particles */
+    vblocks[i].num_cell_verts = (int *)malloc(sizeof(int) * num_particles[i]);
+    memset(vblocks[i].num_cell_verts, 0, sizeof(int) * num_particles[i]);
 
     /* process voronoi output */
     if (!exitcode)
@@ -292,10 +300,13 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
     }
   }
 
+
+  /* DEPRECATED, malloc moved to calling function instead TP */
+/*   vblock->num_cell_verts = (int *)malloc(sizeof(int) * num_particles); */
+/*   memset(vblock->num_cell_verts, 0, sizeof(int) * num_particles); */
+
   /* number of vertices in each cell; size is number of particles; 
-     if a cell is skipped, the number of vertices will be 0*/
-  vblock->num_cell_verts = (int *)malloc(sizeof(int) * num_particles);
-  memset(vblock->num_cell_verts, 0, sizeof(int) * num_particles);
+     if a cell is skipped, the number of vertices will be 0 */
   cell = 0;
   FOREACHvertex_i_(vertices) {
     numneighbors = 0;

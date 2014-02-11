@@ -73,8 +73,8 @@ int main(int argc, char *argv[]) {
     }
 
     // debug
-    fprintf(stderr, "mins = [%.3f %.3f %.3f] maxs = [%.3f %.3f %.3f]\n",
-	    mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2]);
+//     fprintf(stderr, "mins = [%.3f %.3f %.3f] maxs = [%.3f %.3f %.3f]\n",
+// 	    mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2]);
 
   }
   // broadcast global extents (todo: combine into one broadcast)
@@ -93,8 +93,6 @@ int main(int argc, char *argv[]) {
 
   // sort and distribute particles to all blocks
   SortParticles(p, mins, maxs, particles, num_particles);
-
-  printf("%d: %d\n", rank, num_particles[0]);
 
   // run tess in post processing mode
   tess_init_diy_exist(nblocks, mins, maxs, wrap,0, minvol, maxvol,

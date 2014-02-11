@@ -29,7 +29,7 @@
 #endif
 
 #define SPHERE_RAD_FACTOR .002 // used to compute sphere radius
-// #define PAPER // color scheme for paper (white backgound)
+#define PAPER // color scheme for paper (white backgound)
 #define PNETCDF_IO
 
 #ifndef SERIAL_IO

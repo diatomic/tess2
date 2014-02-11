@@ -29,7 +29,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=1
+num_procs=4
 
 # procs per node
 #ppn=4 # for BG/P
@@ -46,23 +46,23 @@ exe=./post-voronoi
 
 # total number of blocks in the domain
 #tb=$[$num_procs * 1]
-tb=8
+tb=128
 
 # inout file
-#infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"
+infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/6606356352.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/input-data/nfw_particles_1e5.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/input-data/cnfw_particles_2e5.dat"
-infile="./pts.out"
+#infile="./pts.out"
 
 # output file
-#outfile="7445077095.out"
+outfile="7445077095.out"
 #outfile="6606356352.out"
 #outfile="nfw.out"
 #outfile="mchalo00.out"
 #outfile="nor_ex.out"
 #outfile="cnfw_2e5.out"
-outfile="pts-vor.out"
+#outfile="pts-vor.out"
 
 #volume range (-1.0: unused)
 minv=-1.0
@@ -74,9 +74,9 @@ maxv=-1.0
 # 2 = float interleaved x y z
 # 3 = double x's followed by y's followed by z's
 # 4 = double interleaved x y z
-#it=0
+it=0
 #it=3
-it=2
+#it=2
 
 #byte swapping
 swap=0
@@ -98,11 +98,11 @@ args="$tb $infile $outfile $minv $maxv $it $swap $wrap"
 
 if [ "$ARCH" = "MAC_OSX" ]; then
 
-#mpiexec -l -n $num_procs $exe $args
+mpiexec -l -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 
-dsymutil $exe ; mpiexec -l -n $num_procs valgrind -q $exe $args
+#dsymutil $exe ; mpiexec -l -n $num_procs valgrind -q $exe $args
 
 #dsymutil $exe ; mpiexec -n $num_procs valgrind -q --leak-check=yes $exe $args
 
