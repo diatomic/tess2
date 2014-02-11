@@ -29,7 +29,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=4
+num_procs=1
 
 # procs per node
 #ppn=4 # for BG/P

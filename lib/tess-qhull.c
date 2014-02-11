@@ -141,6 +141,10 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
   /* delaunay vertices */
   int **tet_verts = (int **)malloc(nblocks * sizeof(int *));
   int *num_tets = (int *)malloc(nblocks * sizeof(int));
+  for (i = 0; i < nblocks; i++) {
+    tet_verts[i] =  NULL;
+    num_tets[i] = 0;
+  }
 
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
@@ -218,7 +222,8 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
   /* cleanup */
   for (i = 0; i < nblocks; i++) {
     free(rics[i]);
-    free(tet_verts[i]);
+    if (tet_verts[i])
+      free(tet_verts[i]);
   }
   free(rics);
   free(tet_verts);
