@@ -85,12 +85,12 @@ int main(int argc, char *argv[]) {
 	  block_dims);
 
   // debug
-//   if (rank == 0)
-//     fprintf(stderr, "data_mins[%.1f %.1f %.1f] data_maxs[%.1f %.1f %.1f] "
-// 	    "block_dims[%d %d %d]\n",
-// 	    data_mins[0], data_mins[1], data_mins[2], 
-// 	    data_maxs[0], data_maxs[1], data_maxs[2], 
-// 	    block_dims[0], block_dims[1], block_dims[2]);
+  if (rank == 0)
+    fprintf(stderr, "data_mins[%.1f %.1f %.1f] data_maxs[%.1f %.1f %.1f] "
+	    "block_dims[%d %d %d]\n",
+	    data_mins[0], data_mins[1], data_mins[2], 
+	    data_maxs[0], data_maxs[1], data_maxs[2], 
+	    block_dims[0], block_dims[1], block_dims[2]);
 
   // find neighboring blocks
   GetNeighbors(reader, wrap, nblocks, gids, block_dims, neighbors, 

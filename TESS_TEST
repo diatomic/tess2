@@ -20,9 +20,9 @@
 # without permission
 #
 #----------------------------------------------------------------------------
-ARCH=MAC_OSX
+#ARCH=MAC_OSX
 #ARCH=LINUX
-#ARCH=BGQ
+ARCH=BGQ
 #ARCH=FUSION
 #ARCH=XT
 #ARCH=XE
@@ -43,8 +43,8 @@ fi
 exe=./voronoi
 
 # total number of blocks in the domain
-#tb=$[$num_procs * 1]
-tb=64
+tb=$[$num_procs * 1]
+#tb=64
 
 # data size x y z (always 3D)
 #dsize="3 3 3"
@@ -71,8 +71,9 @@ wrap=0
 # walls 0 or 1 (wrap should be 0)
 walls=0
 
-# output file name
-outfile="vor.out"
+# output file name, "!" to disable output
+#outfile="vor.out"
+outfile="!"
 
 #------
 #

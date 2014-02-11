@@ -55,7 +55,7 @@ infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/input-data/cnfw_particles_2e5.dat"
 #infile="./pts.out"
 
-# output file
+# output file, "!" to disable output
 outfile="7445077095.out"
 #outfile="6606356352.out"
 #outfile="nfw.out"

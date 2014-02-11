@@ -47,7 +47,10 @@ void GetArgs(int argc, char **argv, int &tb, int *dsize, float *jitter,
   *maxvol = atof(argv[7]);
   *wrap = atoi(argv[8]);
   *walls = atoi(argv[9]);
-  strcpy(outfile, argv[10]);
+  if (argv[10][0] =='!')
+    strcpy(outfile, "");
+  else
+    strcpy(outfile, argv[10]);
 
 }
 //----------------------------------------------------------------------------

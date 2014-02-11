@@ -122,7 +122,10 @@ void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
 
   tb = atoi(argv[1]);
   strcpy(infile, argv[2]);
-  strcpy(outfile, argv[3]);
+  if (argv[3][0] =='!')
+    strcpy(outfile, "");
+  else
+    strcpy(outfile, argv[3]);
   *minvol = atof(argv[4]);
   *maxvol = atof(argv[5]);
   *intype = atoi(argv[6]);

@@ -409,14 +409,16 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   save_headers(nblocks, vblocks, hdrs);
 
   /* write output */
+  if (out_file[0]) {
 #ifdef PNETCDF_IO
-  char out_ncfile[256];
-  strncpy(out_ncfile, out_file, sizeof(out_ncfile));
-  strncat(out_ncfile, ".nc", sizeof(out_file));
-  pnetcdf_write(nblocks, vblocks, out_ncfile, comm);
+    char out_ncfile[256];
+    strncpy(out_ncfile, out_file, sizeof(out_ncfile));
+    strncat(out_ncfile, ".nc", sizeof(out_file));
+    pnetcdf_write(nblocks, vblocks, out_ncfile, comm);
 #else
-  diy_write(nblocks, vblocks, hdrs, out_file);
+    diy_write(nblocks, vblocks, hdrs, out_file);
 #endif
+  }
 
 #ifdef TIMING
   MPI_Barrier(comm);
