@@ -43,7 +43,7 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
     Delaunay3D& Dt = Dts[i];
     construct_delaunay(Dt, num_particles[i], particles[i]);
     total += num_particles[i];
-    std::cout << "Num particles (local): " << num_particles[i] << std::endl;
+    // std::cout << "Num particles (local): " << num_particles[i] << std::endl;
 
     /* allocate number of verts for original particles */
     tblocks[i].num_cell_verts = (int *)malloc(sizeof(int) * num_particles[i]);
@@ -114,7 +114,7 @@ void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
 
     Delaunay3D& Dt = Dts[i];
     construct_delaunay(Dt, num_particles[i], particles[i]);
-    std::cout << "Num particles (orig): " << num_particles[i] << std::endl;
+    // std::cout << "Num particles (orig): " << num_particles[i] << std::endl;
     total += num_particles[i];
 
     /* allocate number of verts for original particles */

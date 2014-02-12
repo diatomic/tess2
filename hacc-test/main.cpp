@@ -131,7 +131,10 @@ void GetArgs(int argc, char **argv, char *infile, char *outfile,
   assert(argc >= 6);
 
   strcpy(infile, argv[1]);
-  strcpy(outfile, argv[2]);
+  if (argv[2][0] == '!')
+    strcpy(outfile, "");
+  else
+    strcpy(outfile, argv[2]);
   *minvol = atof(argv[3]);
   *maxvol = atof(argv[4]);
   *wrap = atoi(argv[5]);
