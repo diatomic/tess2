@@ -6,6 +6,7 @@ option                      (debug          "Build tess with debugging on"		    
 option                      (timing	    "Build tess with timing"			    ON)
 option			    (use_cgal	    "Use CGAL"					    OFF)
 option			    (draw	    "Build draw"				    ON)
+option			    (hacc_test	    "Build HACC test"				    OFF)
 
 if			    (timing)
     add_definitions	    (-DTIMING)
