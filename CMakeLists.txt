@@ -70,10 +70,17 @@ find_library                (DIY_LIBRARY NAMES		diy)
 find_path                   (PNetCDF_INCLUDE_DIR	pnetcdf.h)
 find_library                (PNetCDF_LIBRARY NAMES	pnetcdf)
 
+# GenericIO
+if			    (hacc_test)
+find_path                   (GenericIO_INCLUDE_DIR	GenericIO.h)
+find_library                (GenericIO_LIBRARY NAMES	GenericIO)
+endif			    (hacc_test)
+
 set                         (CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-isystem")
 include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/lib
 			     ${DIY_INCLUDE_DIRS}
 			     ${PNetCDF_INCLUDE_DIR}
+			     ${GenericIO_INCLUDE_DIR}
                              SYSTEM ${MPI_INCLUDE_PATH}
                             )
 		
@@ -81,6 +88,7 @@ set			    (libraries
 			     ${libraries}
 			     ${DIY_LIBRARY}
 			     ${PNetCDF_LIBRARY}
+			     ${GenericIO_LIBRARY}
 			     ${MPI_C_LIBRARIES}
 			     ${MPI_CXX_LIBRARIES}
 			     ${CMAKE_THREAD_LIBS_INIT}
@@ -90,3 +98,4 @@ add_subdirectory	    (lib)
 add_subdirectory	    (driver)
 add_subdirectory	    (postprocessor)
 add_subdirectory	    (pread-voronoi)
+add_subdirectory	    (hacc-test)
