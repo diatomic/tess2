@@ -10,10 +10,10 @@
 # See COPYRIGHT in top-level directory.
 #
 #----------------------------------------------------------------------------
-#TESS = $(HOME)/tess
 TESS = $(HOME)/tess-qhull
+#TESS = $(HOME)/tess-cgal-install
 
-include $(TESS)/user_defs.mk
+include ../user_defs.mk
 
 ifeq ($(ARCH), MAC_OSX) # mac version
 GENERICIO = $(HOME)/software/genericio/
@@ -25,7 +25,7 @@ ifeq ($(ARCH), BGQ) # BG/Q version
 GENERICIO = $(HOME)/software/genericio-gcc/
 endif
 
-INCLUDES = $(DIY_INC) $(DELAUANAY_INC) $(PNETCDF_INC) -I$(TESS)/lib -I$(GENERICIO)
+INCLUDES = $(DIY_INC) $(DELAUANAY_INC) $(PNETCDF_INC) -I../lib -I$(GENERICIO)
 LIBS = -L$(TESS)/lib -ltess $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB) -L$(GENERICIO)/genericio.build/libs -lGenericIO
 
 ###########
@@ -73,7 +73,7 @@ default: all
 
 all: hacc-voronoi
 
-hacc-voronoi: $(OBJS) $(TESS)/lib/libtess.a
+hacc-voronoi: $(OBJS)
 	$(CXX) -o hacc-voronoi $(OBJS) $(LIBS)
 
 clean:
