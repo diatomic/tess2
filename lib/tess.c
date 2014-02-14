@@ -893,7 +893,7 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
   int *unique_verts = NULL; /* unique vertices in one cell */
   int num_unique_verts; /* number of unique vertices in one cell*/
   static int max_unique_verts; /* allocated number of unique vertices */
-  int chunk_size = 1024; /* allocation chunk size for unique_verts */
+  int chunk_size = 128; /* allocation chunk size for unique_verts */
   float vol_bin_width; /* width of a volume histogram bin */
   float dense_bin_width; /* width of a density histogram bin */
   float tot_cell_vol = 0.0; /* sum of cell volumes */
@@ -1741,13 +1741,12 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
   struct bb_t bounds; /* block bounds */
   int vid; /* vertex id */
   int i, j, k, n;
-  int chunk_size = 1024; /* allocation chunk size for sent particles */
+  int chunk_size = 128; /* allocation chunk size for sent particles */
   struct remote_particle_t rp; /* particle being sent or received */
   struct sent_t sent; /* info about sent particle saved for later */
   int complete; /* no vertices in the cell are the infinite vertex */
 
-  int allocated_convex_hull = 8;
-  *convex_hull_particles = (int*)malloc(8 * sizeof(int));
+  int allocated_convex_hull = 0;
   *num_convex_hull_particles = 0;
 
   DIY_Block_bounds(0, lid, &bounds);
@@ -1790,18 +1789,11 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
           
       }
       else {
-      
-	/* should do this at most once per cell because at most
+      	/* should do this at most once per cell because at most
 	   one infinite vertex */
 	complete = 0;
-	(*convex_hull_particles)[*num_convex_hull_particles] = j;
-	++(*num_convex_hull_particles);
-	if (*num_convex_hull_particles >= allocated_convex_hull) {
-	    allocated_convex_hull *= 2;
-	    *convex_hull_particles = 
-	      (int*)realloc(*convex_hull_particles, 
-			    allocated_convex_hull * sizeof(int));
-	}
+	add_int(j, convex_hull_particles, num_convex_hull_particles,
+		&allocated_convex_hull, chunk_size);
       }
       
       n++;
@@ -1891,7 +1883,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
   struct bb_t bounds; /* local block bounds */
   struct remote_particle_t rp; /* particle being sent or received */
   struct sent_t sent; /* info about sent particle saved for later */
-  int chunk_size = 1024; /* allocation chunk size for sent particles */
+  int chunk_size = 128; /* allocation chunk size for sent particles */
   
   DIY_Block_bounds(0, lid, &bounds);
 

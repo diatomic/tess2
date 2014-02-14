@@ -58,7 +58,7 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
     sprintf (flags, "qhull d Qt"); /* print delaunay cells */
 
     /* eat qhull output by sending it to dev/null
-       need to see how this behaves on BG/P, will get I/O forwarded but will 
+       need to see how this behaves on BG/P, will get I/O forwarded but will
        stop there and not proceed to storage */
     exitcode = qh_new_qhull(dim, num_particles[i], pts, ismalloc,
 			    flags, dev_null, stderr);
@@ -255,7 +255,7 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
   int *skip_cells = NULL; /* cells (input particles) skipped by qhull */
   int num_skip_cells = 0; /* number of skipped cells */
   int alloc_skip_cells = 0; /* allocated number of skipped cells */
-  int chunk_size = 1024; /* chunk size for allocating skip_cells */
+  int chunk_size = 128; /* chunk size for allocating skip_cells */
 
   /* init, get counts */
   int cell = 0; /* index of cell being processed */
@@ -305,11 +305,6 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
     }
   }
 
-
-  /* DEPRECATED, malloc moved to calling function instead TP */
-/*   vblock->num_cell_verts = (int *)malloc(sizeof(int) * num_particles); */
-/*   memset(vblock->num_cell_verts, 0, sizeof(int) * num_particles); */
-
   /* number of vertices in each cell; size is number of particles; 
      if a cell is skipped, the number of vertices will be 0 */
   cell = 0;
@@ -333,7 +328,6 @@ int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
 
   /* allocate the cell vertices */
   vblock->tot_num_cell_verts = 0;
-/*   for (i = 0; i < temp_num_cells; i++) */
   for (i = 0; i < num_particles; i++)
     vblock->tot_num_cell_verts += vblock->num_cell_verts[i];
   vblock->cells = (int *)malloc(sizeof(int) * vblock->tot_num_cell_verts);
