@@ -67,7 +67,7 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 }
 //----------------------------------------------------------------------------
 //
-//   creates original voronoi cells
+//   creates all final voronoi and delaunay cells
 //
 //   nblocks: number of blocks
 //   vblocks: pointer to array of vblocks
@@ -83,11 +83,11 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 //   times: timing
 //   ds: the delaunay data structures
 //
-void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
-		int *num_particles, int *num_orig_particles, 
-		float **particles, int **gids, int **nids, 
-		unsigned char **dirs, double *times,
-		void* ds) {
+void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
+	       int *num_particles, int *num_orig_particles, 
+	       float **particles, int **gids, int **nids, 
+	       unsigned char **dirs, double *times,
+	       void* ds) {
 
   int num_recvd; // number of received particles in current block
   int i,j;

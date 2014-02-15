@@ -64,48 +64,38 @@ void tess(float **particles, int *num_particles, char *out_file);
 void voronoi_delaunay(int nblocks, float **particles, int *num_particles, 
 		      double *times, char *out_file);
 int gen_particles(int lid, float **particles, float jitter);
-#ifdef __cplusplus
-extern "C"
-#endif
 void complete_cells(struct vblock_t *vblock, int lid);
-#ifdef __cplusplus
-extern "C"
-#endif
 void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock, 
-			      int lid,
-			      int** convex_hull_particles, int* num_convex_hull_particles);
+			      int lid, int** convex_hull_particles, 
+			      int* num_convex_hull_particles);
 void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock, 
-			    int lid,
-			    int* convex_hull_particles, int num_convex_hull_particles,
-                struct wall_t *walls,
-                int num_walls,
-                float** mirror_particles,
-                int*  num_mirror_particles);
-#ifdef __cplusplus
-extern "C"
-#endif
+			    int lid, int* convex_hull_particles, 
+			    int num_convex_hull_particles,
+			    struct wall_t *walls,
+			    int num_walls,
+			    float** mirror_particles,
+			    int*  num_mirror_particles);
+/* #ifdef __cplusplus */
+/* extern "C" */
+/* #endif */
+void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
+	       int *num_particles, int *num_orig_particles, 
+	       float **particles, int **gids, int **nids, 
+	       unsigned char **dirs, double *times, void* ds);
 void cell_faces(struct vblock_t *vblock);
 void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs);
-#ifdef __cplusplus
-extern "C"
-#endif
-void orig_cells(int nblocks, struct vblock_t *vblocks, int dim,
-		int *num_particles, int *num_orig_particles, 
-		float **particles, int **gids, int **nids, 
-		unsigned char **dirs, double *times, void* ds);
-#ifdef __cplusplus
-extern "C"
-#endif
+/* #ifdef __cplusplus */
+/* extern "C" */
+/* #endif */
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 		 int *num_particles, float **particles, void* ds);
-
-#ifdef __cplusplus
-extern "C"
-#endif
+/* #ifdef __cplusplus */
+/* extern "C" */
+/* #endif */
 void* init_delaunay_data_structures(int nblocks);
-#ifdef __cplusplus
-extern "C"
-#endif
+/* #ifdef __cplusplus */
+/* extern "C" */
+/* #endif */
 void clean_delaunay_data_strucutres(void* ds);
 
 void neighbor_particles(int nblocks, float **particles,
@@ -134,6 +124,10 @@ void delaunay(int num_blocks, struct vblock_t *vblocks);
 void neigh_cells(struct vblock_t *vblock, int cell, int face, int cur_vert);
 int compare(const void *a, const void *b);
 void add_int(int val, int **vals, int *numvals, int *maxvals, int chunk_size);
+void add_float(float val, float **vals, int *numvals, int *maxvals, 
+	       int chunk_size);
+void add_pt(float *val, float **vals, int *numvals, int *maxvals, 
+	    int chunk_size);
 void add_empty_int(int **vals, int index, int *numitems, int *maxitems, 
 		  int chunk_size, int init_val);
 void add_sent(struct sent_t val, struct sent_t **vals, int *numvals, 
@@ -155,7 +149,8 @@ void create_walls(int *num_walls, struct wall_t **walls);
 void destroy_walls(int num_walls, struct wall_t *walls);
 int test_outside(const float * pt, const struct wall_t *wall);
 void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall);
-void add_mirror_particles(int nblocks, float **mirror_particles, int *num_mirror_particles, float **particles,
-			int *num_particles, int *num_orig_particles,
-			int **gids, int **nids, unsigned char **dirs);
+void add_mirror_particles(int nblocks, float **mirror_particles, 
+			  int *num_mirror_particles, float **particles,
+			  int *num_particles, int *num_orig_particles,
+			  int **gids, int **nids, unsigned char **dirs);
 #endif

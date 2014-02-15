@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <unistd.h>
+#include <sys/resource.h>
 
 static int dim = 3; /* everything 3D */
 static float data_mins[3], data_maxs[3]; /* extents of overall domain */
@@ -274,9 +275,13 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
     create_walls(&num_walls,&walls);
 
 #ifdef MEMORY
-  fprintf(stderr, "1 start\n");
-  sleep(10);
-  fprintf(stderr, "1 end\n");
+  int dwell = 0;
+  struct rusage r_usage;
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "1: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "1: done\n");
 #endif
 
 #ifdef TIMING
@@ -296,14 +301,19 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  fprintf(stderr, "2 start\n");
-  sleep(10);
-  fprintf(stderr, "2 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "2: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "2: done\n");
 #endif
 
   /* keep track of which particles lie on the convex hull of the local points */
   int** convex_hull_particles	  = (int**) malloc(nblocks * sizeof(int*));
   int*  num_convex_hull_particles = (int*)  malloc(nblocks * sizeof(int));
+  for (i = 0; i < nblocks; i++)
+    convex_hull_particles[i] = NULL;
+
   /* determine which cells are incomplete or too close to neighbor */
   for (i = 0; i < nblocks; i++)
     incomplete_cells_initial(&tblocks[i], &vblocks[i], i,
@@ -311,9 +321,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 			     &num_convex_hull_particles[i]);
 
 #ifdef MEMORY
-  fprintf(stderr, "3 start\n");
-  sleep(10);
-  fprintf(stderr, "3 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "3: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "3: done\n");
 #endif
 
   /* cleanup local temporary blocks */
@@ -334,18 +346,22 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   }
 
 #ifdef MEMORY
-  fprintf(stderr, "4 start\n");
-  sleep(10);
-  fprintf(stderr, "4 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "4: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "4: done\n");
 #endif
 
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
 
 #ifdef MEMORY
-  fprintf(stderr, "5 start\n");
-  sleep(10);
-  fprintf(stderr, "5 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "5: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "5: done\n");
 #endif
 
   /* Second, decisive phase */
@@ -360,15 +376,19 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
 
 #ifdef MEMORY
-  fprintf(stderr, "6 start\n");
-  sleep(10);
-  fprintf(stderr, "6 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "6: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "6: done\n");
 #endif
 
   /* CLP - Create  pointers to wall-mirror particles for each block */
   float** mirror_particles;
   int *num_mirror_particles; /* number of received particles for each block */
   mirror_particles = (float **)malloc(nblocks * sizeof(float *));
+  for (i = 0; i < nblocks; i++)
+    mirror_particles[i] = NULL;
   num_mirror_particles = (int *)malloc(nblocks * sizeof(int));
   
   /* CLP - give walls and pointer for creating wall-mirror particles 
@@ -380,18 +400,22 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 			   &mirror_particles[i], &num_mirror_particles[i]);
 
 #ifdef MEMORY
-  fprintf(stderr, "7 start\n");
-  sleep(10);
-  fprintf(stderr, "7 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "7: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "7: done\n");
 #endif
 
   /* cleanup local temporary blocks */
   destroy_blocks(nblocks, tblocks, NULL);
   
 #ifdef MEMORY
-  fprintf(stderr, "8 start\n");
-  sleep(10);
-  fprintf(stderr, "8 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "8: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "8: done\n");
 #endif
 
   /* exchange particles with neighbors */
@@ -399,9 +423,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 		     gids, nids, dirs);
     
 #ifdef MEMORY
-  fprintf(stderr, "9 start\n");
-  sleep(10);
-  fprintf(stderr, "9 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "9: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "9: done\n");
 #endif
 
   /* CLP - Function to add wall-mirror particles to particles 
@@ -411,15 +437,19 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 		       num_orig_particles, gids, nids, dirs);
   
   /* cleanup convex_hull_particles */
-  for (i = 0; i < nblocks; ++i)
-    free(convex_hull_particles[i]);
+  for (i = 0; i < nblocks; ++i) {
+    if (convex_hull_particles)
+      free(convex_hull_particles[i]);
+  }
   free(convex_hull_particles);
   free(num_convex_hull_particles);
 
   /* CLP cleanup */
   destroy_walls(num_walls, walls);
-  for (i = 0; i < nblocks; ++i)
-    free(mirror_particles[i]);
+  for (i = 0; i < nblocks; ++i) {
+    if (mirror_particles[i])
+      free(mirror_particles[i]);
+  }
   free(num_mirror_particles);
 
 #ifdef TIMING
@@ -431,19 +461,23 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  fprintf(stderr, "10 start\n");
-  sleep(10);
-  fprintf(stderr, "10 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "10: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "10: done\n");
 #endif
 
-  /* create original voronoi cells */
-  orig_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
-	     particles, gids, nids, dirs, times, ds);
+  /* create all final voronoi cells */
+  all_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
+	    particles, gids, nids, dirs, times, ds);
 
 #ifdef MEMORY
-  fprintf(stderr, "11 start\n");
-  sleep(10);
-  fprintf(stderr, "11 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "11: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "11: done\n");
 #endif
 
   /* cleanup */
@@ -465,9 +499,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  fprintf(stderr, "12 start\n");
-  sleep(10);
-  fprintf(stderr, "12 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "12: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "12: done\n");
 #endif
 
   /* compute volume and surface area manually (not using convex hulls) */
@@ -489,9 +525,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   save_headers(nblocks, vblocks, hdrs);
 
 #ifdef MEMORY
-  fprintf(stderr, "13 start\n");
-  sleep(10);
-  fprintf(stderr, "13 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "13: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "13: done\n");
 #endif
 
   /* write output */
@@ -512,9 +550,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
  
 #ifdef MEMORY
-  fprintf(stderr, "14 start\n");
-  sleep(10);
-  fprintf(stderr, "14 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "14: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "14: done\n");
 #endif
 
   /* collect stats */
@@ -525,9 +565,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   free(num_orig_particles);
   
 #ifdef MEMORY
-  fprintf(stderr, "15 start\n");
-  sleep(10);
-  fprintf(stderr, "15 end\n");
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "15: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "15: done\n");
 #endif
 
 }
@@ -722,10 +764,6 @@ void neighbor_particles(int nblocks, float **particles,
   /* copy received particles to particles */
   for (i = 0; i < nblocks; i++) {
 
-    /* debug */
-/*     fprintf(stderr, "num_particles in gid %d before exchange is %d\n", */
-/* 	    DIY_Gid(0, i), num_particles[i]); */
-
     int n = (num_particles[i] - num_orig_particles[i]);
     int new_remote_particles = num_recv_particles[i] + n;
 
@@ -763,10 +801,6 @@ void neighbor_particles(int nblocks, float **particles,
       } /* copy received particles */
 
     } /* if num_recv_particles */
-
-    /* debug */
-/*     fprintf(stderr, "num_particles in gid %d after exchange is %d\n", */
-/* 	    DIY_Gid(0, i), num_particles[i]); */
 
   } /* for all blocks */
 
@@ -1900,8 +1934,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 
   /* CLP */
   int* wall_cut = (int *)malloc(num_walls * sizeof(int));
-  int allocated_mirror_particles = 8;
-  *mirror_particles = (float*)malloc(8 * 3* sizeof(float));
+  int allocated_mirror_particles = 0;
   *num_mirror_particles = 0;
   
   i = 0; n = 0;
@@ -1975,16 +2008,12 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	  for (wi = 0; wi < num_walls; wi++) {
 
 	    /* CLP - If the mirror-generate[wall-index] is not 1 */
-	    if (!wall_cut[wi]) {
+	    if (!wall_cut[wi])
 	      /* CLP - generate the sign of pt relative to the wall.  
 		 If it is not positive (wall vectors must point inward!) 
 		 then set the mirror-generate[wall-index] to one  */
 	      wall_cut[wi] += test_outside(pt,&walls[wi]);
-	      /* debug */
-/* 	      if (wall_cut[wi])  */
-/* 		fprintf(stderr, "Point %f, %f, %f is outside wall %d\n", */
-/* 			pt[0],pt[1],pt[2],wi); */
-	    }
+
 	  }
 
 	} /* vid */
@@ -2059,18 +2088,8 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	spt[1] = tblock->sites[3 * j + 1];
 	spt[2] = tblock->sites[3 * j + 2];
 	generate_mirror(rpt,spt,&walls[wi]);
-            
-	(*mirror_particles)[*num_mirror_particles*3] = rpt[0];
-	(*mirror_particles)[*num_mirror_particles*3 +1] = rpt[1];
-	(*mirror_particles)[*num_mirror_particles*3 +2] = rpt[2];
-	++(*num_mirror_particles);
-            
-	if (*num_mirror_particles >= allocated_mirror_particles) {
-	  allocated_mirror_particles *= 2;
-	  *mirror_particles =
-	    (float*)realloc(*mirror_particles,
-			    allocated_mirror_particles * 3 * sizeof(float));
-	}
+	add_pt(rpt, mirror_particles, num_mirror_particles,
+	       &allocated_mirror_particles, chunk_size);
       }
 
     } /* for */
@@ -2546,6 +2565,74 @@ void add_int(int val, int **vals, int *numvals, int *maxvals, int chunk_size) {
 }
 /*--------------------------------------------------------------------------*/
 /*
+  adds a float to a c-style vector of floats
+
+  val: value to be added
+  vals: pointer to dynamic array of values
+  numvals: pointer to number of values currently stored, updated by add_int
+  maxvals: pointer to number of values currently allocated
+  chunk_size: number of values to allocate at a time
+
+*/
+void add_float(float val, float **vals, int *numvals, int *maxvals, 
+	       int chunk_size) {
+
+  /* first time */
+  if (*maxvals == 0) {
+    *vals = (float *)malloc(chunk_size * sizeof(float));
+    *numvals = 0;
+    *maxvals = chunk_size;
+  }
+
+  /* grow memory */
+  else if (*numvals >= *maxvals) {
+    *vals = (float *)realloc(*vals, 
+			       (chunk_size + *maxvals) * sizeof(float));
+    *maxvals += chunk_size;
+  }
+
+  /* add the element */
+  (*vals)[*numvals] = val;
+  (*numvals)++;
+
+}
+/*--------------------------------------------------------------------------*/
+/*
+  adds a point (array of 3 floats) to a c-style vector of x,y,z,x,y,z points
+
+  val: value to be added
+  vals: pointer to dynamic array of values
+  numvals: pointer to number of points currently stored, updated by add_int
+  maxvals: pointer to number of points currently allocated
+  chunk_size: number of points to allocate at a time
+
+*/
+void add_pt(float *val, float **vals, int *numvals, int *maxvals, 
+	    int chunk_size) {
+
+  /* first time */
+  if (*maxvals == 0) {
+    *vals = (float *)malloc(chunk_size * 3 * sizeof(float));
+    *numvals = 0;
+    *maxvals = chunk_size;
+  }
+
+  /* grow memory */
+  else if (*numvals >= *maxvals) {
+    *vals = (float *)realloc(*vals, 
+			       (chunk_size + *maxvals) * 3 * sizeof(float));
+    *maxvals += chunk_size;
+  }
+
+  /* add the element */
+  (*vals)[3 * *numvals] = val[0];
+  (*vals)[3 * *numvals + 1] = val[1];
+  (*vals)[3 * *numvals + 2] = val[2];
+  (*numvals)++;
+
+}
+/*--------------------------------------------------------------------------*/
+/*
   adds a sent particle to a c-style vector of sent particles
 
   val: sent particle to be added
@@ -2985,7 +3072,7 @@ void create_walls(int *num_walls, struct wall_t **walls) {
   (*walls)[5].d = data_maxs[0];
   
   
-  }
+}
 /*---------------------------------------------------------------------------*/
 /* CLP
   frees walls
@@ -2998,59 +3085,58 @@ void destroy_walls(int num_walls, struct wall_t *walls) {
   if (num_walls) {
     free(walls);
     //fprintf(stderr, "freed walls\n");
+  }
 
-    }
-
- }
-
- /*---------------------------------------------------------------------------*/
+}
+/*---------------------------------------------------------------------------*/
 /* CLP
   determines if point is inside or outside wall
-  http://mathworld.wolfram.com/Plane.html Equation (24) Signed point-plane distance, ignoring positive denominator
+  http://mathworld.wolfram.com/Plane.html Equation (24) 
+  Signed point-plane distance, ignoring positive denominator
   pt: point
   wall: wall
 */
+int test_outside(const float *pt,const struct wall_t *wall) {
 
-int test_outside(const float *pt,const struct wall_t *wall)
-{
-    float D = pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + wall->d;
-    if (D > 0)
-        return 0;
-    else {
-       // fprintf(stderr, "Out of Bounds (%f,%f,%f)\n",pt[0],pt[1],pt[2]);
-        return 1;
-        }
+  float D = pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + wall->d;
+  if (D > 0)
+    return 0;
+  else {
+    // fprintf(stderr, "Out of Bounds (%f,%f,%f)\n",pt[0],pt[1],pt[2]);
+    return 1;
+  }
+
 }
-
 /*---------------------------------------------------------------------------*/
 /* CLP
   returns point reflected across wall
-  http://mathworld.wolfram.com/Plane.html Equation (24) Signed point-plane distance, including denominator
+  http://mathworld.wolfram.com/Plane.html Equation (24) 
+  Signed point-plane distance, including denominator
   rpt
   pt: site-point
   wall: wall
 */
-void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall)
-{
+void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall) {
 
-    /*signed distance from wall to site point */
-    float D = (pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + wall->d)/sqrt(wall->a*wall->a + wall->b*wall->b + wall->c*wall->c);
+  /*signed distance from wall to site point */
+  float D = (pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + 
+	     wall->d)/sqrt(wall->a*wall->a + wall->b*wall->b + 
+			   wall->c*wall->c);
     
-    rpt[0] = pt[0] - 2*D*wall->a;
-    rpt[1] = pt[1] - 2*D*wall->b;
-    rpt[2] = pt[2] - 2*D*wall->c;
-
+  rpt[0] = pt[0] - 2*D*wall->a;
+  rpt[1] = pt[1] - 2*D*wall->b;
+  rpt[2] = pt[2] - 2*D*wall->c;
 
 }
-
 /*---------------------------------------------------------------------------*/
 /* CLP
  Adds mirror particles to list
 */
-void add_mirror_particles(int nblocks, float **mirror_particles, int *num_mirror_particles, float **particles,
-			int *num_particles, int *num_orig_particles,
-			int **gids, int **nids, unsigned char **dirs)
-{
+void add_mirror_particles(int nblocks, float **mirror_particles, 
+			  int *num_mirror_particles, float **particles,
+			  int *num_particles, int *num_orig_particles,
+			  int **gids, int **nids, unsigned char **dirs) {
+
   int i,j;
     
   /* copy mirror particles to particles */
@@ -3090,9 +3176,8 @@ void add_mirror_particles(int nblocks, float **mirror_particles, int *num_mirror
       } /* copy mirror particles */
 
     } /* if num_mirror_particles */
+
   }
 
 }
-
-
-
+/*---------------------------------------------------------------------------*/

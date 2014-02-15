@@ -88,7 +88,7 @@ args="$tb $dsize $jitter $minv $maxv $wrap $walls $outfile"
 
 if [ "$ARCH" = "MAC_OSX" ]; then
 
-#mpiexec -l -n $num_procs $exe $args
+mpiexec -l -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 
