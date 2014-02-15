@@ -64,8 +64,6 @@ all: voronoi
 
 voronoi: $(OBJS) ../lib/libtess.a
 	$(CXX) -o voronoi $(OBJS) $(LIBS)
-#	$(CXX) -o voronoi $(OBJS) $(LIBS) /home/tpeterka/software/valgrindobj/lib/valgrind/ppc32-bgp/valgrind_memcheck.o -Wl,-e,_start_valgrind
-	cp voronoi ..
 
 clean:
 	rm -f *.o 

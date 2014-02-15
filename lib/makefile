@@ -83,15 +83,12 @@ libtess.a: $(TESS_OBJS)
 
 draw: $(DRAW_OBJS) 
 	$(CXX) -o draw $(DRAW_OBJS) $(GL_LIBS) $(LIBS)
-	mv draw ..
 
 dump: $(DUMP_OBJS) 
 	$(CXX) -o dump $(DUMP_OBJS)
-	mv dump ..
 
 dense: $(DENSE_OBJS) 
 	mpicxx -o dense $(DENSE_OBJS) $(DIY_LIB) $(PNETCDF_LIB)
-	mv dense ..
 
 clean:
 	rm -f *.o 
