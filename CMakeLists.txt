@@ -4,6 +4,7 @@ cmake_minimum_required      (VERSION 2.8)
 option                      (optimize       "Build tess with optimization"		    ON)
 option                      (debug          "Build tess with debugging on"		    OFF)
 option                      (timing	    "Build tess with timing"			    ON)
+option                      (memory	    "Build tess with memory profiling"		    OFF)
 option			    (use_cgal	    "Use CGAL"					    OFF)
 option			    (draw	    "Build draw"				    ON)
 option			    (hacc_test	    "Build HACC test"				    OFF)
@@ -11,6 +12,10 @@ option			    (hacc_test	    "Build HACC test"				    OFF)
 if			    (timing)
     add_definitions	    (-DTIMING)
 endif			    (timing)
+
+if			    (memory)
+  add_definitions	    (-DMEMORY)
+endif			    (memory)
 
 # Debugging
 if                          (debug)
