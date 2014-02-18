@@ -53,6 +53,13 @@ static float eps = 0.0001; // epsilon for floating point values to be equal
 static bool project; // whether to project to 2D
 static float proj_plane[3]; // normal to projection plane
 
+// timing
+#define DENSE_MAX_TIMES 4
+#define INPUT_TIME 0
+#define COMP_TIME 1
+#define OUTPUT_TIME 2
+#define TOT_TIME 3
+
 // function prototypes
 void ParseArgs(int argc, char **argv, int *num_given_bounds,
 	       float *given_mins, float *given_maxs);
@@ -85,7 +92,7 @@ void phys2idx(float *pos, int *grid_idx);
 void DataBounds(int nblocks, MPI_Comm comm);
 void SummaryStats(float max_dense, float tot_mass,
 		  float check_mass, int tot_cells, int max_cell_grid_pts,
-		  double tot_time, MPI_Comm comm);
+		  double *times, MPI_Comm comm);
 void DistributeScalarCIC(float *pt, float scalar,
 			 vector <int> &grid_idxs, vector <float> &grid_scalars);
 //--------------------------------------------------------------------------
@@ -104,10 +111,6 @@ int main(int argc, char** argv) {
   // grid given bounds
   int num_given_bounds; // number of given bounds
   float given_mins[3], given_maxs[3]; // the given bounds
-
-  // timing
-  double tot_time; // total time
-  double less_io_time; // total time minus read and write
 
   // local block grid parameters
   int block_min_idx[3]; // global grid index of block minimum grid point
@@ -130,7 +133,11 @@ int main(int argc, char** argv) {
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &groupsize);
 
-  tot_time = MPI_Wtime();
+  // timing
+  double times[DENSE_MAX_TIMES]; // timing
+  MPI_Barrier(comm);
+  times[TOT_TIME] = MPI_Wtime();
+  times[INPUT_TIME] = MPI_Wtime();
 
   // read the tessellation
   // pnetcdf is the only version for the density estimator (no diy version)
@@ -155,7 +162,9 @@ int main(int argc, char** argv) {
   int maxblocks; // max blocks in any process
   MPI_Allreduce(&nblocks, &maxblocks, 1, MPI_INT, MPI_MAX, comm);
 
-  less_io_time = MPI_Wtime();
+  MPI_Barrier(comm);
+  times[INPUT_TIME] = MPI_Wtime() - times[INPUT_TIME];
+  times[COMP_TIME] = MPI_Wtime();
 
   // init diy
   diy_neighs = new gb_t*[nblocks];
@@ -285,10 +294,14 @@ int main(int argc, char** argv) {
   }
 
   MPI_Barrier(comm);
-  less_io_time = MPI_Wtime() - less_io_time;
+  times[COMP_TIME] = MPI_Wtime() - times[COMP_TIME];
+  times[OUTPUT_TIME] = MPI_Wtime();
 
   // write file
   WriteGrid(density, comm, nblocks, maxblocks);
+
+  MPI_Barrier(comm);
+  times[OUTPUT_TIME] = MPI_Wtime() - times[OUTPUT_TIME];
 
   // cleanup
   for (int i = 0; i < nblocks; i++)
@@ -298,10 +311,10 @@ int main(int argc, char** argv) {
   delete[] items;
 
   MPI_Barrier(comm);
-  tot_time = MPI_Wtime() - tot_time;
+  times[TOT_TIME] = MPI_Wtime() - times[TOT_TIME];
 
   SummaryStats(max_dense, tot_mass, check_mass, tot_cells,
-	       max_cell_grid_pts, tot_time, comm);
+	       max_cell_grid_pts, times, comm);
 
   DIY_Finalize();
   MPI_Finalize();
@@ -345,6 +358,16 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
     // cell bounds
     CellBounds(vblocks[block], cell, cell_min, cell_max,
 	       cell_centroid, normals);
+
+    // debug
+//     if (cell_min[0] < data_mins[0] || cell_min[1] < data_mins[1] || 
+// 	cell_min[2] < data_mins[2] ||
+// 	cell_max[0] > data_maxs[0] || cell_max[1] > data_maxs[1] || 
+// 	cell_max[2] > data_maxs[2])
+//       fprintf(stderr, "1: block = %d cell = %d cell_mins = [%.1f %.1f %.1f] "
+// 	      "cell_maxs = [%.1f %.1f %.1f]\n", block, cell,
+// 	      cell_min[0], cell_min[1], cell_min[2],
+// 	      cell_max[0], cell_max[1], cell_max[2]);
 
     // debug
     check_mass++;
@@ -651,6 +674,13 @@ void CellBounds(vblock_t *vblock, int c_cell, float *cell_min, float *cell_max,
   int cell = vblock->complete_cells[c_cell];
   int num_faces; // number of faces in the current cell
   int num_verts; // number of vertices in the current face
+
+  // debug
+  if (cell >= vblock->num_orig_particles)
+    fprintf(stderr, "block mins [%.1f %.1f %.1f] has cell %d >= "
+	    "num_orig_particles %d\n",
+	    vblock->mins[0], vblock->mins[1], vblock->mins[2], cell,
+	    vblock->num_orig_particles);
 
   // number of faces in the current cell
   if (cell < vblock->num_orig_particles - 1)
@@ -1108,6 +1138,7 @@ int CellGridPts(vblock_t *vblock, int cell, float *cell_mins,
 
   // grid_pts and border memory allocation
   int npts = cell_grid_pts[0] * cell_grid_pts[1] * cell_grid_pts[2];
+
   if (!alloc_grid_pts) {
     grid_pts = (grid_pt_t *)malloc(npts * sizeof(grid_pt_t));
     border = (int *)malloc(npts * 2 * sizeof(int)); // more than large enough
@@ -1219,12 +1250,12 @@ void DataBounds(int nblocks, MPI_Comm comm) {
 // check_mass: local ground truth total mass
 // tot_cells: local total number of cells
 // max_cell_grid_pts: maximum number of grid points covered by a cell
-// tot_time: total time
+// times: timing info
 // comm: MPI cmmunicator
 //
 void SummaryStats(float max_dense, float tot_mass,
 		  float check_mass, int tot_cells, int max_cell_grid_pts,
-		  double tot_time, MPI_Comm comm) {
+		  double *times, MPI_Comm comm) {
 
   int rank;
   MPI_Comm_rank(comm, &rank);
@@ -1272,7 +1303,10 @@ void SummaryStats(float max_dense, float tot_mass,
 	    glo_max_dense, glo_tot_mass, glo_check_mass);
     fprintf(stderr, "Total number of cell interior evaluations = %.lld\n", 
 	    tot_interior_evals);
-    fprintf(stderr, "Total time = %.3lf s\n", tot_time);
+    fprintf(stderr, "Total time = %.3lf s = \n", times[TOT_TIME]);
+    fprintf(stderr, "%.3lf s input + %.3lf s density computation + "
+	    "%.3lf s output\n",
+	    times[INPUT_TIME], times[COMP_TIME], times[OUTPUT_TIME]);
     fprintf(stderr, "-----------------------------------\n");
   }
 

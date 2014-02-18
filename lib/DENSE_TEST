@@ -29,7 +29,7 @@ ARCH=MAC_OSX
 
 # number of procs
 # must be <= tb
-num_procs=8
+num_procs=16
 
 # procs per node
 ppn=1 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
@@ -44,7 +44,7 @@ fi
 exe=./dense
 
 # input file
-infile="vor.out.nc"
+infile="../driver/vor.out.nc"
 #infile="vor.out-100K.nc"
 #infile="vor.out-100K-2b.nc"
 #infile="vor-99.out.nc"
@@ -61,9 +61,9 @@ infile="vor.out.nc"
 #gsize="40 40 40"
 #gsize="32 32 32"
 #gsize="64 64 64"
-gsize="128 128 128"
+#gsize="128 128 128"
 #gsize="256 256 256"
-#gsize="512 512 512"
+gsize="512 512 512"
 #gsize="1024 1024 1024"
 #gsize="2048 2048 2048"
 
@@ -96,7 +96,7 @@ args="$infile $gsize $project $mass $swap $ng $gmin $gmax"
 
 if [ "$ARCH" = "MAC_OSX" ]; then
 
-mpiexec -n $num_procs $exe $args
+mpiexec -l -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 

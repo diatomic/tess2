@@ -469,6 +469,7 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
   nc_type type;
   int ndims, natts;
   int rank, groupsize; /* MPI usual */
+  int i;
 
   /* open file for reading */
   err = ncmpi_open(comm, in_file, NC_NOWRITE, MPI_INFO_NULL, &ncid); ERR;
@@ -499,9 +500,20 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
 
   *nblocks = (rank < groupsize - 1 ? bp : *tot_blocks - (rank * bp));
 
+  /* all gids and block index in file of each gid
+     todo: not scalable*/
+  int *all_gids = (int *)malloc(*tot_blocks * sizeof(int));
+  int *gid2idx = (int *)malloc(*tot_blocks * sizeof(int));
+  start[0] = 0;
+  count[0] = *tot_blocks;
+  err = ncmpi_inq_varid(ncid, "g_block_ids", &varids[23]); ERR;
+  err = ncmpi_get_vara_int_all(ncid, varids[23], start, count, 
+			       all_gids); ERR;
+  for (i = 0; i < *tot_blocks; i++)
+    gid2idx[all_gids[i]] = i;
+
   /* block offsets */
-  int64_t block_ofsts[NUM_QUANTS]; /* current block offsets for variables */
-  int64_t *proc_ofsts = (int64_t*)malloc(groupsize * sizeof(int64_t));
+  int64_t *block_ofsts = (int64_t*)malloc(*tot_blocks * sizeof(int64_t));
   *vblocks = (struct vblock_t**)malloc(*nblocks * sizeof(struct vblock_t*));
 
   /* read all blocks */
@@ -509,42 +521,6 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
   *num_neighbors = (int *)malloc(*nblocks * sizeof(int));
   *neighbors = (int **)malloc(*nblocks * sizeof(int *));
   *neigh_procs = (int **)malloc(*nblocks * sizeof(int *));
-
-  /* intitial block offsets for my first block */
-  start[0] = 0;
-  count[0] = groupsize;
-  /* save_verts */
-  err = ncmpi_get_vara_longlong_all(ncid, varids[5], start, count, 
-				    (long long *)proc_ofsts); ERR;
-  block_ofsts[NUM_VERTICES] = proc_ofsts[rank];
-  /* sites */
-  err = ncmpi_get_vara_longlong_all(ncid, varids[9], start, count, 
-				    (long long *)proc_ofsts); ERR;
-  block_ofsts[NUM_ORIG_PARTS] = proc_ofsts[rank];
-  /* complete_cells */
-  err = ncmpi_get_vara_longlong_all(ncid, varids[6], start, count, 
-				    (long long *) proc_ofsts); ERR;
-  block_ofsts[NUM_COMP_CELLS] = proc_ofsts[rank];
-  /* loc_tets */
-  err = ncmpi_get_vara_longlong_all(ncid, varids[26], start, count, 
-				    (long long *) proc_ofsts); ERR;
-  block_ofsts[NUM_LOC_TETRAS] = proc_ofsts[rank];
-  /* rem_tets */
-  err = ncmpi_get_vara_longlong_all(ncid, varids[29], start, count, 
-				    (long long *) proc_ofsts); ERR;
-  block_ofsts[NUM_REM_TETRAS] = proc_ofsts[rank];
-  /* faces */
-  err = ncmpi_get_vara_longlong_all(ncid, varids[35], start, count, 
-				    (long long *) proc_ofsts); ERR;
-  block_ofsts[NUM_UNIQUE_FACES] = proc_ofsts[rank];
-  /* cell_faces */
-  err = ncmpi_get_vara_longlong_all(ncid, varids[7], start, count, 
-				    (long long *) proc_ofsts); ERR;
-  block_ofsts[NUM_CELL_FACES] = proc_ofsts[rank];
-  /* num_neighbors */
-  err = ncmpi_get_vara_longlong_all(ncid, varids[40], start, count, 
-				    (long long *) proc_ofsts); ERR;
-  block_ofsts[NUM_NEIGHBORS] = proc_ofsts[rank];
 
   /* for all blocks */
   int b;
@@ -590,8 +566,12 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
 				   v->maxs); ERR;
 
     /* save_verts */
+    start[0] = 0;
+    count[0] = *tot_blocks;
+    err = ncmpi_get_vara_longlong_all(ncid, varids[5], start, count, 
+				      (long long *)block_ofsts); ERR;
     v->save_verts = (float *)malloc(v->num_verts * 3 * sizeof(float));
-    start[0] = block_ofsts[NUM_VERTICES];
+    start[0] = block_ofsts[start_block_ofst + b];
     start[1] = 0;
     count[0] = v->num_verts;
     count[1] = 3;
@@ -600,8 +580,12 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
 				   v->save_verts); ERR;
 
     /* sites */
+    start[0] = 0;
+    count[0] = *tot_blocks;
+    err = ncmpi_get_vara_longlong_all(ncid, varids[9], start, count, 
+				      (long long *)block_ofsts); ERR;
     v->sites = (float *)malloc(v->num_orig_particles * 3 * sizeof(float));
-    start[0] = block_ofsts[NUM_ORIG_PARTS];
+    start[0] = block_ofsts[start_block_ofst + b];
     start[1] = 0;
     count[0] = v->num_orig_particles;
     count[1] = 3;
@@ -610,8 +594,12 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
 				   v->sites); ERR;
 
     /* complete cells */
+    start[0] = 0;
+    count[0] = *tot_blocks;
+    err = ncmpi_get_vara_longlong_all(ncid, varids[6], start, count, 
+				      (long long *) block_ofsts); ERR;
     v->complete_cells = (int *)malloc(v->num_complete_cells * sizeof(int));
-    start[0] = block_ofsts[NUM_COMP_CELLS];
+    start[0] = block_ofsts[start_block_ofst + b];
     count[0] = v->num_complete_cells;
     err = ncmpi_inq_varid(ncid, "complete_cells", &varids[15]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[15], start, count, 
@@ -619,12 +607,16 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
 
     /* areas, uses same block offsets as complete cells */
     v->areas = (float *)malloc(v->num_complete_cells * sizeof(float));
+    start[0] = block_ofsts[start_block_ofst + b];
+    count[0] = v->num_complete_cells;
     err = ncmpi_inq_varid(ncid, "areas", &varids[16]); ERR;
     err = ncmpi_get_vara_float_all(ncid, varids[16], start, count, 
 				   v->areas); ERR;
 
     /* volumes, uses same block offsets as complete cells */
     v->vols = (float *)malloc(v->num_complete_cells * sizeof(float));
+    start[0] = block_ofsts[start_block_ofst + b];
+    count[0] = v->num_complete_cells;
     err = ncmpi_inq_varid(ncid, "vols", &varids[17]); ERR;
     err = ncmpi_get_vara_float_all(ncid, varids[17], start, count, 
 				   v->vols); ERR;
@@ -639,7 +631,11 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
     if ((*num_neighbors)[b]) {
       (*neighbors)[b] = (int *)malloc((*num_neighbors)[b] * sizeof(int));
       (*neigh_procs)[b] = (int *)malloc((*num_neighbors)[b] * sizeof(int));
-      start[0] = block_ofsts[NUM_NEIGHBORS];
+      start[0] = 0;
+      count[0] = *tot_blocks;
+      err = ncmpi_get_vara_longlong_all(ncid, varids[40], start, count, 
+					(long long *) block_ofsts); ERR;
+      start[0] = block_ofsts[start_block_ofst + b];
       count[0] = (*num_neighbors)[b];
       err = ncmpi_get_vara_int_all(ncid, varids[21], start, count, 
 				   (*neighbors)[b]); ERR;
@@ -650,44 +646,39 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
        for now relies on blocks being in gid order in file */
     int n;
     for (n = 0; n < (*num_neighbors)[b]; n++) {
-      (*neigh_procs)[b][n] = (*neighbors)[b][n] / bp;
+      (*neigh_procs)[b][n] = gid2idx[(*neighbors)[b][n]] / bp;
       if ((*neigh_procs)[b][n] >= groupsize)
 	(*neigh_procs[b][n] = groupsize - 1);
     }
 
     /* gids */
-    start[0] = start_block_ofst + b;
-    count[0] = 1;
-    err = ncmpi_inq_varid(ncid, "g_block_ids", &varids[23]); ERR;
-    err = ncmpi_get_vara_int_all(ncid, varids[23], start, count, 
-				 &((*gids)[b])); ERR;
-    /* assert that blocks were written in gid order in the file by checking
-       that gid / bp = my rank  unless my rank is the last processs,
-       in which case gid / bf >= my rank */
-    if (rank == groupsize - 1)
-      assert((*gids)[b] / bp >= rank);
-    else
-      assert((*gids)[b] / bp == rank);
-
-    (*vblocks)[b] = v;
+    (*gids)[b] = all_gids[start_block_ofst + b];
 
     /* tets */
     /* local */
+    start[0] = 0;
+    count[0] = *tot_blocks;
+    err = ncmpi_get_vara_longlong_all(ncid, varids[26], start, count, 
+				      (long long *) block_ofsts); ERR;
     v->loc_tets = (int *)malloc(4 * v->num_loc_tets * sizeof(int));
     count[0] = v->num_loc_tets;
     count[1] = (count[0] ? 4 : 0);
-    start[0] = (count[0] ? block_ofsts[NUM_LOC_TETRAS] : 0);
+    start[0] = (count[0] ? block_ofsts[start_block_ofst + b] : 0);
     start[1] = 0;
     err = ncmpi_inq_varid(ncid, "loc_tets", &varids[27]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[27], start, count, 
 				 v->loc_tets); ERR;
     /* remote */
+    start[0] = 0;
+    count[0] = *tot_blocks;
+    err = ncmpi_get_vara_longlong_all(ncid, varids[29], start, count, 
+				      (long long *) block_ofsts); ERR;
     v->rem_tet_gids = (int *)malloc(4 * v->num_rem_tets * sizeof(int));
     v->rem_tet_nids = (int *)malloc(4 * v->num_rem_tets * sizeof(int));
     v->rem_tet_wrap_dirs = (unsigned char *)malloc(4 * v->num_rem_tets);
     count[0] = v->num_rem_tets;
     count[1] = (count[0] ? 4 : 0);
-    start[0] = (count[0] ? block_ofsts[NUM_REM_TETRAS] : 0);
+    start[0] = (count[0] ? block_ofsts[start_block_ofst + b] : 0);
     start[1] = 0;
     err = ncmpi_inq_varid(ncid, "rem_tet_gids", &varids[30]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[30], start, count, 
@@ -700,8 +691,12 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
 				   v->rem_tet_wrap_dirs); ERR;
     
     /* faces */
+    start[0] = 0;
+    count[0] = *tot_blocks;
+    err = ncmpi_get_vara_longlong_all(ncid, varids[35], start, count, 
+				      (long long *) block_ofsts); ERR;
     v->faces = (struct vface_t *)malloc(v->num_faces * sizeof(struct vface_t));
-    start[0] = block_ofsts[NUM_UNIQUE_FACES];
+    start[0] = block_ofsts[start_block_ofst + b];
     start[1] = 0;
     count[0] = v->num_faces;
     count[1] = 3 + MAX_FACE_VERTS;
@@ -710,37 +705,39 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
 				 (int *)(v->faces)); ERR;
 
     /* cell_faces_start */
+    start[0] = 0;
+    count[0] = *tot_blocks;
+    err = ncmpi_get_vara_longlong_all(ncid, varids[9], start, count, 
+				      (long long *) block_ofsts); ERR;
     v->cell_faces_start = (int *)malloc(v->num_orig_particles * sizeof(int));
-    start[0] = block_ofsts[NUM_ORIG_PARTS];
+    start[0] = block_ofsts[start_block_ofst + b];
     count[0] = v->num_orig_particles;
     err = ncmpi_inq_varid(ncid, "cell_faces_start", &varids[38]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[38], start, count, 
 				 v->cell_faces_start); ERR;
 
     /* cell_faces */
+    start[0] = 0;
+    count[0] = *tot_blocks;
+    err = ncmpi_get_vara_longlong_all(ncid, varids[7], start, count, 
+				      (long long *) block_ofsts); ERR;
     v->cell_faces = (int *)malloc(v->tot_num_cell_faces * sizeof(int));
-    start[0] = block_ofsts[NUM_CELL_FACES];
+    start[0] = block_ofsts[start_block_ofst + b];
     count[0] = v->tot_num_cell_faces;
     err = ncmpi_inq_varid(ncid, "cell_faces", &varids[39]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[39], start, count, 
 				 v->cell_faces); ERR;
 
-    /* update block offsets */
-    block_ofsts[NUM_VERTICES] += v->num_verts;
-    block_ofsts[NUM_COMP_CELLS] += v->num_complete_cells;
-    block_ofsts[NUM_CELL_FACES] += v->tot_num_cell_faces;
-    block_ofsts[NUM_ORIG_PARTS] += v->num_orig_particles;
-    block_ofsts[NUM_NEIGHBORS] += (*num_neighbors)[b];
-    block_ofsts[NUM_BLOCKS]++;
-    block_ofsts[NUM_LOC_TETRAS] += v->num_loc_tets;
-    block_ofsts[NUM_REM_TETRAS] += v->num_rem_tets;
-    block_ofsts[NUM_UNIQUE_FACES] += v->num_faces;
+    /* save the block */
+    (*vblocks)[b] = v;
 
   } /* for all blocks */
 
   /* cleanup */
   err = ncmpi_close(ncid); ERR;
-  free(proc_ofsts);
+  free(block_ofsts);
+  free(all_gids);
+  free(gid2idx);
 
 }
 /*--------------------------------------------------------------------------*/
