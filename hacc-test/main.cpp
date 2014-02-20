@@ -328,7 +328,7 @@ void Redistribute(int *bf, int* &gids,
     int b = 0; // local block id
 
     // particles going to child blocks
-    vector<float> ps[bf[0] * bf[1] * bf[2]];
+    vector<float> *ps = new vector<float>[bf[0] * bf[1] * bf[2]];
 
     // for all particles
     for (int i = 0; i < num_particles[b]; i++) {
@@ -446,6 +446,8 @@ void Redistribute(int *bf, int* &gids,
       assert(particles[b][3 * k + 2] >= bb[b].min[2] &&
 	     particles[b][3 * k + 2] <= bb[b].max[2]);
     }
+
+    delete[] ps;
 
   } // parents
 
