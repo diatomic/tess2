@@ -1,18 +1,17 @@
-
-/*---------------------------------------------------------------------------
- *
- * parallel voronoi and delaunay tesselation
- *
- * Tom Peterka
- * Argonne National Laboratory
- * 9700 S. Cass Ave.
- * Argonne, IL 60439
- * tpeterka@mcs.anl.gov
- *
- * (C) 2013 by Argonne National Laboratory.
- * See COPYRIGHT in top-level directory.
- *
---------------------------------------------------------------------------*/
+// ---------------------------------------------------------------------------
+//  
+//   parallel voronoi and delaunay tesselation
+//  
+//   Tom Peterka
+//   Argonne National Laboratory
+//   9700 S. Cass Ave.
+//   Argonne, IL 60439
+//   tpeterka@mcs.anl.gov
+//  
+//   (C) 2013 by Argonne National Laboratory.
+//   See COPYRIGHT in top-level directory.
+//  
+// --------------------------------------------------------------------------
 #include "mpi.h"
 #include "diy.h"
 #include "tess.h"
@@ -24,41 +23,43 @@
 #include <unistd.h>
 #include <sys/resource.h>
 
-static int dim = 3; /* everything 3D */
-static float data_mins[3], data_maxs[3]; /* extents of overall domain */
-MPI_Comm comm; /* MPI communicator */
-static float min_vol, max_vol; /* cell volume range */
-static int nblocks; /* number of blocks per process */
-static double *times; /* timing info */
-static int wrap_neighbors; /* whether wraparound neighbors are used */
-/* CLP - if wrap_neighbors is 0 then check this condition. */
+static int dim = 3; // everything 3D 
+static float data_mins[3], data_maxs[3]; // extents of overall domain 
+MPI_Comm comm; // MPI communicator 
+static float min_vol, max_vol; // cell volume range 
+static int nblocks; // number of blocks per process 
+static double *times; // timing info 
+static int wrap_neighbors; // whether wraparound neighbors are used 
+// CLP - if wrap_neighbors is 0 then check this condition. 
 static int walls_on;
 
-/* pnetcdf output */
+// pnetcdf output 
 #define PNETCDF_IO
 
-/* MEMORY PROFILING */
-/* #define MEMORY */
+// MEMORY PROFILING 
+// #define MEMORY 
 
-/*------------------------------------------------------------------------*/
-/*
-  initialize parallel voronoi and delaunay tessellation including
-  initializing DIY with given info on local blocks and their neighbors
-
-  num_blocks: local number of blocks in my process
-  gids: global ids of my local blocks
-  bounds: block bounds (extents) of my local blocks
-  neighbors: neighbor lists for each of my local blocks, in lid order
-  neighbor bounds need not be known, will be discovered automatically
-  num_neighbors: number of neighbors for each of my local blocks, in lid order
-  global_mins, global_maxs: overall data extents
-  wrap: whether wraparound neighbors are used
-  twalls_on: whether walls boundaries are used
-  minvol, maxvol: filter range for which cells to keep
-  pass -1.0 to skip either or both bounds
-  mpi_comm: MPI communicator
-  all_times: times for particle exchange, voronoi cells, convex hulls, and output
-*/
+// ------------------------------------------------------------------------
+//
+//   initialize parallel voronoi and delaunay tessellation including
+//   initializing DIY with given info on local blocks and their neighbors
+//
+//   num_blocks: local number of blocks in my process
+//   gids: global ids of my local blocks
+//   bounds: block bounds (extents) of my local blocks
+//   neighbors: neighbor lists for each of my local blocks, in lid order
+//   neighbor bounds need not be known, will be discovered automatically
+//   num_neighbors: number of neighbors for each of my local blocks, 
+//     in lid order
+//   global_mins, global_maxs: overall data extents
+//   wrap: whether wraparound neighbors are used
+//   twalls_on: whether walls boundaries are used
+//   minvol, maxvol: filter range for which cells to keep
+//   pass -1.0 to skip either or both bounds
+//   mpi_comm: MPI communicator
+//   all_times: times for particle exchange, voronoi cells, convex hulls, 
+//     and output
+//
 void tess_init(int num_blocks, int *gids, 
 	       struct bb_t *bounds, struct gb_t **neighbors, 
 	       int *num_neighbors, float *global_mins, float *global_maxs, 
@@ -67,7 +68,7 @@ void tess_init(int num_blocks, int *gids,
 
   int i;
 
-  /* save globals */
+  // save globals 
   comm = mpi_comm;
   nblocks = num_blocks;
   min_vol = minvol;
@@ -76,36 +77,36 @@ void tess_init(int num_blocks, int *gids,
   wrap_neighbors = wrap;
   walls_on = twalls_on;
 
-  /* data extents */
+  // data extents 
   for(i = 0; i < 3; i++) {
     data_mins[i] = global_mins[i];
     data_maxs[i] = global_maxs[i];
   }
 
-  /* init times */
+  // init times 
   for (i = 0; i < MAX_TIMES; i++)
     times[i] = 0.0;
 
-  /* init DIY */
+  // init DIY 
   DIY_Init(dim, 1, comm);
   DIY_Decomposed(num_blocks, gids, bounds, NULL, NULL, NULL, NULL, neighbors, 
 		 num_neighbors, wrap);
 
 }
-/*------------------------------------------------------------------------*/
-/*
-  initialize parallel voronoi and delaunay tessellation with an existing
-  diy domain, assumes DIY_Init and DIY_Decompose done already
-
-  num_blocks: local number of blocks in my process
-  global_mins, global_maxs: overall data extents
-  wrap: whether wraparound neighbors are used
-  twalls_on: whether walls boundaries are used
-  minvol, maxvol: filter range for which cells to keep
-  pass -1.0 to skip either or both bounds
-  mpi_comm: MPI communicator
-  all_times: times for particle exchange, voronoi cells, convex hulls, and output
-*/
+// ------------------------------------------------------------------------
+//
+//   initialize parallel voronoi and delaunay tessellation with an existing
+//   diy domain, assumes DIY_Init and DIY_Decompose done already
+//
+//   num_blocks: local number of blocks in my process
+//   global_mins, global_maxs: overall data extents
+//   wrap: whether wraparound neighbors are used
+//   twalls_on: whether walls boundaries are used
+//   minvol, maxvol: filter range for which cells to keep
+//   pass -1.0 to skip either or both bounds
+//   mpi_comm: MPI communicator
+//   all_times: times for particle exchange, voronoi cells, 
+//    convex hulls, and output
 void tess_init_diy_exist(int num_blocks, float *global_mins, 
 			 float *global_maxs, int wrap, int twalls_on, 
 			 float minvol, float maxvol, MPI_Comm mpi_comm, 
@@ -113,7 +114,7 @@ void tess_init_diy_exist(int num_blocks, float *global_mins,
 
   int i;
 
-  /* save globals */
+  // save globals 
   comm = mpi_comm;
   nblocks = num_blocks;
   min_vol = minvol;
@@ -122,65 +123,64 @@ void tess_init_diy_exist(int num_blocks, float *global_mins,
   wrap_neighbors = wrap;
   walls_on = twalls_on;
 
-  /* data extents */
+  // data extents 
   for(i = 0; i < 3; i++) {
     data_mins[i] = global_mins[i];
     data_maxs[i] = global_maxs[i];
   }
 
-  /* init times */
+  // init times 
   for (i = 0; i < MAX_TIMES; i++)
     times[i] = 0.0;
 
 }
-/*------------------------------------------------------------------------*/
-/*
-finalize tesselation
-*/
+// ------------------------------------------------------------------------
+//
+// finalize tesselation
+//
 void tess_finalize() {
 
   DIY_Finalize();
 
 }
-/*------------------------------------------------------------------------*/
-/*
-  parallel tessellation
-
-  particles: particles[block_num][particle] 
-  where each particle is 3 values, px, py, pz
-  num_particles; number of particles in each block
-  out_file: output file name
-*/
+// ------------------------------------------------------------------------
+//
+//   parallel tessellation
+//
+//   particles: particles[block_num][particle] 
+//   where each particle is 3 values, px, py, pz
+//   num_particles; number of particles in each block
+//   out_file: output file name
 void tess(float **particles, int *num_particles, char *out_file) {
 
   voronoi_delaunay(nblocks, particles, num_particles, times, out_file);
 
 }
-/*------------------------------------------------------------------------*/
-/*
-  test of parallel tesselation
-
-  tot_blocks: total number of blocks in the domain
-  data_size: domain grid size (x, y, z)
-  jitter: maximum amount to randomly move each particle
-  minvol, maxvol: filter range for which cells to keep
-  pass -1.0 to skip either or both bounds
-  wrap: whether wraparound neighbors are used
-  twalls_on: whether walls boundaries are used
-  times: times for particle exchange, voronoi cells, convex hulls, and output
-  outfile: output file name
-*/
+// ------------------------------------------------------------------------
+//
+//   test of parallel tesselation
+//
+//   tot_blocks: total number of blocks in the domain
+//   data_size: domain grid size (x, y, z)
+//   jitter: maximum amount to randomly move each particle
+//   minvol, maxvol: filter range for which cells to keep
+//   pass -1.0 to skip either or both bounds
+//   wrap: whether wraparound neighbors are used
+//   twalls_on: whether walls boundaries are used
+//   times: times for particle exchange, voronoi cells, convex hulls, and output
+//   outfile: output file name
+//
 void tess_test(int tot_blocks, int *data_size, float jitter, 
 	       float minvol, float maxvol, int wrap, int twalls_on, 
 	       double *times, char *outfile) {
 
-  float **particles; /* particles[block_num][particle] 
-			 where each particle is 3 values, px, py, pz */
-  int *num_particles; /* number of particles in each block */
-  int dim = 3; /* 3D */
-  int given[3] = {0, 0, 0}; /* no constraints on decomposition in {x, y, z} */
-  int ghost[6] = {0, 0, 0, 0, 0, 0}; /* ghost in {-x, +x, -y, +y, -z, +z} */
-  int nblocks; /* my local number of blocks */
+  float **particles; // particles[block_num][particle] 
+		     // where each particle is 3 values, px, py, pz 
+  int *num_particles; // number of particles in each block 
+  int dim = 3; // 3D 
+  int given[3] = {0, 0, 0}; // no constraints on decomposition in {x, y, z} 
+  int ghost[6] = {0, 0, 0, 0, 0, 0}; // ghost in {-x, +x, -y, +y, -z, +z} 
+  int nblocks; // my local number of blocks 
   int i;
 
   comm = MPI_COMM_WORLD;
@@ -189,33 +189,33 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   wrap_neighbors = wrap;
   walls_on = twalls_on;
   
-  /* debug */
-/*   fprintf(stderr, "Wrap %d, Walls %d\n", wrap_neighbors,walls_on); */
+  // debug 
+  // fprintf(stderr, "Wrap %d, Walls %d\n", wrap_neighbors,walls_on); 
 
-  /* data extents */
+  // data extents 
   for(i = 0; i < 3; i++) {
     data_mins[i] = 0.0;
     data_maxs[i] = data_size[i] - 1.0;
   }
 
-  /* have DIY do the decomposition */
+  // have DIY do the decomposition 
   DIY_Init(dim, 1, comm);
   DIY_Decompose(ROUND_ROBIN_ORDER, data_size, tot_blocks, &nblocks, 1, 
 		ghost, given, wrap);
 
-  /* generate test points in each block */
+  // generate test points in each block 
   particles = (float **)malloc(nblocks * sizeof(float *));
   num_particles = (int *)malloc(nblocks * sizeof(int));
   for (i = 0; i < nblocks; i++)
     num_particles[i] = gen_particles(i, &particles[i], jitter);
 
-  /* save particles in a separate file for future reference */
-  /* write_particles(nblocks, particles, num_particles, "pts.out"); */
+  // save particles in a separate file for future reference 
+  // write_particles(nblocks, particles, num_particles, "pts.out"); 
 
-  /* compute tessellations */
+  // compute tessellations 
   voronoi_delaunay(nblocks, particles, num_particles, times, outfile);
 
-  /* cleanup */
+  // cleanup 
   for (i = 0; i < nblocks; i++)
     free(particles[i]);
   free(particles);
@@ -224,36 +224,36 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   DIY_Finalize();
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  parallel voronoi and delaunay tesselation
-
-  nblocks: local number of blocks
-  particles: particles[block_num][particle] 
-  where each particle is 3 values, px, py, pz
-  num_particles; number of particles in each block
-  times: times for particle exchange, voronoi cells, convex hulls, and output
-  out_file: output file name
-*/
+// --------------------------------------------------------------------------
+//
+//   parallel voronoi and delaunay tesselation
+//
+//   nblocks: local number of blocks
+//   particles: particles[block_num][particle] 
+//   where each particle is 3 values, px, py, pz
+//   num_particles; number of particles in each block
+//   times: times for particle exchange, voronoi cells, convex hulls, and output
+//   out_file: output file name
+// 
 void voronoi_delaunay(int nblocks, float **particles, int *num_particles, 
 		      double *times, char *out_file) {
 
-  int *num_orig_particles; /* number of original particles, before any
-			      neighbor exchange */
-  int dim = 3; /* 3D */
-  int rank; /* MPI rank */
+  int *num_orig_particles; // number of original particles, before any
+			   // neighbor exchange 
+  int dim = 3; // 3D 
+  int rank; // MPI rank 
   int i;
   void* ds; // persistent delaunay data structures
 
   MPI_Comm_rank(comm, &rank);
 
-  /* init timing */
+  // init timing 
   for (i = 0; i < MAX_TIMES; i++)
     times[i] = 0.0;
 
-  int **hdrs; /* headers */
-  struct vblock_t *vblocks; /* voronoi blocks */
-  struct vblock_t *tblocks; /* temporary voronoi blocks */
+  int **hdrs; // headers 
+  struct vblock_t *vblocks; // voronoi blocks 
+  struct vblock_t *tblocks; // temporary voronoi blocks 
 
   num_orig_particles = (int *)malloc(nblocks * sizeof(int));
   for (i = 0; i < nblocks; i++)
@@ -261,14 +261,14 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
   ds = init_delaunay_data_structures(nblocks);
 
-  /* allocate and initialize blocks */
-  create_blocks(nblocks, &vblocks, &hdrs); /* final */
-  create_blocks(nblocks, &tblocks, NULL); /* temporary */
+  // allocate and initialize blocks 
+  create_blocks(nblocks, &vblocks, &hdrs); // final 
+  create_blocks(nblocks, &tblocks, NULL); // temporary 
   
-  /* CLP - if !wrap_neighbors && walls, then initialize wall structure 
-     using data_mins and data_maxs
-     Currently assuimg walls on all sides, but format can easily be 
-     modified to be ANY set of walls */
+  // CLP - if !wrap_neighbors && walls, then initialize wall structure 
+  //   using data_mins and data_maxs
+  //   Currently assuimg walls on all sides, but format can easily be 
+  //   modified to be ANY set of walls 
   struct wall_t *walls;
   int num_walls = 0;
   if (!wrap_neighbors && walls_on)
@@ -289,7 +289,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   times[LOCAL_TIME] = MPI_Wtime();
 #endif
 
-  /* create local voronoi cells */
+  // create local voronoi cells 
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
   
   #ifdef TIMING
@@ -308,13 +308,13 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "2: done\n");
 #endif
 
-  /* keep track of which particles lie on the convex hull of the local points */
+  // keep track of which particles lie on the convex hull of the local points 
   int** convex_hull_particles	  = (int**) malloc(nblocks * sizeof(int*));
   int*  num_convex_hull_particles = (int*)  malloc(nblocks * sizeof(int));
   for (i = 0; i < nblocks; i++)
     convex_hull_particles[i] = NULL;
 
-  /* determine which cells are incomplete or too close to neighbor */
+  // determine which cells are incomplete or too close to neighbor 
   for (i = 0; i < nblocks; i++)
     incomplete_cells_initial(&tblocks[i], &vblocks[i], i,
 			     &convex_hull_particles[i],
@@ -328,17 +328,17 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "3: done\n");
 #endif
 
-  /* cleanup local temporary blocks */
+  // cleanup local temporary blocks 
   destroy_blocks(nblocks, tblocks, NULL);
 
-  /* exchange particles with neighbors */
-  int **gids; /* owner global block ids of received particles */
-  int **nids; /* owner native particle ids of received particles */
-  unsigned char **dirs; /* wrapping directions of received articles */
+  // exchange particles with neighbors 
+  int **gids; // owner global block ids of received particles 
+  int **nids; // owner native particle ids of received particles 
+  unsigned char **dirs; // wrapping directions of received articles 
   gids = (int **)malloc(nblocks * sizeof(int *));
   nids = (int **)malloc(nblocks * sizeof(int *));
   dirs = (unsigned char **)malloc(nblocks * sizeof(unsigned char *));
-  /* intialize to NULL to make realloc inside neighbor_particles just work */
+  // intialize to NULL to make realloc inside neighbor_particles just work 
   for (i = 0; i < nblocks; ++i) {
     gids[i] = NULL;
     nids[i] = NULL;
@@ -364,15 +364,15 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "5: done\n");
 #endif
 
-  /* Second, decisive phase */
+  // Second, decisive phase 
 
-  /* reset real blocks and allocate and initialize temporary blocks again */
+  // reset real blocks and allocate and initialize temporary blocks again 
   reset_blocks(nblocks, vblocks);
-  create_blocks(nblocks, &tblocks, NULL); /* temporary */
+  create_blocks(nblocks, &tblocks, NULL); // temporary 
 
-  /* Recompute local cells
-     TODO: here an later it's wasteful to recompute everything from scratch;
-     it would be wiser to just insert new points. Current limitation: qhull */
+  // Recompute local cells
+  // TODO: here an later it's wasteful to recompute everything from scratch;
+  // it would be wiser to just insert new points. Current limitation: qhull 
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
 
 #ifdef MEMORY
@@ -383,16 +383,16 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "6: done\n");
 #endif
 
-  /* CLP - Create  pointers to wall-mirror particles for each block */
+  // CLP - Create  pointers to wall-mirror particles for each block 
   float** mirror_particles;
-  int *num_mirror_particles; /* number of received particles for each block */
+  int *num_mirror_particles; // number of received particles for each block 
   mirror_particles = (float **)malloc(nblocks * sizeof(float *));
   for (i = 0; i < nblocks; i++)
     mirror_particles[i] = NULL;
   num_mirror_particles = (int *)malloc(nblocks * sizeof(int));
   
-  /* CLP - give walls and pointer for creating wall-mirror particles 
-     to function call */
+  // CLP - give walls and pointer for creating wall-mirror particles 
+  //    to function call 
   for (i = 0; i < nblocks; i++)
     incomplete_cells_final(&tblocks[i], &vblocks[i], i, 
 			   convex_hull_particles[i], 
@@ -407,7 +407,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "7: done\n");
 #endif
 
-  /* cleanup local temporary blocks */
+  // cleanup local temporary blocks 
   destroy_blocks(nblocks, tblocks, NULL);
   
 #ifdef MEMORY
@@ -418,7 +418,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "8: done\n");
 #endif
 
-  /* exchange particles with neighbors */
+  // exchange particles with neighbors 
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
     
@@ -430,13 +430,13 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "9: done\n");
 #endif
 
-  /* CLP - Function to add wall-mirror particles to particles 
-     (see neighbor_particles()) */
+  // CLP - Function to add wall-mirror particles to particles 
+  //   (see neighbor_particles()) 
   add_mirror_particles(nblocks, mirror_particles,
 		       num_mirror_particles, particles,num_particles,
 		       num_orig_particles, gids, nids, dirs);
   
-  /* cleanup convex_hull_particles */
+  // cleanup convex_hull_particles 
   for (i = 0; i < nblocks; ++i) {
     if (convex_hull_particles)
       free(convex_hull_particles[i]);
@@ -444,7 +444,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   free(convex_hull_particles);
   free(num_convex_hull_particles);
 
-  /* CLP cleanup */
+  // CLP cleanup 
   destroy_walls(num_walls, walls);
   for (i = 0; i < nblocks; ++i) {
     if (mirror_particles[i])
@@ -468,7 +468,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "10: done\n");
 #endif
 
-  /* create all final voronoi cells */
+  // create all final voronoi cells 
   all_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
 	    particles, gids, nids, dirs, times, ds);
 
@@ -480,7 +480,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "11: done\n");
 #endif
 
-  /* cleanup */
+  // cleanup 
   for (i = 0; i < nblocks; i++) {
     free(gids[i]);
     free(nids[i]);
@@ -490,11 +490,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   clean_delaunay_data_strucutres(ds);
 
 #ifdef TIMING
-  /* previously no barrier here; want min and max time;
-     changed to barrier and simple time now */
+  // previously no barrier here; want min and max time;
+  //   changed to barrier and simple time now 
   MPI_Barrier(comm);
   times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
-  /* MPI_Barrier(comm); */
+  // MPI_Barrier(comm); 
   times[VOL_TIME] = MPI_Wtime();
 #endif
 
@@ -506,22 +506,22 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "12: done\n");
 #endif
 
-  /* compute volume and surface area manually (not using convex hulls) */
+  // compute volume and surface area manually (not using convex hulls) 
   cell_vols(nblocks, vblocks, particles);
 
 #ifdef TIMING
-  /* previously no barrier here; want min and max time;
-     changed to barrier and simple time now */
+  // previously no barrier here; want min and max time;
+  //   changed to barrier and simple time now 
   MPI_Barrier(comm);
   times[VOL_TIME] = MPI_Wtime() - times[VOL_TIME];
-  /* MPI_Barrier(comm); */
+  // MPI_Barrier(comm); 
   times[OUT_TIME] = MPI_Wtime();
 #endif
 
-  /* prepare for output */
+  // prepare for output 
   prep_out(nblocks, vblocks);
 
-  /* save headers */
+  // save headers 
   save_headers(nblocks, vblocks, hdrs);
 
 #ifdef MEMORY
@@ -532,7 +532,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "13: done\n");
 #endif
 
-  /* write output */
+  // write output 
   if (out_file[0]) {
 #ifdef PNETCDF_IO
     char out_ncfile[256];
@@ -557,10 +557,10 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "14: done\n");
 #endif
 
-  /* collect stats */
+  // collect stats 
   collect_stats(nblocks, vblocks, times);
 
-  /* cleanup */
+  // cleanup 
   destroy_blocks(nblocks, vblocks, hdrs);
   free(num_orig_particles);
   
@@ -573,24 +573,23 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  computes volume and surface area for completed cells
-
-  nblocks: number of blocks
-  vblocks: pointer to array of vblocks
-  particles: particles in each block, particles[block_num][particle] include
-   particles received from neighbors
-
-*/
+// --------------------------------------------------------------------------
+//
+//   computes volume and surface area for completed cells
+//
+//   nblocks: number of blocks
+//   vblocks: pointer to array of vblocks
+//   particles: particles in each block, particles[block_num][particle] include
+//    particles received from neighbors
+//
 void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles) {
 
   int b, j, f;
 
-  /* compute areas of all faces */
+  // compute areas of all faces 
   face_areas(nblocks, vblocks);
 
-  /* for all blocks */
+  // for all blocks 
   for (b = 0; b < nblocks; b++) {
 
     vblocks[b].areas = (float *)malloc(vblocks[b].temp_num_complete_cells *
@@ -598,14 +597,14 @@ void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles) {
     vblocks[b].vols = (float *)malloc(vblocks[b].temp_num_complete_cells *
 					   sizeof(float));
 
-    /* for all complete cells */
+    // for all complete cells 
     for (j = 0; j < vblocks[b].temp_num_complete_cells; j++) {
 
-      int cell = vblocks[b].temp_complete_cells[j]; /* current cell */
-      int num_faces; /* number of faces in the current cell */
+      int cell = vblocks[b].temp_complete_cells[j]; // current cell 
+      int num_faces; // number of faces in the current cell 
       vblocks[b].areas[j] = 0.0;
       vblocks[b].vols[j] = 0.0;
-      float temp_vol = 0.0; /* temporaries */
+      float temp_vol = 0.0; // temporaries 
       float temp_area = 0.0;
 
       if (cell < vblocks[b].num_orig_particles - 1)
@@ -615,15 +614,15 @@ void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles) {
 	num_faces = vblocks[b].tot_num_cell_faces -
 	  vblocks[b].cell_faces_start[cell];
 
-      /* for all faces */
+      // for all faces 
       for (f = 0; f < num_faces; f++) {
 
-	/* current face */
+	// current face 
 	int fid = vblocks[b].cell_faces[vblocks[b].cell_faces_start[cell] + f];
 
-	/* input particles of cells sharing the face */
+	// input particles of cells sharing the face 
 	float p0[3], p1[3]; 
-	int p; /* index of particle (could be neighbor's) */
+	int p; // index of particle (could be neighbor's) 
 
 	p = vblocks[b].faces[fid].cells[0];
 	p0[0] = particles[b][3 * p];
@@ -634,21 +633,21 @@ void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles) {
 	p1[1] = particles[b][3 * p + 1];
 	p1[2] = particles[b][3 * p + 2];
 
-	/* height of pyramid from site to face = 
-	   distance between sites sharing the face / 2 */
+	// height of pyramid from site to face = 
+	//   distance between sites sharing the face / 2 
 	float height = sqrt((p0[0] - p1[0]) * (p0[0] - p1[0]) +
 			    (p0[1] - p1[1]) * (p0[1] - p1[1]) +
 			    (p0[2] - p1[2]) * (p0[2] - p1[2])) / 2.0;
 
-	/* add the volume of the pyramid formed by site and current face
-	   to the volume of the cell and add the face area to the surface
-	   area of the cell */
+	// add the volume of the pyramid formed by site and current face
+	//   to the volume of the cell and add the face area to the surface
+	//   area of the cell 
 	temp_vol += vblocks[b].face_areas[fid] * height / 3.0;
 	temp_area += vblocks[b].face_areas[fid];
 
-      } /* for all faces */
+      } // for all faces 
 
-      /* store the cell permanently if it passes the volume thresholds */
+      // store the cell permanently if it passes the volume thresholds 
       if ((min_vol < 0 || temp_vol >= min_vol) &&
 	  (max_vol < 0 || temp_vol <= max_vol)) {
 
@@ -660,45 +659,44 @@ void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles) {
 
       }
 
-    } /* for all complete cells */
+    } // for all complete cells 
 
-  } /* for all blocks */
+  } // for all blocks 
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  computes areas of all faces
-
-  nblocks: number of blocks
-  vblocks: pointer to array of vblocks
-
-*/
+// --------------------------------------------------------------------------
+//
+//   computes areas of all faces
+//
+//   nblocks: number of blocks
+//   vblocks: pointer to array of vblocks
+//
 void face_areas(int nblocks, struct vblock_t *vblocks) {
 
   int b, f, v;
 
-  /* for all blocks */
+  // for all blocks 
   for (b = 0; b < nblocks; b++) {
 
     vblocks[b].face_areas = (float *)malloc(vblocks[b].num_faces *
 					    sizeof(float));
 
-    /* for all faces */
+    // for all faces 
     for (f = 0; f < vblocks[b].num_faces; f++) {
 
       vblocks[b].face_areas[f] = 0.0;
 
-      /* all triangles fan out from same vertex */
+      // all triangles fan out from same vertex 
       int v0 = vblocks[b].faces[f].verts[0];
 
-      /* for all vertices in a face */
+      // for all vertices in a face 
       for (v = 2; v <vblocks[b].faces[f].num_verts; v++) {
 
-	/* remaining 2 vertices of one triangle in the polygon */
+	// remaining 2 vertices of one triangle in the polygon 
 	int v1 = vblocks[b].faces[f].verts[v - 1];
 	int v2 = vblocks[b].faces[f].verts[v];
 
-	/* vectors for two sides of triangle v1v1 and v0v2 */
+	// vectors for two sides of triangle v1v1 and v0v2 
 	float s1[3], s2[3]; 
 	s1[0] = vblocks[b].verts[3 * v1] - 
 	  vblocks[b].verts[3 * v0];
@@ -713,55 +711,55 @@ void face_areas(int nblocks, struct vblock_t *vblocks) {
 	s2[2] = vblocks[b].verts[3 * v2 + 2] - 
 	  vblocks[b].verts[3 * v0 + 2];
 
-	/* cross product of s1 and s2 */
+	// cross product of s1 and s2 
 	float c[3];
 	c[0] = s1[1] * s2[2] - s1[2] * s2[1];
 	c[1] = s1[2] * s2[0] - s1[0] * s2[2];
 	c[2] = s1[0] * s2[1] - s1[1] * s2[0];
 
-	/* area of triangle is |c| / 2 */
+	// area of triangle is |c| / 2 
 	float a = sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]) / 2.0;
 	vblocks[b].face_areas[f] += a;
 
-      } /* for all vertices */
+      } // for all vertices 
 
-    } /* for all faces */
+    } // for all faces 
 
-  } /* for all blocks */
+  } // for all blocks 
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  exchanges particles with neighbors
-
-  nblocks: local number of blocks
-  particles: particles before and after neighbor exchange (input / output)
-  num_particles: number of new particles in each block (input / output)
-  gids: global block ids of owners of received particles in each of my blocks
-  nids: native particle ids of received particles in each of my blocks
-   (allocated by this function, user's responsibility to free)
-  dirs: wrapping direction of received particles in each of my blocks
-
-  to send the site to the neighbor
-*/
+// --------------------------------------------------------------------------
+//
+//   exchanges particles with neighbors
+//
+//   nblocks: local number of blocks
+//   particles: particles before and after neighbor exchange (input / output)
+//   num_particles: number of new particles in each block (input / output)
+//   gids: global block ids of owners of received particles in each of my blocks
+//   nids: native particle ids of received particles in each of my blocks
+//    (allocated by this function, user's responsibility to free)
+//   dirs: wrapping direction of received particles in each of my blocks
+//
+//   to send the site to the neighbor
+// 
 void neighbor_particles(int nblocks, float **particles,
 			int *num_particles, int *num_orig_particles,
 			int **gids, int **nids, unsigned char **dirs) {
 
-  void ***recv_particles; /* pointers to particles in ecah block 
-			     that are received from neighbors */
-  int *num_recv_particles; /* number of received particles for each block */
+  void ***recv_particles; // pointers to particles in ecah block 
+			  //   that are received from neighbors 
+  int *num_recv_particles; // number of received particles for each block 
   int i, j;
 
   recv_particles = (void ***)malloc(nblocks * sizeof(void **));
   num_recv_particles = (int *)malloc(nblocks * sizeof(int));
 
-  /* particles were previously enqueued by local_cells(), ready to
-     be exchanged */
+  // particles were previously enqueued by local_cells(), ready to
+  //   be exchanged 
   DIY_Exchange_neighbors(0, recv_particles, num_recv_particles, 1.0, 
 			 &item_type);
 
-  /* copy received particles to particles */
+  // copy received particles to particles 
   for (i = 0; i < nblocks; i++) {
 
     int n = (num_particles[i] - num_orig_particles[i]);
@@ -773,13 +771,13 @@ void neighbor_particles(int nblocks, float **particles,
  
     if (num_recv_particles[i]) {
 
-      /* grow space */
+      // grow space 
       particles[i] = 
 	(float *)realloc(particles[i], 
 			 (num_particles[i] + num_recv_particles[i]) *
 			 3 * sizeof(float));
 
-      /* copy received particles */
+      // copy received particles 
       for (j = 0; j < num_recv_particles[i]; j++) { 
 
 	particles[i][3 * num_particles[i]] =
@@ -798,66 +796,61 @@ void neighbor_particles(int nblocks, float **particles,
 	num_particles[i]++;
 	n++;
 
-      } /* copy received particles */
+      } // copy received particles 
 
-    } /* if num_recv_particles */
+    } // if num_recv_particles 
 
-  } /* for all blocks */
+  } // for all blocks 
 
-  /* clean up */
+  // clean up 
   DIY_Flush_neighbors(0, recv_particles, num_recv_particles, &item_type);
   free(num_recv_particles);
   free(recv_particles);
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  exchanges is_complete list for exchanged particles with neighbors
-
-  nblocks: number of blocks
-  vblocks: local blocks
-  rics: completion satus of received particles in each of my blocks
-   (allocated by this function, user's responsibility to free)
-
-*/
+// --------------------------------------------------------------------------
+//
+//   exchanges is_complete list for exchanged particles with neighbors
+//
+//   nblocks: number of blocks
+//   vblocks: local blocks
+//   rics: completion satus of received particles in each of my blocks
+//    (allocated by this function, user's responsibility to free)
+//
+// 
 void neighbor_is_complete(int nblocks, struct vblock_t *vblocks,
 			  struct remote_ic_t **rics) {
 
-  void ***recv_ics; /* pointers to is_complete entries in ecah block 
-			     that are received from neighbors */
-  int *num_recv_ics; /* number of received is_completes for each block */
+  void ***recv_ics; // pointers to is_complete entries in ecah block 
+                    //  that are received from neighbors 
+  int *num_recv_ics; // number of received is_completes for each block 
   int i, j;
-  struct remote_ic_t ic; /* completion status being sent or received */
+  struct remote_ic_t ic; // completion status being sent or received 
 
   recv_ics = (void ***)malloc(nblocks * sizeof(void **));
   num_recv_ics = (int *)malloc(nblocks * sizeof(int));
 
-  /* for all blocks */
+  // for all blocks 
   for (i = 0; i < nblocks; i++) {
 
-    /* for all particles in the current block */
+    // for all particles in the current block 
     for (j = 0; j < vblocks[i].num_sent_particles; j++) {
       int p = vblocks[i].sent_particles[j].particle;
       ic.is_complete = vblocks[i].is_complete[p];
       ic.gid = DIY_Gid(0, i);
       ic.nid = p;
-      /* DEPRECATED */
-/*       DIY_Enqueue_item_all_near(0, i, (void *)&ic, */
-/* 				NULL, sizeof(struct remote_ic_t), */
-/* 				&(vblocks[i].sites[3 * p]), */
-/* 				vblocks[i].sent_particles[j].ghost, NULL); */
       DIY_Enqueue_item_gbs(0, i, (void *)&ic,
 			   NULL, sizeof(struct remote_ic_t),
 			   vblocks[i].sent_particles[j].neigh_gbs,
 			   vblocks[i].sent_particles[j].num_gbs, NULL);
     }
 
-  } /* for all blocks */
+  } // for all blocks 
 
-  /* exchange neighbors */
+  // exchange neighbors 
   DIY_Exchange_neighbors(0, recv_ics, num_recv_ics, 1.0, &ic_type);
 
-  /* copy received is_completed entries */
+  // copy received is_completed entries 
   for (i = 0; i < nblocks; i++) {
 
     rics[i] = (struct remote_ic_t *)malloc(num_recv_ics[i] * 
@@ -874,16 +867,16 @@ void neighbor_is_complete(int nblocks, struct vblock_t *vblocks,
 
   }
 
-  /* clean up */
+  // clean up 
   DIY_Flush_neighbors(0, recv_ics, num_recv_ics, &ic_type);
   free(num_recv_ics);
   free(recv_ics);
 
 }
-/*--------------------------------------------------------------------------*/
-/*
- makes DIY datatype for sending / receiving one item
-*/
+// --------------------------------------------------------------------------
+//
+//  makes DIY datatype for sending / receiving one item
+// 
 void item_type(DIY_Datatype *dtype) {
 
   struct map_block_t map[] = {
@@ -897,10 +890,10 @@ void item_type(DIY_Datatype *dtype) {
   DIY_Create_struct_datatype(0, 6, map, dtype);
 
 }
-/*--------------------------------------------------------------------------*/
-/*
- makes DIY datatype for sending / receiving one is_complete entry
-*/
+// --------------------------------------------------------------------------
+//
+//  makes DIY datatype for sending / receiving one is_complete entry
+// 
 void ic_type(DIY_Datatype *dtype) {
 
   struct map_block_t map[] = {
@@ -911,41 +904,41 @@ void ic_type(DIY_Datatype *dtype) {
   DIY_Create_struct_datatype(0, 3, map, dtype);
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  collects statistics
-
-  nblocks: number of blocks
-  vblocks: pointer to array of vblocks
-  times: timing info
-*/
+// --------------------------------------------------------------------------
+//
+//   collects statistics
+//
+//   nblocks: number of blocks
+//   vblocks: pointer to array of vblocks
+//   times: timing info
+// 
 void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 
   int i, j, k, m, n, v, f;
-  int tot_num_cell_verts = 0; /* number of cell verts in all local blocks */
-  int tot_num_face_verts = 0; /* number of face verts in all local blocks */
-  int *unique_verts = NULL; /* unique vertices in one cell */
-  int num_unique_verts; /* number of unique vertices in one cell*/
-  static int max_unique_verts; /* allocated number of unique vertices */
-  int chunk_size = 128; /* allocation chunk size for unique_verts */
-  float vol_bin_width; /* width of a volume histogram bin */
-  float dense_bin_width; /* width of a density histogram bin */
-  float tot_cell_vol = 0.0; /* sum of cell volumes */
-  float tot_cell_dense = 0.0; /* sum of cell densities */
-  struct stats_t stats; /* local stats */
-  static int first_dense = 1; /* first density value saved */
+  int tot_num_cell_verts = 0; // number of cell verts in all local blocks 
+  int tot_num_face_verts = 0; // number of face verts in all local blocks 
+  int *unique_verts = NULL; // unique vertices in one cell 
+  int num_unique_verts; // number of unique vertices in one cell
+  static int max_unique_verts; // allocated number of unique vertices 
+  int chunk_size = 128; // allocation chunk size for unique_verts 
+  float vol_bin_width; // width of a volume histogram bin 
+  float dense_bin_width; // width of a density histogram bin 
+  float tot_cell_vol = 0.0; // sum of cell volumes 
+  float tot_cell_dense = 0.0; // sum of cell densities 
+  struct stats_t stats; // local stats 
+  static int first_dense = 1; // first density value saved 
   int rank;
 
   MPI_Comm_rank(comm, &rank);
 
-  /* timing range */
+  // timing range 
   stats.min_cell_time = times[CELL_TIME];
   stats.max_cell_time = times[CELL_TIME];
   stats.min_vol_time = times[VOL_TIME];
   stats.max_vol_time = times[VOL_TIME];
 
-  /* --- first pass: find average number of vertices per cell and 
-     volume range --- */
+  // --- first pass: find average number of vertices per cell and 
+  //   volume range --- 
 
   stats.tot_tets  = 0;
   stats.tot_cells = 0;
@@ -957,13 +950,13 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
   stats.avg_cell_vol   = 0.0;
   stats.avg_cell_dense = 0.0;
 
-  for (i = 0; i < nblocks; i++) { /* for all blocks */
+  for (i = 0; i < nblocks; i++) { // for all blocks 
 
     stats.tot_tets += (vblocks[i].num_loc_tets + vblocks[i].num_rem_tets);
     stats.tot_cells += vblocks[i].num_complete_cells;
     stats.tot_verts += vblocks[i].num_verts;
 
-    /* for all complete cells in the current block */
+    // for all complete cells in the current block 
     f = 0;
     v = 0;
     for (j = 0; j < vblocks[i].num_complete_cells; j++) {
@@ -978,9 +971,9 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 	tot_cell_dense += dense;
       }
 
-      int cell = vblocks[i].complete_cells[j]; /* current cell */
-      int num_faces; /* number of face in the current cell */
-      int num_verts; /* number of vertices in current face */
+      int cell = vblocks[i].complete_cells[j]; // current cell 
+      int num_faces; // number of face in the current cell 
+      int num_verts; // number of vertices in current face 
 
       if (cell < vblocks[i].num_orig_particles - 1)
 	num_faces = vblocks[i].cell_faces_start[cell + 1] -
@@ -989,10 +982,10 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 	num_faces = vblocks[i].tot_num_cell_faces -
 	  vblocks[i].cell_faces_start[cell];
 
-      stats.tot_faces += num_faces; /* not unique, but total for all cells */
+      stats.tot_faces += num_faces; // not unique, but total for all cells 
       num_unique_verts = 0;
 
-      /* volume range */
+      // volume range 
       if (i == 0 && j == 0) {
 	stats.min_cell_vol = vblocks[i].vols[j];
 	stats.max_cell_vol = vblocks[i].vols[j];
@@ -1004,7 +997,7 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 	  stats.max_cell_vol = vblocks[i].vols[j];
       }
 
-      /* density range */
+      // density range 
       if (first_dense && vblocks[i].vols[j] > 0.0) {
 	stats.min_cell_dense = dense;
 	stats.max_cell_dense = stats.min_cell_dense;
@@ -1017,7 +1010,7 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 	  stats.max_cell_dense = dense;
       }
 
-      /* for all faces in the current cell */
+      // for all faces in the current cell 
       for (k = 0; k < num_faces; k++) {
 
 	int start = vblocks[i].cell_faces_start[cell];
@@ -1026,10 +1019,10 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 
 	tot_num_face_verts += num_verts;
 
-	/* for all verts in the current face */
+	// for all verts in the current face 
 	for (m = 0; m < num_verts; m++) {
 
-	  /* check if we already counted it */
+	  // check if we already counted it 
 	  for (n = 0; n < num_unique_verts; n++) {
 	    if (vblocks[i].faces[face].verts[m] == unique_verts[n])
 	      break;
@@ -1039,23 +1032,23 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 		    &num_unique_verts, &max_unique_verts, chunk_size);
 	  v++;
 
-	} /* for all verts */
+	} // for all verts 
 
 	f++;
 
-      } /* for all faces */
+      } // for all faces 
 
       tot_num_cell_verts += num_unique_verts;
 
-    } /* for all complete cells */
+    } // for all complete cells 
 
 
-  } /* for all blocks */
+  } // for all blocks 
 
   free(unique_verts);
 
-  /* compute local averages */
-  if (stats.tot_cells) { /* don't divide by 0 */
+  // compute local averages 
+  if (stats.tot_cells) { // don't divide by 0 
     stats.avg_cell_verts = tot_num_cell_verts / stats.tot_cells;
     stats.avg_cell_faces = stats.tot_faces / stats.tot_cells;
     stats.avg_face_verts = tot_num_face_verts / stats.tot_faces;
@@ -1063,12 +1056,12 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
     stats.avg_cell_dense = tot_cell_dense / stats.tot_cells;
   }
 
-  /* aggregate totals across all procs and compute average on that */
+  // aggregate totals across all procs and compute average on that 
   aggregate_stats(nblocks, vblocks, &stats);
 
-  /* --- print output --- */
+  // --- print output --- 
 
-  /* global stats */
+  // global stats 
   vol_bin_width = (stats.max_cell_vol - stats.min_cell_vol) / 
     stats.num_vol_bins;
   dense_bin_width = (stats.max_cell_dense - stats.min_cell_dense) / 
@@ -1078,11 +1071,11 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
     fprintf(stderr, "local voronoi / delaunay time = %.3lf s\n",
 	    times[LOCAL_TIME]);
     fprintf(stderr, "particle exchange time = %.3lf s\n", times[EXCH_TIME]);
-    /* fprintf(stderr, "[min, max] voronoi / delaunay time = [%.3lf, %.3lf] s\n", */
-    /* 	    stats.min_cell_time, stats.max_cell_time); */
+    // fprintf(stderr, "[min, max] voronoi / delaunay time = [%.3lf, %.3lf] s\n", 
+    // 	    stats.min_cell_time, stats.max_cell_time); 
     fprintf(stderr, "Voronoi / delaunay time = %.3lf s\n", times[CELL_TIME]);
-    /* fprintf(stderr, "[min, max] cell volume / area time = [%.3lf, %.3lf] s\n", */
-    /* 	    stats.min_vol_time, stats.max_vol_time); */
+    // fprintf(stderr, "[min, max] cell volume / area time = [%.3lf, %.3lf] s\n", 
+    // 	    stats.min_vol_time, stats.max_vol_time); 
     fprintf(stderr, "Cell volume / area time = %.3lf s\n", times[VOL_TIME]);
     fprintf(stderr, "output time = %.3lf s\n", times[OUT_TIME]);
     fprintf(stderr, "-----\n");
@@ -1123,31 +1116,31 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
   }
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  aggregates local statistics into global statistics
-
-  nblocks: number of blocks
-  vblocks: pointer to array of vblocks
-  loc_stats: local statistics
-*/
+// --------------------------------------------------------------------------
+//
+//   aggregates local statistics into global statistics
+//
+//   nblocks: number of blocks
+//   vblocks: pointer to array of vblocks
+//   loc_stats: local statistics
+// 
 void aggregate_stats(int nblocks, struct vblock_t *vblocks, 
 		     struct stats_t *loc_stats) {
 
-  float vol_bin_width; /* width of a volume histogram bin */
-  float dense_bin_width; /* width of a density histogram bin */
-  struct stats_t glo_stats; /* global stats */
-  struct stats_t fin_stats; /* final (global) stats */
-  int groupsize; /* MPI usual */
-  DIY_Datatype dtype; /* custom datatype */
-  MPI_Op op1, op2; /* custom operators */
+  float vol_bin_width; // width of a volume histogram bin 
+  float dense_bin_width; // width of a density histogram bin 
+  struct stats_t glo_stats; // global stats 
+  struct stats_t fin_stats; // final (global) stats 
+  int groupsize; // MPI usual 
+  DIY_Datatype dtype; // custom datatype 
+  MPI_Op op1, op2; // custom operators 
   int i, j, k;
 
   MPI_Comm_size(comm, &groupsize);
 
   if (groupsize > 1) {
 
-    /* create datatype */
+    // create datatype 
     struct map_block_t map[] = {
 
       { DIY_INT,   OFST, 1, 
@@ -1200,9 +1193,9 @@ void aggregate_stats(int nblocks, struct vblock_t *vblocks,
     MPI_Op_create(&average, 1, &op1);
     MPI_Op_create(&histogram, 1, &op2);
 
-    /* first reduction computes averages and ranges */
+    // first reduction computes averages and ranges 
     MPI_Reduce(loc_stats, &glo_stats, 1, dtype, op1, 0, comm);
-    /* broadcast global stats to all process */
+    // broadcast global stats to all process 
     MPI_Bcast(&glo_stats, 1, dtype, 0, comm);
 
   }
@@ -1231,34 +1224,34 @@ void aggregate_stats(int nblocks, struct vblock_t *vblocks,
 
   }
 
-  /* find local cell volume and density histograms */
+  // find local cell volume and density histograms 
   vol_bin_width = (glo_stats.max_cell_vol - glo_stats.min_cell_vol) / 
-    glo_stats.num_vol_bins; /* volume */
+    glo_stats.num_vol_bins; // volume 
   dense_bin_width = (glo_stats.max_cell_dense - glo_stats.min_cell_dense) / 
-    glo_stats.num_dense_bins; /* density */
-  for (k = 0; k < glo_stats.num_vol_bins; k++) /* volume */
+    glo_stats.num_dense_bins; // density 
+  for (k = 0; k < glo_stats.num_vol_bins; k++) // volume 
     glo_stats.vol_hist[k] = 0;
-  for (k = 0; k < glo_stats.num_dense_bins; k++) /* density */
+  for (k = 0; k < glo_stats.num_dense_bins; k++) // density 
     glo_stats.dense_hist[k] = 0;
-  for (i = 0; i < nblocks; i++) { /* for all blocks */
+  for (i = 0; i < nblocks; i++) { // for all blocks 
 
-    for (j = 0; j < vblocks[i].num_complete_cells; j++) { /* for all cells */
+    for (j = 0; j < vblocks[i].num_complete_cells; j++) { // for all cells 
 
-      /* volume */
-      for (k = 0; k < glo_stats.num_vol_bins; k++) { /* for all bins */
+      // volume 
+      for (k = 0; k < glo_stats.num_vol_bins; k++) { // for all bins 
 	if (vblocks[i].vols[j] >= glo_stats.min_cell_vol + k * vol_bin_width && 
 	    vblocks[i].vols[j] < 
 	    glo_stats.min_cell_vol + (k + 1) * vol_bin_width) {
 	  glo_stats.vol_hist[k]++;
 	  break;
 	}
-      } /* for all bins */
+      } // for all bins 
       if (k == glo_stats.num_vol_bins)
-	glo_stats.vol_hist[k - 1]++; /* catch roundoff error and open
-					interval on right side of bin */
+	glo_stats.vol_hist[k - 1]++; // catch roundoff error and open
+				     // interval on right side of bin 
 
-      /* density */
-      for (k = 0; k < glo_stats.num_dense_bins; k++) { /* for all bins */
+      // density 
+      for (k = 0; k < glo_stats.num_dense_bins; k++) { // for all bins 
 	if (vblocks[i].vols[j] > 0.0) {
 	  float dense = 1.0 /vblocks[i].vols[j];
 	  if (dense >= glo_stats.min_cell_dense + k * dense_bin_width && 
@@ -1267,21 +1260,21 @@ void aggregate_stats(int nblocks, struct vblock_t *vblocks,
 	    break;
 	  }
 	}
-      } /* for all bins */
+      } // for all bins 
       if (k == glo_stats.num_dense_bins)
-	glo_stats.dense_hist[k - 1]++; /* catch roundoff error and open
-					interval on right side of bin */
+	glo_stats.dense_hist[k - 1]++; // catch roundoff error and open
+				       // interval on right side of bin 
 
-    } /* for all cells */
+    } // for all cells 
 
-  } /* for all blocks */
+  } // for all blocks 
 
   if (groupsize > 1) {
 
-    /* second reduction computes global histogram */
+    // second reduction computes global histogram 
     MPI_Reduce(&glo_stats, &fin_stats, 1, dtype, op2, 0, comm);
 
-    /* copy global stats back to local stats */
+    // copy global stats back to local stats 
     loc_stats->tot_tets      = fin_stats.tot_tets;
     loc_stats->tot_cells      = fin_stats.tot_cells;
     loc_stats->tot_faces      = fin_stats.tot_faces;
@@ -1323,31 +1316,31 @@ void aggregate_stats(int nblocks, struct vblock_t *vblocks,
   }
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  reduces averages and ranges
-
-  in: input 1
-  inout: input 2 and output
-  len: 1
-  datatype: unused
-*/
+// --------------------------------------------------------------------------
+//
+//   reduces averages and ranges
+//
+//   in: input 1
+//   inout: input 2 and output
+//   len: 1
+//   datatype: unused
+// 
 void average(void *in, void *inout, int *len, MPI_Datatype *type) {
 
-  /* quiet compiler warnings about unused variables */
+  // quiet compiler warnings about unused variables 
   type = type;
   len = len;
 
   struct stats_t *stats1 = (struct stats_t *)in;
   struct stats_t *stats2 = (struct stats_t *)inout;
 
-  /* weights for weighted averages based on cell counts */
+  // weights for weighted averages based on cell counts 
   float w1 = (float)stats1->tot_cells / 
     (stats1->tot_cells + stats2->tot_cells);
   float w2 = (float)stats2->tot_cells / 
     (stats1->tot_cells + stats2->tot_cells);
 
-  /* weighted average of two averages */
+  // weighted average of two averages 
   stats2->avg_cell_verts = w1 * stats1->avg_cell_verts +
     w2 * stats2->avg_cell_verts;
   stats2->avg_cell_faces = w1 * stats1->avg_cell_faces +
@@ -1357,13 +1350,13 @@ void average(void *in, void *inout, int *len, MPI_Datatype *type) {
   stats2->avg_cell_dense = w1 * stats1->avg_cell_dense +
     w2 * stats2->avg_cell_dense;
 
-  /* new weights for weighted averages based on face counts */
+  // new weights for weighted averages based on face counts 
   w1 = (float)stats1->tot_faces / 
     (stats1->tot_faces + stats2->tot_faces);
   w2 = (float)stats2->tot_faces / 
     (stats1->tot_faces + stats2->tot_faces);
 
-  /* weighted average of two averages */
+  // weighted average of two averages 
   stats2->avg_face_verts = w1 * stats1->avg_face_verts + 
     w2 * stats2->avg_face_verts;
 
@@ -1388,24 +1381,24 @@ void average(void *in, void *inout, int *len, MPI_Datatype *type) {
   if (stats1->max_vol_time > stats2->max_vol_time)
     stats2->max_vol_time = stats1->max_vol_time;
 
-  /* ought to do a cross-validation to find correct number of bins
-     for now just pick a number */
+  // ought to do a cross-validation to find correct number of bins
+  //   for now just pick a number 
   stats2->num_vol_bins = 50;
   stats2->num_dense_bins = 100;
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  reduces histograms
-
-  in: input 1
-  inout: input 2 and output
-  len: 1
-  datatype: unused
-*/
+// --------------------------------------------------------------------------
+//
+//   reduces histograms
+//
+//   in: input 1
+//   inout: input 2 and output
+//   len: 1
+//   datatype: unused
+// 
 void histogram(void *in, void *inout, int *len, MPI_Datatype *type) {
 
-  /* quiet compiler warnings about unused variables */
+  // quiet compiler warnings about unused variables 
   type = type;
   len = len;
 
@@ -1438,19 +1431,19 @@ void histogram(void *in, void *inout, int *len, MPI_Datatype *type) {
     stats2->dense_hist[i] += stats1->dense_hist[i];
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  prepare for output
-
-  nblocks: number of blocks
-  vblocks: pointer to array of vblocks
-*/
+// --------------------------------------------------------------------------
+//
+//   prepare for output
+//
+//   nblocks: number of blocks
+//   vblocks: pointer to array of vblocks
+// 
 void prep_out(int nblocks, struct vblock_t *vblocks) {
 
-  struct bb_t bounds; /* block bounds */
+  struct bb_t bounds; // block bounds 
   int i, j;
 
-  /* save extents */
+  // save extents 
   for (i = 0; i < nblocks; i++) {
     DIY_Block_bounds(0, i, &bounds);
     vblocks[i].mins[0] = bounds.min[0];
@@ -1461,7 +1454,7 @@ void prep_out(int nblocks, struct vblock_t *vblocks) {
     vblocks[i].maxs[2] = bounds.max[2];
   }
 
-  /* save vertices (float version) */
+  // save vertices (float version) 
   for (i = 0; i < nblocks; i++) {
     vblocks[i].save_verts = (float *)malloc(vblocks[i].num_verts * 3 * 
 					       sizeof(float));
@@ -1477,14 +1470,14 @@ void prep_out(int nblocks, struct vblock_t *vblocks) {
   }
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  save headers
-
-  nblocks: number of blocks
-  vblocks: pointer to array of vblocks
-  hdrs: block headers
-*/
+// --------------------------------------------------------------------------
+//
+//   save headers
+//
+//   nblocks: number of blocks
+//   vblocks: pointer to array of vblocks
+//   hdrs: block headers
+// 
 void save_headers(int nblocks, struct vblock_t *vblocks, int **hdrs) {
 
   int i;
@@ -1494,8 +1487,8 @@ void save_headers(int nblocks, struct vblock_t *vblocks, int **hdrs) {
     hdrs[i][NUM_VERTS] = vblocks[i].num_verts;
     hdrs[i][TOT_NUM_CELL_VERTS] = vblocks[i].tot_num_cell_verts;
     hdrs[i][NUM_COMPLETE_CELLS] = vblocks[i].num_complete_cells;
-/*     hdrs[i][TOT_NUM_CELL_FACES] = vblocks[i].tot_num_cell_faces; */
-/*     hdrs[i][TOT_NUM_FACE_VERTS] = vblocks[i].tot_num_face_verts; */
+//     hdrs[i][TOT_NUM_CELL_FACES] = vblocks[i].tot_num_cell_faces; 
+//     hdrs[i][TOT_NUM_FACE_VERTS] = vblocks[i].tot_num_face_verts; 
     hdrs[i][NUM_ORIG_PARTICLES] = vblocks[i].num_orig_particles;
     hdrs[i][NUM_LOC_TETS] = vblocks[i].num_loc_tets;
     hdrs[i][NUM_REM_TETS] = vblocks[i].num_rem_tets;
@@ -1505,21 +1498,21 @@ void save_headers(int nblocks, struct vblock_t *vblocks, int **hdrs) {
   }
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  creates and initializes blocks and headers
-
-  num_blocks: number of blocks
-  vblocks: pointer to array of vblocks
-  hdrs: pointer to array of headers, pass NULL if not used
-
-  side effects: allocates memory for blocks and headers
-*/
+// --------------------------------------------------------------------------
+//
+//   creates and initializes blocks and headers
+//
+//   num_blocks: number of blocks
+//   vblocks: pointer to array of vblocks
+//   hdrs: pointer to array of headers, pass NULL if not used
+//
+//   side effects: allocates memory for blocks and headers
+// 
 void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs) {
 
   int i, j;
 
-  /* allocate blocks and headers */
+  // allocate blocks and headers 
   *vblocks = (struct vblock_t*)malloc(sizeof(struct vblock_t) * 
 				      num_blocks);
   if (hdrs)
@@ -1566,14 +1559,14 @@ void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs) {
   }
 
 }
-/*---------------------------------------------------------------------------*/
-/*
-  frees blocks and headers
-
-  num_blocks: number of blocks
-  vblocks: array of vblocks
-  hdrs: pointer to array of headers, pass NULL if not used
-*/
+// ---------------------------------------------------------------------------
+//
+//   frees blocks and headers
+//
+//   num_blocks: number of blocks
+//   vblocks: array of vblocks
+//   hdrs: pointer to array of headers, pass NULL if not used
+// 
 void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
 
   int i;
@@ -1625,22 +1618,22 @@ void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
   free(vblocks);
 
 }
-/*---------------------------------------------------------------------------*/
-/*
-  resets blocks and headers between phases
-  destroys and re-creates most of the block, but keeps data related
-  sent particles
-
-  num_blocks: number of blocks
-  vblocks: array of vblocks
-*/
+// ---------------------------------------------------------------------------
+//
+//   resets blocks and headers between phases
+//   destroys and re-creates most of the block, but keeps data related
+//   sent particles
+//
+//   num_blocks: number of blocks
+//   vblocks: array of vblocks
+// 
 void reset_blocks(int num_blocks, struct vblock_t *vblocks) {
 
   int i;
 
   for (i = 0; i < num_blocks; i++) {
 
-    /* free old data */
+    // free old data 
     if (vblocks[i].verts)
       free(vblocks[i].verts);
     if (vblocks[i].save_verts)
@@ -1671,7 +1664,7 @@ void reset_blocks(int num_blocks, struct vblock_t *vblocks) {
       free(vblocks[i].rem_tet_nids);
     if (vblocks[i].rem_tet_wrap_dirs)
       free(vblocks[i].rem_tet_wrap_dirs);
-    /* keep sent_particles, don't free them */
+    // keep sent_particles, don't free them 
     if (vblocks[i].faces)
       free(vblocks[i].faces);
     if (vblocks[i].cell_faces_start)
@@ -1679,7 +1672,7 @@ void reset_blocks(int num_blocks, struct vblock_t *vblocks) {
     if (vblocks[i].cell_faces)
       free(vblocks[i].cell_faces);
 
-    /* initialize new data */
+    // initialize new data 
     vblocks[i].num_verts = 0;
     vblocks[i].verts = NULL;
     vblocks[i].save_verts = NULL;
@@ -1701,8 +1694,8 @@ void reset_blocks(int num_blocks, struct vblock_t *vblocks) {
     vblocks[i].rem_tet_nids = NULL;
     vblocks[i].rem_tet_wrap_dirs = NULL;
     vblocks[i].num_rem_tets = 0;
-    /* keep sent_particles, don't reset num_sent_particles,
-       alloc_sent_particles, sent_particles */
+    // keep sent_particles, don't reset num_sent_particles,
+    //   alloc_sent_particles, sent_particles 
     vblocks[i].num_faces = 0;
     vblocks[i].tot_num_cell_faces = 0;
     vblocks[i].faces = NULL;
@@ -1712,17 +1705,17 @@ void reset_blocks(int num_blocks, struct vblock_t *vblocks) {
   }
 
 }
-/*---------------------------------------------------------------------------*/
-/*
-  finds the direction of the nearest block to the given point
-
-  p: coordinates of the point
-  bounds: block bounds
-*/
+// ---------------------------------------------------------------------------
+//
+//   finds the direction of the nearest block to the given point
+//
+//   p: coordinates of the point
+//   bounds: block bounds
+// 
 unsigned char nearest_neighbor(float* p, struct bb_t* bounds) {
 
-  /* TODO: possibly find the 3 closest neighbors, and look at the ratio of
-     the distances to deal with the corners  */
+  // TODO: possibly find the 3 closest neighbors, and look at the ratio of
+  //   the distances to deal with the corners  
 
   int		i;
   float	        dists[6];
@@ -1735,19 +1728,17 @@ unsigned char nearest_neighbor(float* p, struct bb_t* bounds) {
 
   int   smallest = 0;
   for (i = 1; i < 6; ++i) {
-    if (dists[i] < dists[smallest]) {
+    if (dists[i] < dists[smallest])
       smallest = i;
-    }
   }
 
   return dirs[smallest];
 
 }
-
-/*---------------------------------------------------------------------------*/
-/*
-  returns distance between points p and q
-*/
+// ---------------------------------------------------------------------------
+//
+//   returns distance between points p and q
+// 
 float distance(float* p, float* q) {
 
   return sqrt((p[0] - q[0]) * (p[0] - q[0]) +
@@ -1755,67 +1746,67 @@ float distance(float* p, float* q) {
 	      (p[2] - q[2]) * (p[2] - q[2]));
 
 }
-/*---------------------------------------------------------------------------*/
-/*
-  determines cells that are incomplete or too close to neighbor such that
-  they might change after neighbor exchange. The particles corresponding
-  to sites of these cells are enqueued for exchange with neighors
-
-  tblock: one temporary voronoi block
-  vblock: one voronoi block
-  lid: local id of block
-  convex_hull_particles: pointer to convex hull particles to recheck later
-  num_convex_hull_particles: number of convex hull particles
-*/
+// ---------------------------------------------------------------------------
+//
+//   determines cells that are incomplete or too close to neighbor such that
+//   they might change after neighbor exchange. The particles corresponding
+//   to sites of these cells are enqueued for exchange with neighors
+//
+//   tblock: one temporary voronoi block
+//   vblock: one voronoi block
+//   lid: local id of block
+//   convex_hull_particles: pointer to convex hull particles to recheck later
+//   num_convex_hull_particles: number of convex hull particles
+// 
 void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 			      int lid,
 			      int** convex_hull_particles,
 			      int*  num_convex_hull_particles) {
 
-  struct bb_t bounds; /* block bounds */
-  int vid; /* vertex id */
+  struct bb_t bounds; // block bounds 
+  int vid; // vertex id 
   int i, j, k, n;
-  int chunk_size = 128; /* allocation chunk size for sent particles */
-  struct remote_particle_t rp; /* particle being sent or received */
-  struct sent_t sent; /* info about sent particle saved for later */
-  int complete; /* no vertices in the cell are the infinite vertex */
+  int chunk_size = 128; // allocation chunk size for sent particles 
+  struct remote_particle_t rp; // particle being sent or received 
+  struct sent_t sent; // info about sent particle saved for later 
+  int complete; // no vertices in the cell are the infinite vertex 
 
   int allocated_convex_hull = 0;
   *num_convex_hull_particles = 0;
 
   DIY_Block_bounds(0, lid, &bounds);
 
-  /* get gids of all neighbors, in case a particle needs to be
-     sent to all neighbors
-     (enumerating all gids manually (not via DIY_Enqueue_Item_all)
-     to be consisent with enumerating particular neighbors) */
+  // get gids of all neighbors, in case a particle needs to be
+  //   sent to all neighbors
+  //   (enumerating all gids manually (not via DIY_Enqueue_Item_all)
+  //   to be consisent with enumerating particular neighbors) 
   int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
   struct gb_t all_neigh_gbs[MAX_NEIGHBORS];
   DIY_Get_neighbors(0, lid, all_neigh_gbs);
 
-  n = 0; /* index into tblock->cells */
+  n = 0; // index into tblock->cells 
 
-  /* for all cells */
+  // for all cells 
   for (j = 0; j < tblock->num_orig_particles; j++) {
 
-    complete = 1; /* assume complete cell unless found otherwise */
+    complete = 1; // assume complete cell unless found otherwise 
     sent.num_gbs = 0;
 
-    /* for all vertex indices in the current cell */
+    // for all vertex indices in the current cell 
     
     for (k = 0; k < tblock->num_cell_verts[j]; k++) {
 
       vid = tblock->cells[n];
 
-      /* if a vertex is not the infinite vertex, add any neighbors
-	 within the delaunay circumsphere radius of block bounds */
+      // if a vertex is not the infinite vertex, add any neighbors
+      // within the delaunay circumsphere radius of block bounds 
       if (vid) {
-	float pt[3]; /* target point as a float (verts are double) */
+	float pt[3]; // target point as a float (verts are double) 
 	pt[0] = tblock->verts[3 * vid];
 	pt[1] = tblock->verts[3 * vid + 1];
 	pt[2] = tblock->verts[3 * vid + 2];
-	/* radius of delaunay circumshpere is the distance from
-	   voronoi vertex to voronoi site */
+	// radius of delaunay circumshpere is the distance from
+	//   voronoi vertex to voronoi site 
 	float sph_rad = distance(pt, &tblock->sites[3 * j]);
 	DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
 			     MAX_NEIGHBORS, pt, sph_rad);
@@ -1823,8 +1814,8 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
           
       }
       else {
-      	/* should do this at most once per cell because at most
-	   one infinite vertex */
+      	// should do this at most once per cell because at most
+	//   one infinite vertex 
 	complete = 0;
 	add_int(j, convex_hull_particles, num_convex_hull_particles,
 		&allocated_convex_hull, chunk_size);
@@ -1832,7 +1823,7 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
       
       n++;
 
-    } /* for all vertex indices in this cell */
+    } // for all vertex indices in this cell 
     
 
     rp.x = tblock->sites[3 * j];
@@ -1843,16 +1834,16 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
     rp.dir = 0x00;
     
 
-    /* particle needs to be sent either to particular neighbors or to all */
+    // particle needs to be sent either to particular neighbors or to all 
     if (!complete || sent.num_gbs) {
 
       if (!complete) {
 
-	/* incomplete cell goes to the closest neighbor */
+	// incomplete cell goes to the closest neighbor 
 	unsigned char nearest_dir = 
 	  nearest_neighbor(&(tblock->sites[3 * j]), &bounds);
 
-	/* Send the particle to the neighbor in direction dirs[smallest] */
+	// Send the particle to the neighbor in direction dirs[smallest] 
 	sent.num_gbs = 0;
 	for (i = 0; i < num_all_neigh_gbs; i++) {
 
@@ -1865,7 +1856,7 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 	  }
 
 	}
-	assert(sent.num_gbs <= 1); /* sanity */
+	assert(sent.num_gbs <= 1); // sanity 
 
       }
 
@@ -1874,35 +1865,35 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 			   sent.neigh_gbs, sent.num_gbs,
 			   &transform_particle);
 
-      /* save the details of the sent particle for later sending
-	 completion status of sent particles to same neighbors */
+      // save the details of the sent particle for later sending
+      // completion status of sent particles to same neighbors 
       sent.particle = j;
       add_sent(sent, &(vblock->sent_particles),
 	       &(vblock->num_sent_particles),
 	       &(vblock->alloc_sent_particles), chunk_size);
 
-    } /* if (!complete || sent.num_gbs) */
+    } // if (!complete || sent.num_gbs) 
 
-  } /* for all cells */
+  } // for all cells 
 
 }
-/*---------------------------------------------------------------------------*/
-/* 
-   Go through the original convex hull particles and enqueue any remaining
-   incomplete cells to all neighbors
-
-   tblock: one temporary voronoi block
-   vblock: one voronoi block
-   lid: local id of block
-   convex_hull_particles: convex hull particles to check
-   num_convex_hull_particles: number of particles
-   CLP - Recieve List of Planar Walls
-   walls: walls
-   num_walls: number of walls
-   CLP - Return List of Mirror Points
-   mirror_particles: sites reflected across walls
-   num_mirror_particles: the number of mirror particles
-*/
+// ---------------------------------------------------------------------------
+//
+//    Go through the original convex hull particles and enqueue any remaining
+//    incomplete cells to all neighbors
+//
+//    tblock: one temporary voronoi block
+//    vblock: one voronoi block
+//    lid: local id of block
+//    convex_hull_particles: convex hull particles to check
+//    num_convex_hull_particles: number of particles
+//    CLP - Recieve List of Planar Walls
+//    walls: walls
+//    num_walls: number of walls
+//    CLP - Return List of Mirror Points
+//    mirror_particles: sites reflected across walls
+//    num_mirror_particles: the number of mirror particles
+// 
 void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 			    int lid,
 			    int* convex_hull_particles,
@@ -1913,26 +1904,26 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 			    int*  num_mirror_particles) {
 
   int i, j, k, l, n, wi;
-  int vid; /* vertex id */
-  struct bb_t bounds; /* local block bounds */
-  struct remote_particle_t rp; /* particle being sent or received */
-  struct sent_t sent; /* info about sent particle saved for later */
-  int chunk_size = 128; /* allocation chunk size for sent particles */
+  int vid; // vertex id 
+  struct bb_t bounds; // local block bounds 
+  struct remote_particle_t rp; // particle being sent or received 
+  struct sent_t sent; // info about sent particle saved for later 
+  int chunk_size = 128; // allocation chunk size for sent particles 
   
   DIY_Block_bounds(0, lid, &bounds);
 
-  /* get gids of all neighbors, in case a particle needs to be
-     sent to all neighbors
-     (enumerating all gids manually (not via DIY_Enqueue_Item_all)
-     to be consisent with enumerating particular neighbors) */
+  // get gids of all neighbors, in case a particle needs to be
+  //   sent to all neighbors
+  //   (enumerating all gids manually (not via DIY_Enqueue_Item_all)
+  //   to be consisent with enumerating particular neighbors) 
   int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
   struct gb_t all_neigh_gbs[MAX_NEIGHBORS];
   DIY_Get_neighbors(0, lid, all_neigh_gbs);
 
-  /* We must go through all the particles to maintain n
-     (the index into the vertices array) */
+  // We must go through all the particles to maintain n
+  //   (the index into the vertices array) 
 
-  /* CLP */
+  // CLP 
   int* wall_cut = (int *)malloc(num_walls * sizeof(int));
   int allocated_mirror_particles = 0;
   *num_mirror_particles = 0;
@@ -1942,15 +1933,15 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 
     sent.num_gbs = 0;
 
-    /* CLP - zero generate-wall-point array (length of number of walls) */
+    // CLP - zero generate-wall-point array (length of number of walls) 
     for (wi = 0; wi < num_walls; wi++)
       wall_cut[wi] = 0;
 
-    /* CLP - adding a check so that the array convex_hull_particles 
-       is not accessed where it is uninitialized */
+    // CLP - adding a check so that the array convex_hull_particles 
+    //   is not accessed where it is uninitialized 
     if (i < num_convex_hull_particles && j == convex_hull_particles[i]) {
       
-      /* direction of closest neighbor */
+      // direction of closest neighbor 
       unsigned char nearest_dir = 
 	nearest_neighbor(&(tblock->sites[3*j]), &bounds);
 
@@ -1960,8 +1951,8 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 
 	if (!vid) {
 
-	  /* local point still on the convex hull goes to everybody
-	     it hasn't gone to yet */
+	  // local point still on the convex hull goes to everybody
+	  // it hasn't gone to yet 
 	  sent.num_gbs = 0;
 	  for (l = 0; l < num_all_neigh_gbs; l++) {
 	    if (all_neigh_gbs[l].neigh_dir != 0x00 &&
@@ -1974,28 +1965,28 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	    }
 	  }
  
-	  /* CLP - set the mirror-generate array to all ones  
-	     (extra calculations but simpler to assume!) */
+	  // CLP - set the mirror-generate array to all ones  
+	  // (extra calculations but simpler to assume!) 
 	  for (wi = 0; wi < num_walls; wi++)
             wall_cut[wi] = 1;
       
-	} /* !vid */
+	} // !vid 
 
-	else { /* vid */
+	else { // vid 
 
-	  float pt[3]; /* target point as a float (verts are double) */
+	  float pt[3]; // target point as a float (verts are double) 
 	  pt[0] = tblock->verts[3 * vid];
 	  pt[1] = tblock->verts[3 * vid + 1];
 	  pt[2] = tblock->verts[3 * vid + 2];
 
-	  /* radius of delaunay circumshpere is the distance from
-	     voronoi vertex to voronoi site */
+	  // radius of delaunay circumshpere is the distance from
+	  //   voronoi vertex to voronoi site 
 	  float sph_rad = distance(pt, &tblock->sites[3 * j]);
 	  DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
 			       MAX_NEIGHBORS, pt, sph_rad);
 
-	  /* remove the neighbor in the nearest_dir;
-	     we've already sent to it */
+	  // remove the neighbor in the nearest_dir;
+	  // we've already sent to it 
 	  for (l = 0; l < sent.num_gbs; ++l) {
 	    if (sent.neigh_gbs[l].neigh_dir == nearest_dir) {
 	      if (l < sent.num_gbs - 1)
@@ -2004,21 +1995,21 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	    }
 	  }
      
-	  /* CLP - for each wall */
+	  // CLP - for each wall 
 	  for (wi = 0; wi < num_walls; wi++) {
 
-	    /* CLP - If the mirror-generate[wall-index] is not 1 */
+	    // CLP - If the mirror-generate[wall-index] is not 1 
 	    if (!wall_cut[wi])
-	      /* CLP - generate the sign of pt relative to the wall.  
-		 If it is not positive (wall vectors must point inward!) 
-		 then set the mirror-generate[wall-index] to one  */
+	      // CLP - generate the sign of pt relative to the wall.  
+	      // If it is not positive (wall vectors must point inward!) 
+	      // then set the mirror-generate[wall-index] to one  
 	      wall_cut[wi] += test_outside(pt,&walls[wi]);
 
 	  }
 
-	} /* vid */
+	} // vid 
 
-      } /* for k = 0; k < tblock->num_cell_verts[j] */
+      } // for k = 0; k < tblock->num_cell_verts[j] 
 
       if (sent.num_gbs) {
 
@@ -2043,42 +2034,42 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 
       ++i;
 
-      /* CLP disabling this break when there are walls because 
-	 I need to iterate through all the particles. */
+      // CLP disabling this break when there are walls because 
+      // I need to iterate through all the particles. 
       if (!num_walls && i >= num_convex_hull_particles)
         break;
 
-    } /* if (j == convex_hull_particles[i]) */
+    } // if (j == convex_hull_particles[i]) 
 
-    /* CLP - else { add my test, (loop through vids, test looks like above }*/
+    // CLP - else { add my test, (loop through vids, test looks like above }
     else {
 
       for (k = 0; k < tblock->num_cell_verts[j]; ++k) {
 
 	vid = tblock->cells[n + k];
-	float pt[3]; /* target point as a float (verts are double) */
+	float pt[3]; // target point as a float (verts are double) 
 	pt[0] = tblock->verts[3 * vid];
 	pt[1] = tblock->verts[3 * vid + 1];
 	pt[2] = tblock->verts[3 * vid + 2];
 
-	/* CLP - for each wall */
+	// CLP - for each wall 
 	for (wi = 0; wi < num_walls; wi++) {
-	  /* CLP - If the mirror-generate[wall-index] is not 1 */
+	  // CLP - If the mirror-generate[wall-index] is not 1 
 	  if (!wall_cut[wi])
-	    /* CLP - generate the sign of pt relative to the wall.  
-	       If it is not positive (wall vectors must point inward!) 
-	       then set the mirror-generate[wall-index] to one  */
+	    // CLP - generate the sign of pt relative to the wall.  
+	    // If it is not positive (wall vectors must point inward!) 
+	    // then set the mirror-generate[wall-index] to one  
 	    wall_cut[wi] += test_outside(pt,&walls[wi]);
 	}
 
-      } /* for k */
+      } // for k 
     
-    } /* else */
+    } // else 
     
-    /* CLP - for each mirror-generate index that is 1, 
-       generate the mirror point given site rp and the wall
-       Here I am building a list of points.  Where do they go? 
-       Return as pointer */
+    // CLP - for each mirror-generate index that is 1, 
+    //   generate the mirror point given site rp and the wall
+    //   Here I am building a list of points.  Where do they go? 
+    //   Return as pointer 
     for (wi =0; wi < num_walls; wi++) {
 
       if (wall_cut[wi]) {
@@ -2092,49 +2083,49 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 	       &allocated_mirror_particles, chunk_size);
       }
 
-    } /* for */
+    } // for 
       
     n += tblock->num_cell_verts[j];
     
   }
   
-  /* CLP cleanup */
+  // CLP cleanup 
   free(wall_cut);
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  determines connectivity of faces in complete cells
-
-  vblock: one voronoi block
-
-  side effects: allocates memory for cell_faces and cell_faces_start 
-  in voronoi block
-*/
+// --------------------------------------------------------------------------
+//
+//   determines connectivity of faces in complete cells
+//
+//   vblock: one voronoi block
+//
+//   side effects: allocates memory for cell_faces and cell_faces_start 
+//   in voronoi block
+// 
 void cell_faces(struct vblock_t *vblock) {
 
-  int cell; /* current cell */
+  int cell; // current cell 
   int i;
 
-  /* todo: allocate to size of complete cells and don't store faces for
-     incomplete cells */
+  // todo: allocate to size of complete cells and don't store faces for
+  //   incomplete cells 
 
-  /* temporary count of number of faces in each of my original cells */
+  // temporary count of number of faces in each of my original cells 
   int *counts = (int *)malloc(vblock->num_orig_particles *
 			      sizeof(int));
-  /* starting offset of faces in each of my original cells */
+  // starting offset of faces in each of my original cells 
   vblock->cell_faces_start = (int *)malloc(vblock->num_orig_particles *
 					   sizeof(int));
   memset(counts, 0, vblock->num_orig_particles * sizeof(int));
 
-  /* pass 1: traverse faces array and get number of faces in each cell
-     use face starting offsets array temporarily to hold face counts,
-     will convert to starting offsets (prefix sum of counts) later */
+  // pass 1: traverse faces array and get number of faces in each cell
+  //   use face starting offsets array temporarily to hold face counts,
+  //   will convert to starting offsets (prefix sum of counts) later 
   vblock->tot_num_cell_faces = 0;
   for (i = 0; i < vblock->num_faces; i++) {
     cell = vblock->faces[i].cells[0];
-    /* each block retains only those cells and their faces whose particles 
-       it originally had */
+    // each block retains only those cells and their faces whose particles 
+    //   it originally had 
     if (cell < vblock->num_orig_particles) {
       counts[cell]++;
       vblock->tot_num_cell_faces++;
@@ -2146,22 +2137,22 @@ void cell_faces(struct vblock_t *vblock) {
     }
   }
 
-  /* convert face counts to starting offsets and offset of end (used to
-     compute face count of last cell */
+  // convert face counts to starting offsets and offset of end (used to
+  //    compute face count of last cell 
   vblock->cell_faces_start[0] = 0;
   for (i = 1; i < vblock->num_orig_particles; i++)
     vblock->cell_faces_start[i] = vblock->cell_faces_start[i - 1] + 
       counts[i - 1];
 
-  /* allocate cell_faces */
+  // allocate cell_faces 
   vblock->cell_faces = (int *)malloc(vblock->tot_num_cell_faces * sizeof(int));
 
-  /* pass 2: traverse faces array and save face ids for each cell */
+  // pass 2: traverse faces array and save face ids for each cell 
   memset(counts, 0, vblock->num_orig_particles * sizeof(int));
   for (i = 0; i < vblock->num_faces; i++) {
     cell = vblock->faces[i].cells[0];
-    /* again, each block retains only those cells and their faces 
-       whose particles it originally had */
+    // again, each block retains only those cells and their faces 
+    //    whose particles it originally had 
     if (cell < vblock->num_orig_particles) {
       int id = vblock->cell_faces_start[cell] + counts[cell];
       vblock->cell_faces[id] = i;
@@ -2175,34 +2166,34 @@ void cell_faces(struct vblock_t *vblock) {
     }
   }
 
-  /* cleanup */
+  // cleanup 
   free(counts);
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  determines complete cells: cells that don't contain qhull'sinfinite vertex or
-  any other vertices outside of the block bounds
-
-  vblock: one voronoi block
-  lid: local id of block
-
-  side effects: allocates memory for complete cells in voronoi block
-*/
+// --------------------------------------------------------------------------
+//
+//   determines complete cells: cells that don't contain an infinite
+//    vertex or any other vertices outside of the block bounds
+//
+//   vblock: one voronoi block
+//   lid: local id of block
+//
+//   side effects: allocates memory for complete cells in voronoi block
+// 
 void complete_cells(struct vblock_t *vblock, int lid) {
 
-  struct bb_t bounds; /* block bounds */
-  int vid, vid1; /* vertex id */
+  struct bb_t bounds; // block bounds 
+  int vid, vid1; // vertex id 
   int j, k, n, m;
-  double d2_min = 0.0; /* dia^2 of circumscribing sphere of volume min_vol */
-  int start_n; /* index into cells at start of new cell */
-  int too_small; /* whether cell volume is definitely below threshold */
+  double d2_min = 0.0; // dia^2 of circumscribing sphere of volume min_vol 
+  int start_n; // index into cells at start of new cell 
+  int too_small; // whether cell volume is definitely below threshold 
 
-  /* allocate memory based on number of cells and average number of
-     faces and vertices in a cell
-     this is wasteful if filtering on volume because we will probably
-     only need a fraction of this memory
-     todo: fix this with my own memory manager */
+  // allocate memory based on number of cells and average number of
+  //    faces and vertices in a cell
+  //   this is wasteful if filtering on volume because we will probably
+  //   only need a fraction of this memory
+  //   todo: fix this with my own memory manager 
   vblock->temp_complete_cells =
 	  (int *)malloc(vblock->num_orig_particles * sizeof(int));
   vblock->complete_cells =
@@ -2210,34 +2201,29 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 
   DIY_Block_bounds(0, lid, &bounds);
 
-  /* minimum cell diameter squared */
+  // minimum cell diameter squared 
   if (min_vol > 0.0)
-    /* d^2 = 4 * (3/4 * min_vol / pi)^ (2/3) */
+    // d^2 = 4 * (3/4 * min_vol / pi)^ (2/3) 
     d2_min = 1.539339 * pow(min_vol, 0.66667);
 
-  /* find complete cells */
+  // find complete cells 
 
   vblock->temp_num_complete_cells = 0;
-  n = 0; /* index into vblock->cells */
+  n = 0; // index into vblock->cells 
 
-  /* for all cells up to original number of input particles (each block 
-     retains only those cells whose particles it originally had) */
+  // for all cells up to original number of input particles (each block 
+  //    retains only those cells whose particles it originally had) 
     
   for (j = 0; j < vblock->num_orig_particles; j++) {
 
-    /* init */
+    // init 
     if (!vblock->num_cell_verts[j])
       continue;
 
     int complete = 1;
     too_small = (min_vol > 0.0 ? 1 : 0);
     
-
-
-    /* debug */
-/*     fprintf(stderr, "cell %d has %d verts: ", j, vblock->num_cell_verts[j]); */
-
-    /* for all vertex indices in the current cell */
+    // for all vertex indices in the current cell 
     for (k = 0; k < vblock->num_cell_verts[j]; k++) {
 
       if (k == 0)
@@ -2245,18 +2231,15 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 
       vid = vblock->cells[n];
 
-      /* debug */
-/*       fprintf(stderr, "%d ", vid); */
-
       float eps = 1.0e-6;
-      if ( /* vertex can fail for the following reasons */
+      if ( // vertex can fail for the following reasons 
 
-	  /* qhull's "infinite vertex" */
+	  // qhull's "infinite vertex" 
 	  (fabs(vblock->verts[3 * vid] - vblock->verts[0]) < eps &&
 	   fabs(vblock->verts[3 * vid + 1] - vblock->verts[1]) < eps &&
 	   fabs(vblock->verts[3 * vid + 2] - vblock->verts[2]) < eps) ||
 
-	  /* out of overall data bounds when wrapping is off */
+	  // out of overall data bounds when wrapping is off 
         (!wrap_neighbors &&
 	   (vblock->verts[3 * vid]     < (data_mins[0] - eps) ||
 	    vblock->verts[3 * vid]     > (data_maxs[0] + eps) ||
@@ -2267,7 +2250,7 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 
         complete = 0;
         
-        /*CLP -debug */
+        //CLP -debug 
         
         /*
         if (fabs(vblock->verts[3 * vid] - vblock->verts[0]) < eps &&
@@ -2287,17 +2270,15 @@ void complete_cells(struct vblock_t *vblock, int lid) {
             }
         */
 
-
-	n += (vblock->num_cell_verts[j] - k); /* skip rest of this cell */
+	n += (vblock->num_cell_verts[j] - k); // skip rest of this cell 
 	break;
     
+      } // if 
 
-      } /* if */
-
-      /* check minimum volume if enabled and it has not been excceded yet */
+      // check minimum volume if enabled and it has not been excceded yet 
       if (too_small) {
 
-	/* for all vertices in this cell */
+	// for all vertices in this cell 
 	for (m = start_n; m < start_n + vblock->num_cell_verts[j]; m++) {
 	  vid1 = vblock->cells[m];
 	  double d2 =
@@ -2312,62 +2293,53 @@ void complete_cells(struct vblock_t *vblock, int lid) {
 	    break;
 	  }
 
-	} /* all vertices in this cell */
+	} // all vertices in this cell 
 
-      } /* small volume threshold */
+      } // small volume threshold 
 
-      /* check if volume is too small at the end of the cell */
+      // check if volume is too small at the end of the cell 
       if (k == vblock->num_cell_verts[j] - 1 && too_small)
-        {
         complete = 0;
-        //fprintf(stderr, "cell %d failed because too small\n",j);
-        }
       n++;
 
-    } /* for all vertex indices in this cell */
+    } // for all vertex indices in this cell 
 
-    /* one last check that site is within cell bounds. if so, save the cell */
+    // one last check that site is within cell bounds. if so, save the cell 
     if (complete && cell_bounds(vblock, j, start_n)) {
       (vblock->temp_complete_cells)[vblock->temp_num_complete_cells++] = j;
       vblock->is_complete[j] = 1;
     }
     else
-      {
-      /*
-      if (!cell_bounds(vblock, j, start_n))
-            fprintf(stderr, "cell %d failed because site not in bounds\n",j);
-      */
-          
       vblock->is_complete[j] = 0;
-      }
 
-  } /* for all cells */
+  } // for all cells 
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  generates test particles for a  block
-
-  lid: local id of block
-  particles: pointer to particle vector in this order: 
-  particle0x, particle0y, particle0z, particle1x, particle1y, particle1z, ...
-  jitter: maximum amount to randomly move particles
-
-  returns: number of particles in this block
-
-  side effects: allocates memory for particles, caller's responsibility to free
-*/
+// --------------------------------------------------------------------------
+//
+//   generates test particles for a  block
+//
+//   lid: local id of block
+//   particles: pointer to particle vector in this order: 
+//   particle0x, particle0y, particle0z, particle1x, particle1y, particle1z, ...
+//   jitter: maximum amount to randomly move particles
+//
+//   returns: number of particles in this block
+//
+//   side effects: allocates memory for particles, caller's responsibility 
+//     to free
+// 
 int gen_particles(int lid, float **particles, float jitter) {
 
-  int sizes[3]; /* number of grid points */
+  int sizes[3]; // number of grid points 
   int i, j, k;
   int n = 0;
-  int num_particles; /* throreticl num particles with duplicates at 
-			block boundaries */
-  int act_num_particles; /* actual number of particles unique across blocks */
-  float jit; /* random jitter amount, 0 - MAX_JITTER */
+  int num_particles; // throreticl num particles with duplicates at 
+		     // block boundaries 
+  int act_num_particles; // actual number of particles unique across blocks 
+  float jit; // random jitter amount, 0 - MAX_JITTER 
 
-  /* allocate particles */
+  // allocate particles 
   struct bb_t bounds;
   DIY_Block_bounds(0, lid, &bounds);
   sizes[0] = (int)(bounds.max[0] - bounds.min[0] + 1);
@@ -2378,25 +2350,25 @@ int gen_particles(int lid, float **particles, float jitter) {
 
   *particles = (float *)malloc(num_particles * 3 * sizeof(float));
 
-  /* assign particles */
+  // assign particles 
 
   n = 0;
   for (i = 0; i < sizes[0]; i++) {
-    if (bounds.min[0] > 0 && i == 0) /* dedup block doundary points */
+    if (bounds.min[0] > 0 && i == 0) // dedup block doundary points 
       continue;
     for (j = 0; j < sizes[1]; j++) {
-      if (bounds.min[1] > 0 && j == 0) /* dedup block doundary points */
+      if (bounds.min[1] > 0 && j == 0) // dedup block doundary points 
 	continue;
       for (k = 0; k < sizes[2]; k++) {
-	if (bounds.min[2] > 0 && k == 0) /* dedup block doundary points */
+	if (bounds.min[2] > 0 && k == 0) // dedup block doundary points 
 	  continue;
 
-	/* start with particles on a grid */
+	// start with particles on a grid 
 	(*particles)[3 * n] = bounds.min[0] + i;
 	(*particles)[3 * n + 1] = bounds.min[1] + j;
 	(*particles)[3 * n + 2] = bounds.min[2] + k;
 
-	/* and now jitter them */
+	// and now jitter them 
 	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
 	if ((*particles)[3 * n] - jit >= bounds.min[0] &&
 	    (*particles)[3 * n] - jit <= bounds.max[0])
@@ -2434,13 +2406,13 @@ int gen_particles(int lid, float **particles, float jitter) {
   return act_num_particles;
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  prints a block
-
-  vblock: current voronoi block
-  gid: global block id
-*/
+// --------------------------------------------------------------------------
+//
+//   prints a block
+//
+//   vblock: current voronoi block
+//   gid: global block id
+// 
 void print_block(struct vblock_t *vblock, int gid) {
 
   int i;
@@ -2452,14 +2424,14 @@ void print_block(struct vblock_t *vblock, int gid) {
   fprintf(stderr, "\n");
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  prints particles
-
-  prticles: particle array
-  num_particles: number of particles
-  gid: block global id
-*/
+// --------------------------------------------------------------------------
+//
+//   prints particles
+//
+//   prticles: particle array
+//   num_particles: number of particles
+//   gid: block global id
+// 
 void print_particles(float *particles, int num_particles, int gid) {
 
   int n;
@@ -2470,33 +2442,33 @@ void print_particles(float *particles, int num_particles, int gid) {
 	    particles[3 * n + 2]);
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  transforms particles for enqueueing to wraparound neighbors
-  p: pointer to particle
-  wrap_dir: wrapping direcion
-*/
+// --------------------------------------------------------------------------
+//
+//   transforms particles for enqueueing to wraparound neighbors
+//   p: pointer to particle
+//   wrap_dir: wrapping direcion
+// 
 void transform_particle(char *p, unsigned char wrap_dir) {
 
-  /* debug */
-  float particle[3]; /* original particle */
+  // debug 
+  float particle[3]; // original particle 
   particle[0] = ((struct remote_particle_t*)p)->x;
   particle[1] = ((struct remote_particle_t*)p)->y;
   particle[2] = ((struct remote_particle_t*)p)->z;
 
-  /* wrapping toward the left transforms to the right */
+  // wrapping toward the left transforms to the right 
   if ((wrap_dir & DIY_X0) == DIY_X0) {
     ((struct remote_particle_t*)p)->x += (data_maxs[0] - data_mins[0]);
     ((struct remote_particle_t*)p)->dir |= DIY_X0;
   }
 
-  /* and vice versa */
+  // and vice versa 
   if ((wrap_dir & DIY_X1) == DIY_X1) {
     ((struct remote_particle_t*)p)->x -= (data_maxs[0] - data_mins[0]);
     ((struct remote_particle_t*)p)->dir |= DIY_X1;
   }
 
-  /* similar for y, z */
+  // similar for y, z 
   if ((wrap_dir & DIY_Y0) == DIY_Y0) {
     ((struct remote_particle_t*)p)->y += (data_maxs[1] - data_mins[1]);
     ((struct remote_particle_t*)p)->dir |= DIY_Y0;
@@ -2518,10 +2490,10 @@ void transform_particle(char *p, unsigned char wrap_dir) {
   }
 
 }
-/*--------------------------------------------------------------------------*/
-/* 
-   comparison function for qsort
-*/
+// --------------------------------------------------------------------------
+//
+//    comparison function for qsort
+// 
 int compare(const void *a, const void *b) {
 
   if (*((int*)a) < *((int*)b))
@@ -2531,130 +2503,130 @@ int compare(const void *a, const void *b) {
   return 1;
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  adds an int to a c-style vector of ints
-
-  val: value to be added
-  vals: pointer to dynamic array of values
-  numvals: pointer to number of values currently stored, updated by add_int
-  maxvals: pointer to number of values currently allocated
-  chunk_size: number of values to allocate at a time
-
-*/
+// --------------------------------------------------------------------------
+//
+//   adds an int to a c-style vector of ints
+//
+//   val: value to be added
+//   vals: pointer to dynamic array of values
+//   numvals: pointer to number of values currently stored, updated by add_int
+//   maxvals: pointer to number of values currently allocated
+//   chunk_size: number of values to allocate at a time
+//
+// 
 void add_int(int val, int **vals, int *numvals, int *maxvals, int chunk_size) {
 
-  /* first time */
+  // first time 
   if (*maxvals == 0) {
     *vals = (int *)malloc(chunk_size * sizeof(int));
     *numvals = 0;
     *maxvals = chunk_size;
   }
 
-  /* grow memory */
+  // grow memory 
   else if (*numvals >= *maxvals) {
     *vals = (int *)realloc(*vals, 
 			       (chunk_size + *maxvals) * sizeof(int));
     *maxvals += chunk_size;
   }
 
-  /* add the element */
+  // add the element 
   (*vals)[*numvals] = val;
   (*numvals)++;
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  adds a float to a c-style vector of floats
-
-  val: value to be added
-  vals: pointer to dynamic array of values
-  numvals: pointer to number of values currently stored, updated by add_int
-  maxvals: pointer to number of values currently allocated
-  chunk_size: number of values to allocate at a time
-
-*/
+// --------------------------------------------------------------------------
+//
+//   adds a float to a c-style vector of floats
+//
+//   val: value to be added
+//   vals: pointer to dynamic array of values
+//   numvals: pointer to number of values currently stored, updated by add_int
+//   maxvals: pointer to number of values currently allocated
+//   chunk_size: number of values to allocate at a time
+//
+// 
 void add_float(float val, float **vals, int *numvals, int *maxvals, 
 	       int chunk_size) {
 
-  /* first time */
+  // first time 
   if (*maxvals == 0) {
     *vals = (float *)malloc(chunk_size * sizeof(float));
     *numvals = 0;
     *maxvals = chunk_size;
   }
 
-  /* grow memory */
+  // grow memory 
   else if (*numvals >= *maxvals) {
     *vals = (float *)realloc(*vals, 
 			       (chunk_size + *maxvals) * sizeof(float));
     *maxvals += chunk_size;
   }
 
-  /* add the element */
+  // add the element 
   (*vals)[*numvals] = val;
   (*numvals)++;
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  adds a point (array of 3 floats) to a c-style vector of x,y,z,x,y,z points
-
-  val: value to be added
-  vals: pointer to dynamic array of values
-  numvals: pointer to number of points currently stored, updated by add_int
-  maxvals: pointer to number of points currently allocated
-  chunk_size: number of points to allocate at a time
-
-*/
+// --------------------------------------------------------------------------
+//
+//   adds a point (array of 3 floats) to a c-style vector of x,y,z,x,y,z points
+//
+//   val: value to be added
+//   vals: pointer to dynamic array of values
+//   numvals: pointer to number of points currently stored, updated by add_int
+//   maxvals: pointer to number of points currently allocated
+//   chunk_size: number of points to allocate at a time
+//
+// 
 void add_pt(float *val, float **vals, int *numvals, int *maxvals, 
 	    int chunk_size) {
 
-  /* first time */
+  // first time 
   if (*maxvals == 0) {
     *vals = (float *)malloc(chunk_size * 3 * sizeof(float));
     *numvals = 0;
     *maxvals = chunk_size;
   }
 
-  /* grow memory */
+  // grow memory 
   else if (*numvals >= *maxvals) {
     *vals = (float *)realloc(*vals, 
 			       (chunk_size + *maxvals) * 3 * sizeof(float));
     *maxvals += chunk_size;
   }
 
-  /* add the element */
+  // add the element 
   (*vals)[3 * *numvals] = val[0];
   (*vals)[3 * *numvals + 1] = val[1];
   (*vals)[3 * *numvals + 2] = val[2];
   (*numvals)++;
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  adds a sent particle to a c-style vector of sent particles
-
-  val: sent particle to be added
-  vals: pointer to dynamic array of sent particles
-  numvals: pointer to number of values currently stored, updated by add_int
-  maxvals: pointer to number of values currently allocated
-  chunk_size: number of values to allocate at a time
-
-*/
+// --------------------------------------------------------------------------
+//
+//   adds a sent particle to a c-style vector of sent particles
+//
+//   val: sent particle to be added
+//   vals: pointer to dynamic array of sent particles
+//   numvals: pointer to number of values currently stored, updated by add_int
+//   maxvals: pointer to number of values currently allocated
+//   chunk_size: number of values to allocate at a time
+//
+// 
 void add_sent(struct sent_t val, struct sent_t **vals, int *numvals, 
 	      int *maxvals, int chunk_size) {
 
   int i;
 
-  /* first time */
+  // first time 
   if (*maxvals == 0) {
     *vals = (struct sent_t *)malloc(chunk_size * sizeof(struct sent_t));
     *numvals = 0;
     *maxvals = chunk_size;
   }
 
-  /* grow memory */
+  // grow memory 
   else if (*numvals >= *maxvals) {
     *vals = 
       (struct sent_t *)realloc(*vals, 
@@ -2663,7 +2635,7 @@ void add_sent(struct sent_t val, struct sent_t **vals, int *numvals,
     *maxvals += chunk_size;
   }
 
-  /* add the element */
+  // add the element 
   (*vals)[*numvals].particle = val.particle;
   (*vals)[*numvals].num_gbs = val.num_gbs;
   for (i = 0; i < MAX_NEIGHBORS; i++) {
@@ -2673,33 +2645,33 @@ void add_sent(struct sent_t val, struct sent_t **vals, int *numvals,
   (*numvals)++;
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  checks if an array of ints has been allocated large enough to access
-  a given index. If not, grows the array and initializes the empty ints
-
-  vals: pointer to dynamic array of ints
-  index: desired index to be accessed
-  numitems: pointer to number of items currently stored, ie, 
-    last subscript accessed + 1, updated by this function
-  maxitems: pointer to number of items currently allocated
-  chunk_size: minimum number of items to allocate at a time
-  init_val: initalization value for newly allocated items
-
-*/
+// --------------------------------------------------------------------------
+//
+//   checks if an array of ints has been allocated large enough to access
+//   a given index. If not, grows the array and initializes the empty ints
+//
+//   vals: pointer to dynamic array of ints
+//   index: desired index to be accessed
+//   numitems: pointer to number of items currently stored, ie, 
+//     last subscript accessed + 1, updated by this function
+//   maxitems: pointer to number of items currently allocated
+//   chunk_size: minimum number of items to allocate at a time
+//   init_val: initalization value for newly allocated items
+//
+// 
 void add_empty_int(int **vals, int index, int *numitems, int *maxitems, 
 		   int chunk_size, int init_val) {
 
   int i;
-  int alloc_chunk; /* max of chunk_size and chunk needed to get to the index */
+  int alloc_chunk; // max of chunk_size and chunk needed to get to the index 
 
-  /* first time */
+  // first time 
   if (*maxitems == 0) {
 
-    /* allocate */
+    // allocate 
     alloc_chunk = (index < chunk_size ? chunk_size : index + 1);
     *vals = (int *)malloc(alloc_chunk * sizeof(int));
-    /* init empty vals */
+    // init empty vals 
     for (i = 0; i < alloc_chunk; i++)
       (*vals)[i] = init_val;
 
@@ -2708,15 +2680,15 @@ void add_empty_int(int **vals, int index, int *numitems, int *maxitems,
 
   }
 
-  /* grow memory */
+  // grow memory 
   else if (index >= *maxitems) {
 
-    /* realloc */
+    // realloc 
     alloc_chunk = 
       (index < *maxitems + chunk_size ? chunk_size : index + 1 - *maxitems);
     *vals = (int *)realloc(*vals, (alloc_chunk + *maxitems) * sizeof(int));
 
-    /* init empty buckets */
+    // init empty buckets 
     for (i = *maxitems; i < *maxitems + alloc_chunk; i++)
       (*vals)[i] = init_val;
 
@@ -2727,25 +2699,25 @@ void add_empty_int(int **vals, int index, int *numitems, int *maxitems,
   (*numitems)++;
 
 }
-/*--------------------------------------------------------------------------*/
-/* 
-   checks whether the site of the cell is inside the bounds of
-   temporary cell (uses the original cells, not the complete cells, and
-   the double version of verts, not save_verts)
-
-   vblock: one voronoi block
-   cell: current cell counter
-   vert: current vertex counter
-
-   returns: 1 = site is inside cell bounds, 0 = site is outside cell bounds
- */
+// --------------------------------------------------------------------------
+//
+//    checks whether the site of the cell is inside the bounds of
+//    temporary cell (uses the original cells, not the complete cells, and
+//    the double version of verts, not save_verts)
+//
+//    vblock: one voronoi block
+//    cell: current cell counter
+//    vert: current vertex counter
+//
+//    returns: 1 = site is inside cell bounds, 0 = site is outside cell bounds
+//  
  int cell_bounds(struct vblock_t *vblock, int cell, int vert) {
 
   float cell_min[3], cell_max[3];
   int k;
 
-  /* get cell bounds */
-  for (k = 0; k < vblock->num_cell_verts[cell]; k++) { /* vertices */
+  // get cell bounds 
+  for (k = 0; k < vblock->num_cell_verts[cell]; k++) { // vertices 
 
     int v = vblock->cells[vert];
 	  
@@ -2766,9 +2738,9 @@ void add_empty_int(int **vals, int index, int *numitems, int *maxitems,
 
     vert++;
 
-  } /* vertices */
+  } // vertices 
 
-  /* check that site of cell is in the interior of the bounds (sanity) */
+  // check that site of cell is in the interior of the bounds (sanity) 
   if (vblock->sites[3 * cell] < cell_min[0] ||
       vblock->sites[3 * cell] > cell_max[0] ||
       vblock->sites[3 * cell + 1] < cell_min[1] ||
@@ -2791,49 +2763,50 @@ void add_empty_int(int **vals, int index, int *numitems, int *maxitems,
     return 1;
 
 } 
-/*--------------------------------------------------------------------------*/
-/* 
-   for all tets, determines local, and records the necessary 
-   information in vblock
-  
-   tet_verts: vertices of the tetrahedra in the block
-   num_tets: number of tets in this block
-   vblock: local block
-   gids: global block ids of owners of received particles in each of my blocks
-   nids: native particle ids of received particles in each of my blocks
-   dirs: wrapping directions of received particles in each of my blocks
-   rics: is complete status of received particles
-   lid: local id of this block
-   num_recv: number of received particles
-*/
+// --------------------------------------------------------------------------
+//
+//    for all tets, determines local, and records the necessary 
+//    information in vblock
+//  
+//    tet_verts: vertices of the tetrahedra in the block
+//    num_tets: number of tets in this block
+//    vblock: local block
+//    gids: global block ids of owners of received particles in each of 
+//      my blocks
+//    nids: native particle ids of received particles in each of my blocks
+//    dirs: wrapping directions of received particles in each of my blocks
+//    rics: is complete status of received particles
+//    lid: local id of this block
+//    num_recv: number of received particles
+// 
 void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 	      int *gids, int *nids, unsigned char *dirs,
 	      struct remote_ic_t *rics, int lid, int num_recvd) {
 
-  int v; /* vertex in current tet (0, 1, 2, 3) */
-  int t; /* current tet */
-  int n = 0; /* number of vertices in strictly local final tets */
-  int m = 0; /* number of vertices in non strictly local final tets */
+  int v; // vertex in current tet (0, 1, 2, 3) 
+  int t; // current tet 
+  int n = 0; // number of vertices in strictly local final tets 
+  int m = 0; // number of vertices in non strictly local final tets 
   int i;
 
-  /* todo: static allocation wasteful; we don't know how many tets
-     are local and how many are remote; use add_int to groew arrays instead */
+  // todo: static allocation wasteful; we don't know how many tets
+  // are local and how many are remote; use add_int to groew arrays instead 
   vblock->loc_tets = (int *)malloc(num_tets * 4 * sizeof(int));
   vblock->rem_tet_gids = (int *)malloc(num_tets * 4 * sizeof(int));
   vblock->rem_tet_nids = (int *)malloc(num_tets * 4 * sizeof(int));
   vblock->rem_tet_wrap_dirs = (unsigned char *)malloc(num_tets * 4);
 
-  /* for all tets */
+  // for all tets 
   for (t = 0; t < num_tets; t++) {
 
-    /* test whether tet is strictly local (all vertices are local) or not */
+    // test whether tet is strictly local (all vertices are local) or not 
     for (v = 0; v < 4; v++) {
       if (tet_verts[t * 4 + v] >= vblock->num_orig_particles)
         break;
     }
 
-    if (v == 4) { /* local, store it */
-      /* filter out tets that touch local incomplete voronoi cells */
+    if (v == 4) { // local, store it 
+      // filter out tets that touch local incomplete voronoi cells 
       int v1;
       for (v1 = 0; v1 < 4; v1++) {
 	if (!vblock->is_complete[tet_verts[t * 4 + v1]])
@@ -2846,16 +2819,16 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
       }
     }
 
-    /* not strictly local, at least one vertex is remote, and at least one
-       vertex is local */
+    // not strictly local, at least one vertex is remote, and at least one
+    //    vertex is local 
     else if (tet_verts[t * 4 + 0] < vblock->num_orig_particles ||
 	     tet_verts[t * 4 + 1] < vblock->num_orig_particles ||
 	     tet_verts[t * 4 + 2] < vblock->num_orig_particles ||
 	     tet_verts[t * 4 + 3] < vblock->num_orig_particles) {
 
-      /* decide whether I should own this tet, owner will be minimum
-	 block gid of all contributors to this tet */
-      int sort_gids[4]; /* gids of 4 vertices */
+      // decide whether I should own this tet, owner will be minimum
+      // block gid of all contributors to this tet 
+      int sort_gids[4]; // gids of 4 vertices 
       for (v = 0; v < 4; v++) {
 	if (tet_verts[t * 4 + v] < vblock->num_orig_particles)
 	  sort_gids[v] = DIY_Gid(0, lid);
@@ -2865,22 +2838,22 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
       }
       qsort(sort_gids, 4, sizeof(int), &compare);
 
-      /* I will own the tet */
+      // I will own the tet 
       if (sort_gids[0] == DIY_Gid(0, lid)) {
 
-	/* filter out tets that touch local incomplete voronoi cells */
+	// filter out tets that touch local incomplete voronoi cells 
 	for (v = 0; v < 4; v++) {
 
-	  /* if this vertex is local, check its completion status */
+	  // if this vertex is local, check its completion status 
 	  if (tet_verts[t * 4 + v] < vblock->num_orig_particles &&
 	      !vblock->is_complete[tet_verts[t * 4 + v]])
 	    break;
 
-	  /* if this vertex is remote, check its completion status */
+	  // if this vertex is remote, check its completion status 
 	  if (tet_verts[t * 4 + v] >= vblock->num_orig_particles) {
 
-	    /* find the correct entry in the completion status
-	       todo: linear search for now, accelerate later */
+	    // find the correct entry in the completion status
+	    //    todo: linear search for now, accelerate later 
 	    for (i = 0; i < num_recvd; i++) {
 	      if (rics[i].gid ==
 		  gids[tet_verts[t * 4 + v] - vblock->num_orig_particles] &&
@@ -2888,83 +2861,78 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 		  nids[tet_verts[t * 4 + v] - vblock->num_orig_particles])
 		break;
 	    }
-	    assert(i < num_recvd); /* sanity */
+	    assert(i < num_recvd); // sanity 
 	    if (!rics[i].is_complete)
 	      break;
-	  } /* if vertex is remote */
 
-	} /* for four vertices */
+	  } // if vertex is remote 
 
-	if (v == 4) { /* complete */
+	} // for four vertices 
+
+	if (v == 4) { // complete 
 
 	  int v1;
-	  /* save four remote verts */
+	  // save four remote verts 
 	  for (v1 = 0; v1 < 4; v1++) {
 
-	    /* this vertex is local */
+	    // this vertex is local 
 	    if (tet_verts[t * 4 + v1] < vblock->num_orig_particles) {
 	      vblock->rem_tet_gids[m] = DIY_Gid(0, lid);
 	      vblock->rem_tet_nids[m] = tet_verts[t * 4 + v1];
 	      vblock->rem_tet_wrap_dirs[m] = 0x00;
 	    }
-	    /* this vertex is remote */
+	    // this vertex is remote 
 	    else {
-	      /* need to subtract number of original (local) particles
-		 from vertex to index into gids and nids;
-		 they are only for remote particles but tet verts
-		 are for all particles, local + remote */
+	      // need to subtract number of original (local) particles
+	      // from vertex to index into gids and nids;
+	      // they are only for remote particles but tet verts
+	      // are for all particles, local + remote 
 	      vblock->rem_tet_gids[m] =
 		gids[tet_verts[t * 4 + v1] - vblock->num_orig_particles];
 	      vblock->rem_tet_nids[m] =
 		nids[tet_verts[t * 4 + v1] - vblock->num_orig_particles];
 	      vblock->rem_tet_wrap_dirs[m] =
 		dirs[tet_verts[t * 4 + v1] - vblock->num_orig_particles];
-
-	      /* debug */
-/* 	      fprintf(stderr, "gid %d nid %d dir %0x\n",  */
-/* 		      vblock->rem_tet_gids[m], vblock->rem_tet_nids[m], */
-/* 		      vblock->rem_tet_wrap_dirs[m]); */
-
 	    }
 
 	    m++;
 
-	  } /* same four remote verts */
+	  } // same four remote verts 
 
-	} /* complete */
+	} // complete 
 
-      } /* I will own this tet */
+      } // I will own this tet 
 
-    } /* not strictly local */
+    } // not strictly local 
 
-  } /* for all tets */
+  } // for all tets 
 
-  /* store quantities of local and nonlocal tets */
+  // store quantities of local and nonlocal tets 
   vblock->num_loc_tets = n / 4;
   vblock->num_rem_tets = m / 4;
 
 }
-/*--------------------------------------------------------------------------*/
-/*
- writes particles to a file in interleaved x,y,z order
- no other block information is retained, all particles get sqaushed together
-
- nblocks: locaal number of blocks
- particles: particles in each local block
- num_particles: number of particles in each local block
- outfile: output file name
-*/
+// --------------------------------------------------------------------------
+//
+//  writes particles to a file in interleaved x,y,z order
+//  no other block information is retained, all particles get sqaushed together
+//
+//  nblocks: locaal number of blocks
+//  particles: particles in each local block
+//  num_particles: number of particles in each local block
+//  outfile: output file name
+// 
 void write_particles(int nblocks, float **particles, int *num_particles, 
 		     char *outfile) {
 
   int i;
-  float *all_particles; /* particles from all local blocks merged */
-  MPI_Offset my_size; /* size of my particles */
-  MPI_Offset ofst; /* offset in file where I write my particles */
+  float *all_particles; // particles from all local blocks merged 
+  MPI_Offset my_size; // size of my particles 
+  MPI_Offset ofst; // offset in file where I write my particles 
   MPI_File fd;
   MPI_Status status;
 
-  /* merge all blocks together into one */
+  // merge all blocks together into one 
   int tot_particles = 0;
   for (i = 0; i < nblocks; i++)
     tot_particles += num_particles[i];
@@ -2976,39 +2944,39 @@ void write_particles(int nblocks, float **particles, int *num_particles,
     n += num_particles[i] * 3;
   }
 
-  /* compute my offset */
+  // compute my offset 
   my_size = tot_particles * 3 * sizeof(float);
-  /* in MPI 2.2, should use MPI_OFFSET datatype, but
-     using MPI_LONG_LONG for backwards portability */
+  // in MPI 2.2, should use MPI_OFFSET datatype, but
+  //    using MPI_LONG_LONG for backwards portability 
   MPI_Exscan(&my_size, &ofst, 1, MPI_LONG_LONG, MPI_SUM, comm);
   int rank;
   MPI_Comm_rank(comm, &rank);
   if (rank == 0)
     ofst = 0;
 
-  /* open */
+  // open 
   int retval = MPI_File_open(comm, (char *)outfile,
 			     MPI_MODE_WRONLY | MPI_MODE_CREATE,
 			     MPI_INFO_NULL, &fd);
   assert(retval == MPI_SUCCESS);
   MPI_File_set_size(fd, 0); // start with an empty file every time
 
-  /* write */
+  // write 
   retval = MPI_File_write_at_all(fd, ofst, all_particles, tot_particles * 3, 
 				 MPI_FLOAT, &status);
   if (retval != MPI_SUCCESS)
     handle_error(retval, comm, (char *)"MPI_File_write_at_all");
 
-  /* cleanup */
+  // cleanup 
   free(all_particles);
   MPI_File_close(&fd);
 
 }
-/*--------------------------------------------------------------------------*/
-/*
-  MPI error handler
-  decodes and prints MPI error messages
-*/
+// --------------------------------------------------------------------------
+//
+//   MPI error handler
+//   decodes and prints MPI error messages
+// 
 void handle_error(int errcode, MPI_Comm comm, char *str) {
 
   char msg[MPI_MAX_ERROR_STRING];
@@ -3018,18 +2986,17 @@ void handle_error(int errcode, MPI_Comm comm, char *str) {
   MPI_Abort(comm, 1);
 
 }
-/*--------------------------------------------------------------------------*/
-/* CLP
-  creates and initializes walls
-
-  walls: pointer to array of walls
-   
-  Important!  [a,b,c] must be a unit length vector!
-
-*/
-
-/* allocate blocks and headers */
-
+// --------------------------------------------------------------------------
+// CLP
+//   creates and initializes walls
+//
+//   walls: pointer to array of walls
+//   
+//   Important!  [a,b,c] must be a unit length vector!
+//
+//    allocate blocks and headers
+//
+// 
 void create_walls(int *num_walls, struct wall_t **walls) {
 
   (*num_walls) = 6;
@@ -3071,54 +3038,49 @@ void create_walls(int *num_walls, struct wall_t **walls) {
   (*walls)[5].c = 0;
   (*walls)[5].d = data_maxs[0];
   
-  
 }
-/*---------------------------------------------------------------------------*/
-/* CLP
-  frees walls
-
-  num_walls: number of walls
-  walls: array of walls
-*/
+// ---------------------------------------------------------------------------
+// CLP
+//   frees walls
+//
+//   num_walls: number of walls
+//   walls: array of walls
+// 
 void destroy_walls(int num_walls, struct wall_t *walls) {
 
-  if (num_walls) {
+  if (num_walls)
     free(walls);
-    //fprintf(stderr, "freed walls\n");
-  }
 
 }
-/*---------------------------------------------------------------------------*/
-/* CLP
-  determines if point is inside or outside wall
-  http://mathworld.wolfram.com/Plane.html Equation (24) 
-  Signed point-plane distance, ignoring positive denominator
-  pt: point
-  wall: wall
-*/
+// ---------------------------------------------------------------------------
+// CLP
+//   determines if point is inside or outside wall
+//   http://mathworld.wolfram.com/Plane.html Equation (24) 
+//   Signed point-plane distance, ignoring positive denominator
+//   pt: point
+//   wall: wall
+// 
 int test_outside(const float *pt,const struct wall_t *wall) {
 
   float D = pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + wall->d;
   if (D > 0)
     return 0;
-  else {
-    // fprintf(stderr, "Out of Bounds (%f,%f,%f)\n",pt[0],pt[1],pt[2]);
+  else 
     return 1;
-  }
 
 }
-/*---------------------------------------------------------------------------*/
-/* CLP
-  returns point reflected across wall
-  http://mathworld.wolfram.com/Plane.html Equation (24) 
-  Signed point-plane distance, including denominator
-  rpt
-  pt: site-point
-  wall: wall
-*/
+// ---------------------------------------------------------------------------
+// CLP
+//   returns point reflected across wall
+//   http://mathworld.wolfram.com/Plane.html Equation (24) 
+//   Signed point-plane distance, including denominator
+//   rpt
+//   pt: site-point
+//   wall: wall
+// 
 void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall) {
 
-  /*signed distance from wall to site point */
+  // signed distance from wall to site point 
   float D = (pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + 
 	     wall->d)/sqrt(wall->a*wall->a + wall->b*wall->b + 
 			   wall->c*wall->c);
@@ -3128,10 +3090,10 @@ void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall) {
   rpt[2] = pt[2] - 2*D*wall->c;
 
 }
-/*---------------------------------------------------------------------------*/
-/* CLP
- Adds mirror particles to list
-*/
+// ---------------------------------------------------------------------------
+// CLP
+//  Adds mirror particles to list
+// 
 void add_mirror_particles(int nblocks, float **mirror_particles, 
 			  int *num_mirror_particles, float **particles,
 			  int *num_particles, int *num_orig_particles,
@@ -3139,12 +3101,8 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
 
   int i,j;
     
-  /* copy mirror particles to particles */
+  // copy mirror particles to particles 
   for (i = 0; i < nblocks; i++) {
-
-    /* debug */
-/*     fprintf(stderr, "num_particles in gid %d before exchange is %d\n", */
-/* 	    DIY_Gid(0, i), num_particles[i]); */
 
     int n = (num_particles[i] - num_orig_particles[i]);
     int new_remote_particles = num_mirror_particles[i] + n;
@@ -3154,13 +3112,13 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
     dirs[i] = (unsigned char *)realloc(dirs[i], new_remote_particles);
     if (num_mirror_particles[i]) {
 
-      /* grow space */
+      // grow space 
       particles[i] = 
 	(float *)realloc(particles[i], 
 			 (num_particles[i] + num_mirror_particles[i]) *
 			 3 * sizeof(float));
 
-      /* copy mirror particles */
+      // copy mirror particles 
       for (j = 0; j < num_mirror_particles[i]; j++) {
 
             particles[i][3 * num_particles[i]] = mirror_particles[i][3*j];
@@ -3173,11 +3131,11 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
             num_particles[i]++;
             n++;
 
-      } /* copy mirror particles */
+      } // copy mirror particles 
 
-    } /* if num_mirror_particles */
+    } // if num_mirror_particles 
 
   }
 
 }
-/*---------------------------------------------------------------------------*/
+// ---------------------------------------------------------------------------
