@@ -129,6 +129,9 @@ void transform_particle(char *p, unsigned char wrap_dir);
 void delaunay(int num_blocks, struct vblock_t *vblocks);
 void neigh_cells(struct vblock_t *vblock, int cell, int face, int cur_vert);
 int compare(const void *a, const void *b);
+#ifdef __cplusplus
+extern "C"
+#endif
 void add_int(int val, int **vals, int *numvals, int *maxvals, int chunk_size);
 void add_float(float val, float **vals, int *numvals, int *maxvals, 
 	       int chunk_size);

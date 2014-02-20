@@ -1,7 +1,7 @@
 if			(use_cgal)
-    add_library		(tess tess.c tess-cgal.cpp io.c swap.cpp)
+    add_library		(tess tess.cpp tess-cgal.cpp io.c swap.cpp)
 else			(use_cgal)
-    add_library		(tess tess.c tess-qhull.c io.c swap.cpp)
+    add_library		(tess tess.cpp tess-qhull.c io.c swap.cpp)
 endif			(use_cgal)
 
 if			(draw)
