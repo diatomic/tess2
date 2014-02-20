@@ -10,7 +10,7 @@
 # See COPYRIGHT in top-level directory.
 #
 #----------------------------------------------------------------------------
-TESS = $(HOME)/tess-qhull
+TESS = $(HOME)/tess
 #TESS = $(HOME)/tess-cgal-install
 
 include ../user_defs.mk

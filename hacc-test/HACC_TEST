@@ -28,7 +28,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=1
+num_procs=32
 
 # procs per node
 ppn=8 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
@@ -55,12 +55,15 @@ maxv=-1.0
 # wrapped neighbors 0 or 1
 wrap=0
 
+# redistribution blocking factor (1 1 1 if not used)
+bf="2 2 1"
+
 #------
 #
 # program arguments
 #
 
-args="$infile $outfile $minv $maxv $wrap"
+args="$infile $outfile $minv $maxv $wrap $bf"
 
 #------
 #
