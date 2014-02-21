@@ -294,8 +294,10 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
 	  vblock->faces[num_faces].verts[num_verts++] = 0;
 	  seen_infinite = true;
 	}
-      } else
+      } else {
+	assert(num_verts < MAX_FACE_VERTS);
 	vblock->faces[num_faces].verts[num_verts++] = tet_indices[cur];
+      }
       ++cur;
     } while (cur != begin);
     vblock->faces[num_faces].num_verts = num_verts;

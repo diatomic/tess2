@@ -1487,8 +1487,6 @@ void save_headers(int nblocks, struct vblock_t *vblocks, int **hdrs) {
     hdrs[i][NUM_VERTS] = vblocks[i].num_verts;
     hdrs[i][TOT_NUM_CELL_VERTS] = vblocks[i].tot_num_cell_verts;
     hdrs[i][NUM_COMPLETE_CELLS] = vblocks[i].num_complete_cells;
-//     hdrs[i][TOT_NUM_CELL_FACES] = vblocks[i].tot_num_cell_faces; 
-//     hdrs[i][TOT_NUM_FACE_VERTS] = vblocks[i].tot_num_face_verts; 
     hdrs[i][NUM_ORIG_PARTICLES] = vblocks[i].num_orig_particles;
     hdrs[i][NUM_LOC_TETS] = vblocks[i].num_loc_tets;
     hdrs[i][NUM_REM_TETS] = vblocks[i].num_rem_tets;
