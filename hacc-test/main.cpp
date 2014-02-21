@@ -28,11 +28,12 @@
 using namespace std;
 
 void GetArgs(int argc, char **argv, char *infile, char *outfile,
-	     float *minvol, float *maxvol, int *wrap, int *bf);
+	     float *minvol, float *maxvol, int *wrap, int *bf, 
+	     int *sample_rate);
 void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
 	     int* &gids, float** &particles, int* &num_particles, bb_t* &bb, 
 	     int&tot_blocks, int& nblocks, float *data_mins, float *data_maxs,
-	     int *block_dims);
+	     int *block_dims, int sample_rate);
 void Redistribute(int *bf, int* &gids, 
 		  float** &particles, int* &num_particles, bb_t* &bb, 
 		  int& tot_blocks, int& nblocks, MPI_Comm comm);
@@ -61,12 +62,14 @@ int main(int argc, char *argv[]) {
   int wrap; // whether wraparound neighbors are used
   int rank, groupsize; // MPI usual
   int bf[3]; // redistribution blocking factor
+  int sample_rate; // sample rate
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &groupsize);
 
-  GetArgs(argc, argv, infile, outfile, &minvol, &maxvol, &wrap, bf);
+  GetArgs(argc, argv, infile, outfile, &minvol, &maxvol, &wrap, bf, 
+	  &sample_rate);
 
   // following are allocated by ReadGIO
   int *gids; // local block gids
@@ -88,7 +91,8 @@ int main(int argc, char *argv[]) {
 
   // read generic I/O data
   ReadGIO(reader, rank, groupsize, gids, particles, num_particles, bb, 
-	  tot_blocks, nblocks, data_mins, data_maxs, block_dims);
+	  tot_blocks, nblocks, data_mins, data_maxs, block_dims,
+	  sample_rate);
 
   // check that bf is valid and that bf, tot_blocks, and groupsize agree
   assert(bf[0] > 0 && bf[1] > 0 && bf[2] > 0); // 0's not allowed
@@ -152,9 +156,10 @@ int main(int argc, char *argv[]) {
 // gets command line args
 //
 void GetArgs(int argc, char **argv, char *infile, char *outfile,
-	     float *minvol, float *maxvol, int *wrap, int *bf) {
+	     float *minvol, float *maxvol, int *wrap, int *bf, 
+	     int *sample_rate) {
 
-  assert(argc >= 9);
+  assert(argc >= 10);
 
   strcpy(infile, argv[1]);
   if (argv[2][0] == '!')
@@ -167,6 +172,7 @@ void GetArgs(int argc, char **argv, char *infile, char *outfile,
   bf[0] = atoi(argv[6]);
   bf[1] = atoi(argv[7]);
   bf[2] = atoi(argv[8]);
+  *sample_rate = atoi(argv[9]);
 
 }
 //----------------------------------------------------------------------------
@@ -185,11 +191,12 @@ void GetArgs(int argc, char **argv, char *infile, char *outfile,
 // data_mins: physical global data minimum (output)
 // data_maxs: physical global data maximum (output)
 // block_dims: global number of blocks in each cimension (output)
+// sample_rate: 1 out of every sample_rate particles will be kept
 //
 void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
 	     int* &gids, float** &particles, int* &num_particles, bb_t* &bb, 
 	     int& tot_blocks, int& nblocks, float *data_mins, float *data_maxs,
-	     int *block_dims) {
+	     int *block_dims, int sample_rate) {
 
   double min[3], max[3]; // local block bounds
 
@@ -270,11 +277,12 @@ void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
     reader->ReadBlock(gids[b]);
 
     // package particles
+    num_particles[b] /= sample_rate;
     particles[b] = (float *)malloc(num_particles[b] * 3 * sizeof(float));
     for (int i = 0; i < num_particles[b]; i++) {
-      particles[b][3 * i]     = x[i];
-      particles[b][3 * i + 1] = y[i];
-      particles[b][3 * i + 2] = z[i];
+      particles[b][3 * i]     = x[i * sample_rate];
+      particles[b][3 * i + 1] = y[i * sample_rate];
+      particles[b][3 * i + 2] = z[i * sample_rate];
     }
 
     // cleanup temporary points
