@@ -23,6 +23,9 @@
 #include <unistd.h>
 #include <sys/resource.h>
 
+#include <vector>
+#include <tet.h>
+
 static int dim = 3; // everything 3D 
 static float data_mins[3], data_maxs[3]; // extents of overall domain 
 MPI_Comm comm; // MPI communicator 
@@ -289,8 +292,10 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   times[LOCAL_TIME] = MPI_Wtime();
 #endif
 
-  // create local voronoi cells 
-  local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
+  // create local voronoi cells
+  std::vector<tet_t*>	tets(nblocks);
+  std::vector<int>	ntets(nblocks);
+  local_cells(nblocks, tblocks, dim, num_particles, particles, ds, &tets[0], &ntets[0]);
   
   #ifdef TIMING
   MPI_Barrier(comm);
@@ -370,10 +375,12 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   reset_blocks(nblocks, vblocks);
   create_blocks(nblocks, &tblocks, NULL); // temporary 
 
+  // Clean-up tets; local_cells() will refill them
+  for(int i = 0; i < nblocks; ++i)
+    free(tets[i]);
+
   // Recompute local cells
-  // TODO: here an later it's wasteful to recompute everything from scratch;
-  // it would be wiser to just insert new points. Current limitation: qhull 
-  local_cells(nblocks, tblocks, dim, num_particles, particles, ds);
+  local_cells(nblocks, tblocks, dim, num_particles, particles, ds, &tets[0], &ntets[0]);
 
 #ifdef MEMORY
   getrusage(RUSAGE_SELF, &r_usage);
@@ -468,9 +475,13 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "10: done\n");
 #endif
 
+  // Clean-up tets; all_cells() will refill them
+  for(int i = 0; i < nblocks; ++i)
+    free(tets[i]);
+
   // create all final voronoi cells 
   all_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
-	    particles, gids, nids, dirs, times, ds);
+	    particles, gids, nids, dirs, times, ds, &tets[0], &ntets[0]);
 
 #ifdef MEMORY
   getrusage(RUSAGE_SELF, &r_usage);
@@ -564,6 +575,10 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   destroy_blocks(nblocks, vblocks, hdrs);
   free(num_orig_particles);
   
+  // clenaup tets
+  for(int i = 0; i < nblocks; ++i)
+    free(tets[i]);
+
 #ifdef MEMORY
   getrusage(RUSAGE_SELF, &r_usage);
   fprintf(stderr, "15: max memory = %ld MB, current memory in dashboard\n", 

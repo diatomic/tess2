@@ -10,9 +10,9 @@ void fill_circumcenters(std::vector<float>& circumcenters, tet_t* tets, int num_
     circumcenter(&circumcenters[3*i], &tets[i], particles);
 }
 
-float volume(int v, int* vertex_tets, tet_t* tets, int num_tets, float* particles, const std::vector<float>& circumcenters)
+float volume(int v, int* verts_to_tets, tet_t* tets, int num_tets, float* particles, const std::vector<float>& circumcenters)
 {
-  int vt = vertex_tets[v];
+  int vt = verts_to_tets[v];
 
   std::vector< std::pair<int, int> >	nbrs;
   bool finite = neighbor_edges(nbrs, v, tets, vt);

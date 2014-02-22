@@ -11,22 +11,22 @@ struct tet_t {
 #ifdef __cplusplus
 extern "C"
 #endif
-int find(tet_t* tet, int v);
+int find(struct tet_t* tet, int v);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-void circumcenter(float* c, tet_t* tet, float* particles);
+void circumcenter(float* c, struct tet_t* tet, float* particles);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-int circulate_start(tet_t* tets, int t, int x, int y);
+int circulate_start(struct tet_t* tets, int t, int x, int y);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-void circulate_next(int* next_t, int* next_v, tet_t* tets, int t, int v, int x, int y);
+void circulate_next(int* next_t, int* next_v, struct tet_t* tets, int t, int v, int x, int y);
 
 #ifdef __cplusplus
 extern "C"

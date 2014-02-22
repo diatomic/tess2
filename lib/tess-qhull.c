@@ -28,7 +28,8 @@ void clean_delaunay_data_strucutres(void* ds) {
   ds: the delaunay data structures; unused in qhull
 */
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
-		 int *num_particles, float **particles, void* ds) {
+		 int *num_particles, float **particles, void* ds,
+		 struct tet_t** tets, int* ntets) {
 
   boolT ismalloc = False;    /* True if qhull should free points in
 				qh_freeqhull() or reallocation */
@@ -45,6 +46,11 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
+
+    // This obviously needs to be fixed; for now it's a fakeout to allow for
+    // free() upstream
+    tets[i]  = NULL;
+    ntets[i] = 0;
 
     /* fprintf(stderr, "Num particles (local): %d\n", num_particles[i]); */
 
@@ -116,7 +122,8 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 		int *num_particles, int *num_orig_particles, 
 		float **particles, int **gids, int **nids, 
-		unsigned char **dirs, double *times, void* ds) {
+		unsigned char **dirs, double *times, void* ds,
+		struct tet_t** tets, int* ntets) {
 
   boolT ismalloc = False;    /* True if qhull should free points in
 				qh_freeqhull() or reallocation */
@@ -149,6 +156,11 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
     
+    // This obviously needs to be fixed; for now it's a fakeout to allow for
+    // free() upstream
+    tets[i]  = NULL;
+    ntets[i] = 0;
+
     /* number of received particles */
     num_recvd = num_particles[i] - num_orig_particles[i];
 

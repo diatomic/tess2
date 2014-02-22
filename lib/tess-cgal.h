@@ -1,12 +1,17 @@
 #include <CGAL/Exact_predicates_exact_constructions_kernel.h>
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Triangulation_vertex_base_with_info_3.h>
+#include <CGAL/Triangulation_cell_base_with_info_3.h>
 #include <CGAL/Delaunay_triangulation_3.h>
+
+#include "tet.h"
+#include <vector>
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 
 typedef CGAL::Triangulation_vertex_base_with_info_3<unsigned, K>    Vb;
-typedef CGAL::Triangulation_data_structure_3<Vb>                    Tds;
+typedef CGAL::Triangulation_cell_base_with_info_3<int, K>	    Cb;
+typedef CGAL::Triangulation_data_structure_3<Vb,Cb>                 Tds;
 //Use the Fast_location tag. Default or Compact_location works too.
 //typedef CGAL::Delaunay_triangulation_3<K, Tds, CGAL::Fast_location> Delaunay3D;
 typedef CGAL::Delaunay_triangulation_3<K, Tds>	    Delaunay3D;
@@ -20,6 +25,7 @@ typedef Delaunay3D::Finite_vertices_iterator        Vertex_iterator;
 typedef Delaunay3D::Finite_edges_iterator           Edge_iterator;
 typedef Delaunay3D::Finite_facets_iterator          Facet_iterator;
 typedef Delaunay3D::Finite_cells_iterator           Cell_iterator;
+typedef Delaunay3D::All_cells_iterator		    All_cell_iterator;
 typedef Delaunay3D::Cell_circulator                 Cell_circulator;
 typedef Delaunay3D::Facet_circulator                Facet_circulator;
 
@@ -28,3 +34,5 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
 		       int num_particles);
 int gen_delaunay_output(Delaunay3D &Dt, int **tet_verts);
 void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles);
+
+void gen_tets(Delaunay3D& Dt, tet_t* tets);

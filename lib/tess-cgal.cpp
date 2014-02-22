@@ -31,7 +31,8 @@ void clean_delaunay_data_strucutres(void* ds)
 //   ds: the delaunay data structures
 //
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
-		 int *num_particles, float **particles, void* ds) {
+		 int *num_particles, float **particles, void* ds,
+		 tet_t** tets, int* ntets) {
 
   int i,j;
 
@@ -44,6 +45,11 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
     construct_delaunay(Dt, num_particles[i], particles[i]);
     total += num_particles[i];
     // std::cout << "Num particles (local): " << num_particles[i] << std::endl;
+
+    // fill the tets
+    ntets[i] = Dt.number_of_finite_cells();
+    tets[i]  = (tet_t*) malloc(sizeof(tet_t)*ntets[i]);
+    gen_tets(Dt, tets[i]);
 
     /* allocate number of verts for original particles */
     tblocks[i].num_cell_verts = (int *)malloc(sizeof(int) * num_particles[i]);
@@ -87,7 +93,7 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 	       int *num_particles, int *num_orig_particles, 
 	       float **particles, int **gids, int **nids, 
 	       unsigned char **dirs, double *times,
-	       void* ds) {
+	       void* ds,tet_t** tets, int* ntets) {
 
   int num_recvd; // number of received particles in current block
   int i,j;
@@ -116,6 +122,11 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
     construct_delaunay(Dt, num_particles[i], particles[i]);
     // std::cout << "Num particles (orig): " << num_particles[i] << std::endl;
     total += num_particles[i];
+
+    // fill the tets
+    ntets[i] = Dt.number_of_finite_cells();
+    tets[i]  = (tet_t*) malloc(sizeof(tet_t)*ntets[i]);
+    gen_tets(Dt, tets[i]);
 
     /* allocate number of verts for original particles */
     vblocks[i].num_cell_verts = (int *)malloc(sizeof(int) * num_particles[i]);
@@ -369,3 +380,34 @@ void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
 #endif
 }
 //----------------------------------------------------------------------------
+//
+// Convert Delaunay3D to a vector of tets
+//
+void gen_tets(Delaunay3D& Dt, tet_t* tets)
+{
+  // Initialize all cell info to -1 (infinite cells will keep -1)
+  for(All_cell_iterator cit = Dt.all_cells_begin();
+			cit != Dt.all_cells_end(); ++cit)
+    cit->info() = -1;
+  
+  // Record tet vertices (and indices in info())
+  int idx = 0;
+  for(Cell_iterator cit = Dt.finite_cells_begin();
+		    cit != Dt.finite_cells_end(); ++cit)
+  {
+    cit->info() = idx;		// record indices in cells' info()
+    for (int i = 0; i < 4; ++i)
+      tets[idx].verts[i] = cit->vertex(i)->info();
+    ++idx;
+  }
+  
+  // Record tet adjacency information
+  idx = 0;
+  for(Cell_iterator cit = Dt.finite_cells_begin();
+		    cit != Dt.finite_cells_end(); ++cit)
+  {
+    for (int i = 0; i < 4; ++i)
+      tets[idx].tets[i] = cit->neighbor(i)->info();
+    ++idx;
+  }
+}

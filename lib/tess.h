@@ -20,6 +20,7 @@
 #include "voronoi.h"
 #include "swap.hpp"
 #include "diy.h"
+#include "tet.h"
 
 extern MPI_Comm comm; /* MPI communicator */
 
@@ -84,7 +85,8 @@ extern "C"
 void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 	       int *num_particles, int *num_orig_particles, 
 	       float **particles, int **gids, int **nids, 
-	       unsigned char **dirs, double *times, void* ds);
+	       unsigned char **dirs, double *times, void* ds,
+	       struct tet_t** tets, int* ntets);
 #ifdef __cplusplus
 extern "C"
 #endif
@@ -94,7 +96,8 @@ void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs);
 extern "C"
 #endif
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
-		 int *num_particles, float **particles, void* ds);
+		 int *num_particles, float **particles, void* ds,
+		 struct tet_t** tets, int* ntets);
 #ifdef __cplusplus
 extern "C"
 #endif
