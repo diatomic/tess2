@@ -15,7 +15,7 @@ float volume(int v, int* vertex_tets, tet_t* tets, int num_tets, float* particle
   int vt = vertex_tets[v];
 
   std::vector< std::pair<int, int> >	nbrs;
-  bool finite = neighbors(nbrs, v, tets, vt);
+  bool finite = neighbor_edges(nbrs, v, tets, vt);
 
   if (!finite)
     return -1;	    // don't compute infinite volumes

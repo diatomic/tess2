@@ -156,14 +156,13 @@ void circulate_next(int* next_t, int* next_v, tet_t* tets, int t, int v, int x, 
  * that conain edge (v,u)
  *
  * nbrs:    vector of pairs (u, ut)
- * tets:    array of all tetrahedra
  * v:	    vertex
  * tets:    array of all tetrahedra
  * t:	    tet that contains v
  *
- * returns whether the cell is finite
+ * returns whether the Voronoi cell is finite
  */
-bool neighbors(std::vector< std::pair<int, int> >& nbrs,
+bool neighbor_edges(std::vector< std::pair<int, int> >& nbrs,
 	       int	    v,
 	       tet_t*	    tets,
 	       int	    t
@@ -208,6 +207,55 @@ bool neighbors(std::vector< std::pair<int, int> >& nbrs,
 	  visited_verts.insert(u);
 	  nbrs.push_back(std::make_pair(u,t));
 	}
+	int next = tets[t].tets[i];
+	if (next == -1)
+	  finite = false;
+	else
+	  q.push(next);
+      }
+    }
+  }
+
+  return finite;
+}
+
+/**
+ * fills a vector with tetrahedra that contain the given vertex
+ *
+ * nbrs:    vector to be filled with tet indices
+ * v:	    vertex
+ * tets:    array of all tetrahedra
+ * t:	    tet that contains v
+ *
+ * returns whether the Voronoi cell is finite
+ */
+bool neighbor_tets(std::vector<int>& nbrs,
+		   int	    v,
+		   tet_t*   tets,
+		   int	    t
+		  )
+{
+  bool finite = true;
+  std::queue<int>   q;
+  std::set<int>	    visited_tets;
+  q.push(t);
+
+  // BFS in the star of v
+  while (!q.empty())
+  {
+    int t = q.front();
+    q.pop();
+
+    // already visited, continue
+    if (visited_tets.find(t) != visited_tets.end())
+      continue;
+    visited_tets.insert(t);
+    nbrs.push_back(t);
+
+    // queue neighbors
+    for (int i = 0; i < 4; ++i) {
+      int u = tets[t].verts[i];
+      if (u != v) {
 	int next = tets[t].tets[i];
 	if (next == -1)
 	  finite = false;
