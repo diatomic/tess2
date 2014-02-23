@@ -81,7 +81,7 @@
   hdrs: block headers
   out_file: output file name
 */
-void diy_write(int nblocks, struct vblock_t *vblocks, int ** hdrs, 
+void diy_write(int nblocks, struct vblock_t *vblocks, int **hdrs, 
 	       char *out_file) {
 
   int i;
@@ -98,6 +98,34 @@ void diy_write(int nblocks, struct vblock_t *vblocks, int ** hdrs,
   DIY_Write_close_all(0);
 
   free(pvblocks);
+
+}
+/*--------------------------------------------------------------------------*/
+/*
+  writes delaunay output in diy format
+
+  nblocks: number of blocks
+  dblocks: local delaunay blocks
+  hdrs: block headers
+  out_file: output file name
+*/
+void diy_dwrite(int nblocks, struct dblock_t *dblocks, int **hdrs, 
+	       char *out_file) {
+
+  int i;
+
+  /* pointers to voronoi blocks, needed for writing output */
+  void **pdblocks;
+  pdblocks = (void**)malloc(sizeof(void*) * nblocks);
+  for (i = 0; i < nblocks; i++)
+    pdblocks[i] = &dblocks[i];
+
+  /* write output */
+  DIY_Write_open_all(0, out_file, 0); /* uncompressed for now */
+  DIY_Write_blocks_all(0, pdblocks, nblocks, hdrs, &create_d_datatype);
+  DIY_Write_close_all(0);
+
+  free(pdblocks);
 
 }
 /*--------------------------------------------------------------------------*/
@@ -808,6 +836,64 @@ void create_datatype(void* vblock, int did, int lid, DIY_Datatype *dtype) {
   DIY_Create_struct_datatype(DIY_Addr(vblock), 14, map, dtype);
 
   DIY_Destroy_datatype(&ftype);
+
+}
+/*--------------------------------------------------------------------------*/
+/*
+  creates DIY datatype for the subset of the delaunay block to write to disk
+
+  dblock: voronoi block
+  did: domain id (unused in this case)
+  lid: local block number (unused in this case)
+  dtype: pointer to datatype
+
+  side effects: commits datatype
+
+*/
+void create_d_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype) {
+
+  did = did; /* quiet compiler warning */
+  lid = lid; 
+
+  /* datatype for tet */
+  DIY_Datatype ttype;
+  struct map_block_t tet_map[] = {
+
+    {DIY_INT,    OFST, 4,
+     offsetof(struct tet_t, verts) },
+    {DIY_INT,    OFST, 4,
+     offsetof(struct tet_t, tets)  },
+
+  };
+  DIY_Create_struct_datatype(0, 2, tet_map, &ttype);
+
+  struct dblock_t *d = (struct dblock_t *)dblock;
+  struct map_block_t map[] = {
+
+    { DIY_FLOAT,  OFST, 3, 
+      offsetof(struct dblock_t, mins)                 },
+    { DIY_FLOAT, ADDR, d->num_orig_particles * 3,
+      DIY_Addr(d->particles)                          },
+    { DIY_INT,    ADDR, d->num_complete_cells, 
+      DIY_Addr(d->complete_cells)                     },
+    { ttype,    ADDR, d->num_loc_tets, 
+      DIY_Addr(d->loc_tets)                           },
+    { ttype,    ADDR, d->num_rem_tets, 
+      DIY_Addr(d->rem_tets)                           },
+    { DIY_INT,    ADDR, d->num_rem_tets * 4, 
+      DIY_Addr(d->rem_tet_gids)                       },
+    { DIY_INT,    ADDR, d->num_rem_tets * 4, 
+      DIY_Addr(d->rem_tet_nids)                       },
+    { DIY_BYTE,   ADDR, d->num_rem_tets * 4, 
+      DIY_Addr(d->rem_tet_wrap_dirs)                  },
+    { DIY_FLOAT,  OFST, 3, 
+      offsetof(struct dblock_t, maxs)                 },
+
+  };
+
+  DIY_Create_struct_datatype(DIY_Addr(dblock), 9, map, dtype);
+
+  DIY_Destroy_datatype(&ttype);
 
 }
 /*--------------------------------------------------------------------------*/

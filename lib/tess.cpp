@@ -12,6 +12,16 @@
 //   See COPYRIGHT in top-level directory.
 //  
 // --------------------------------------------------------------------------
+
+// pnetcdf output 
+#define PNETCDF_IO
+
+// MEMORY PROFILING 
+// #define MEMORY 
+
+// using new tet data model (eventually default)
+#define TET
+
 #include "mpi.h"
 #include "diy.h"
 #include "tess.h"
@@ -24,7 +34,7 @@
 #include <sys/resource.h>
 
 #include <vector>
-#include <tet.h>
+#include "tet.h"
 
 static int dim = 3; // everything 3D 
 static float data_mins[3], data_maxs[3]; // extents of overall domain 
@@ -36,11 +46,9 @@ static int wrap_neighbors; // whether wraparound neighbors are used
 // CLP - if wrap_neighbors is 0 then check this condition. 
 static int walls_on;
 
-// pnetcdf output 
-#define PNETCDF_IO
-
-// MEMORY PROFILING 
-// #define MEMORY 
+// c source files such as tess-qhull.c do not want to see
+// arguments by reference, so I hid this function prototype here-TP
+void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs);
 
 // ------------------------------------------------------------------------
 //
@@ -215,8 +223,17 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   // save particles in a separate file for future reference 
   // write_particles(nblocks, particles, num_particles, "pts.out"); 
 
+#ifdef TET
+
+  // compute tessellations 
+  delaunay(nblocks, particles, num_particles, times, outfile);
+
+#else
+
   // compute tessellations 
   voronoi_delaunay(nblocks, particles, num_particles, times, outfile);
+
+#endif
 
   // cleanup 
   for (i = 0; i < nblocks; i++)
@@ -579,6 +596,330 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   for(int i = 0; i < nblocks; ++i)
     free(tets[i]);
 
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "15: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "15: done\n");
+#endif
+
+}
+// --------------------------------------------------------------------------
+//
+//   parallel delaunay tesselation
+//
+//   nblocks: local number of blocks
+//   particles: particles[block_num][particle] 
+//   where each particle is 3 values, px, py, pz
+//   num_particles; number of particles in each block
+//   times: times for particle exchange, voronoi cells, convex hulls, and output
+//   out_file: output file name
+// 
+void delaunay(int nblocks, float **particles, int *num_particles, 
+	      double *times, char *out_file) {
+
+  int *num_orig_particles; // number of original particles, before any
+			   // neighbor exchange 
+  int dim = 3; // 3D 
+  int rank; // MPI rank 
+  int i;
+  void* ds; // persistent delaunay data structures
+
+  MPI_Comm_rank(comm, &rank);
+
+  // init timing 
+  for (i = 0; i < MAX_TIMES; i++)
+    times[i] = 0.0;
+
+  int **hdrs; // headers 
+  struct dblock_t *dblocks; // voronoi blocks 
+
+  num_orig_particles = (int *)malloc(nblocks * sizeof(int));
+  for (i = 0; i < nblocks; i++)
+    num_orig_particles[i] = num_particles[i];
+
+  ds = init_delaunay_data_structures(nblocks);
+
+  // allocate and initialize blocks 
+  create_dblocks(nblocks, dblocks, hdrs);
+  
+#ifdef MEMORY
+  int dwell = 0;
+  struct rusage r_usage;
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "1: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "1: done\n");
+#endif
+
+#ifdef TIMING
+  MPI_Barrier(comm);
+  times[LOCAL_TIME] = MPI_Wtime();
+#endif
+
+  // create local delaunay cells
+  local_dcells(nblocks, dblocks, dim, num_particles, particles, ds);
+  
+  #ifdef TIMING
+  MPI_Barrier(comm);
+  times[LOCAL_TIME] = MPI_Wtime() - times[LOCAL_TIME];
+  if (rank == 0)
+    fprintf(stderr, "-----------------------------------\n");
+  times[EXCH_TIME] = MPI_Wtime();
+#endif
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "2: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "2: done\n");
+#endif
+
+#if 0
+
+  // keep track of which particles lie on the convex hull of the local points 
+  int** convex_hull_particles	  = (int**) malloc(nblocks * sizeof(int*));
+  int*  num_convex_hull_particles = (int*)  malloc(nblocks * sizeof(int));
+  for (i = 0; i < nblocks; i++)
+    convex_hull_particles[i] = NULL;
+
+  // determine which cells are incomplete or too close to neighbor 
+  for (i = 0; i < nblocks; i++)
+    incomplete_cells_initial(&tblocks[i], &vblocks[i], i,
+			     &convex_hull_particles[i],
+			     &num_convex_hull_particles[i]);
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "3: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "3: done\n");
+#endif
+
+  // cleanup local temporary blocks 
+  destroy_blocks(nblocks, tblocks, NULL);
+
+  // exchange particles with neighbors 
+  int **gids; // owner global block ids of received particles 
+  int **nids; // owner native particle ids of received particles 
+  unsigned char **dirs; // wrapping directions of received articles 
+  gids = (int **)malloc(nblocks * sizeof(int *));
+  nids = (int **)malloc(nblocks * sizeof(int *));
+  dirs = (unsigned char **)malloc(nblocks * sizeof(unsigned char *));
+  // intialize to NULL to make realloc inside neighbor_particles just work 
+  for (i = 0; i < nblocks; ++i) {
+    gids[i] = NULL;
+    nids[i] = NULL;
+    dirs[i] = NULL;
+  }
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "4: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "4: done\n");
+#endif
+
+  neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
+		     gids, nids, dirs);
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "5: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "5: done\n");
+#endif
+
+  // Second, decisive phase 
+
+  // reset real blocks and allocate and initialize temporary blocks again 
+  reset_blocks(nblocks, vblocks);
+  create_blocks(nblocks, &tblocks, NULL); // temporary 
+
+  // Clean-up tets; local_cells() will refill them
+  for(int i = 0; i < nblocks; ++i)
+    free(tets[i]);
+
+  // Recompute local cells
+  local_cells(nblocks, tblocks, dim, num_particles, particles, ds, &tets[0], &ntets[0]);
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "6: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "6: done\n");
+#endif
+
+  // CLP - give walls and pointer for creating wall-mirror particles 
+  //    to function call 
+  for (i = 0; i < nblocks; i++)
+    incomplete_cells_final(&tblocks[i], &vblocks[i], i, 
+			   convex_hull_particles[i], 
+			   num_convex_hull_particles[i], walls, num_walls, 
+			   &mirror_particles[i], &num_mirror_particles[i]);
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "7: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "7: done\n");
+#endif
+
+  // cleanup local temporary blocks 
+  destroy_blocks(nblocks, tblocks, NULL);
+  
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "8: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "8: done\n");
+#endif
+
+  // exchange particles with neighbors 
+  neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
+		     gids, nids, dirs);
+    
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "9: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "9: done\n");
+#endif
+  
+  // cleanup convex_hull_particles 
+  for (i = 0; i < nblocks; ++i) {
+    if (convex_hull_particles)
+      free(convex_hull_particles[i]);
+  }
+  free(convex_hull_particles);
+  free(num_convex_hull_particles);
+
+#ifdef TIMING
+  MPI_Barrier(comm);
+  times[EXCH_TIME] = MPI_Wtime() - times[EXCH_TIME];
+  if (rank == 0)
+    fprintf(stderr, "-----------------------------------\n");
+  times[CELL_TIME] = MPI_Wtime();
+#endif
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "10: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "10: done\n");
+#endif
+
+  // Clean-up tets; all_cells() will refill them
+  for(int i = 0; i < nblocks; ++i)
+    free(tets[i]);
+
+  // create all final voronoi cells 
+  all_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
+	    particles, gids, nids, dirs, times, ds, &tets[0], &ntets[0]);
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "11: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "11: done\n");
+#endif
+
+  // cleanup 
+  for (i = 0; i < nblocks; i++) {
+    free(gids[i]);
+    free(nids[i]);
+  }
+  free(gids);
+  free(nids);
+  clean_delaunay_data_strucutres(ds);
+
+#ifdef TIMING
+  // previously no barrier here; want min and max time;
+  //   changed to barrier and simple time now 
+  MPI_Barrier(comm);
+  times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
+  // MPI_Barrier(comm); 
+  times[VOL_TIME] = MPI_Wtime();
+#endif
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "12: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "12: done\n");
+#endif
+
+  // compute volume and surface area manually (not using convex hulls) 
+  cell_vols(nblocks, vblocks, particles);
+
+#ifdef TIMING
+  // previously no barrier here; want min and max time;
+  //   changed to barrier and simple time now 
+  MPI_Barrier(comm);
+  times[VOL_TIME] = MPI_Wtime() - times[VOL_TIME];
+  // MPI_Barrier(comm); 
+  times[OUT_TIME] = MPI_Wtime();
+#endif
+
+#endif // if 0
+
+  // prepare for output 
+  prep_d_out(nblocks, dblocks, hdrs);
+
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "13: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "13: done\n");
+#endif
+
+  // write output 
+  if (out_file[0]) {
+    // pnetcdf turned off for now in delaunay version
+// #ifdef PNETCDF_IO
+//     char out_ncfile[256];
+//     strncpy(out_ncfile, out_file, sizeof(out_ncfile));
+//     strncat(out_ncfile, ".nc", sizeof(out_file));
+//     pnetcdf_write(nblocks, vblocks, out_ncfile, comm);
+// #else
+    diy_dwrite(nblocks, dblocks, hdrs, out_file);
+// #endif
+  }
+
+#ifdef TIMING
+  MPI_Barrier(comm);
+  times[OUT_TIME] = MPI_Wtime() - times[OUT_TIME];
+#endif
+ 
+#ifdef MEMORY
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "14: max memory = %ld MB, current memory in dashboard\n", 
+	  r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "14: done\n");
+#endif
+
+  // collect stats 
+  collect_dstats(nblocks, dblocks, times);
+
+  // cleanup 
+  destroy_dblocks(nblocks, dblocks, hdrs);
+  free(num_orig_particles);
+  
 #ifdef MEMORY
   getrusage(RUSAGE_SELF, &r_usage);
   fprintf(stderr, "15: max memory = %ld MB, current memory in dashboard\n", 
@@ -1133,6 +1474,35 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 }
 // --------------------------------------------------------------------------
 //
+//   collects statistics
+//
+//   nblocks: number of blocks
+//   dblocks: local delaunay blocks
+//   times: timing info
+// 
+void collect_dstats(int nblocks, struct dblock_t *dblocks, double *times) {
+
+  int rank;
+
+  MPI_Comm_rank(comm, &rank);
+
+  // --- print output --- 
+
+  // global stats 
+  if (rank == 0) {
+    fprintf(stderr, "----------------- global stats ------------------\n");
+    fprintf(stderr, "local delaunay time = %.3lf s\n",
+	    times[LOCAL_TIME]);
+    fprintf(stderr, "particle exchange time = %.3lf s\n", times[EXCH_TIME]);
+    fprintf(stderr, "Voronoi / delaunay time = %.3lf s\n", times[CELL_TIME]);
+    fprintf(stderr, "Cell volume / area time = %.3lf s\n", times[VOL_TIME]);
+    fprintf(stderr, "output time = %.3lf s\n", times[OUT_TIME]);
+    fprintf(stderr, "-------------------------------------------------\n");
+  }
+
+}
+// --------------------------------------------------------------------------
+//
 //   aggregates local statistics into global statistics
 //
 //   nblocks: number of blocks
@@ -1513,6 +1883,37 @@ void save_headers(int nblocks, struct vblock_t *vblocks, int **hdrs) {
 }
 // --------------------------------------------------------------------------
 //
+//   prepare for delaunay output, including saving headers
+//
+//   nblocks: number of blocks
+//   dblocks: local blocks
+//   hdrs: block headers
+// 
+void prep_d_out(int nblocks, struct dblock_t *dblocks, int **hdrs) {
+
+  struct bb_t bounds; // block bounds 
+
+  // save extents 
+  for (int i = 0; i < nblocks; i++) {
+
+    DIY_Block_bounds(0, i, &bounds);
+
+    dblocks[i].mins[0] = bounds.min[0];
+    dblocks[i].mins[1] = bounds.min[1];
+    dblocks[i].mins[2] = bounds.min[2];
+    dblocks[i].maxs[0] = bounds.max[0];
+    dblocks[i].maxs[1] = bounds.max[1];
+    dblocks[i].maxs[2] = bounds.max[2];
+
+    hdrs[i][NUM_ORIG_PARTICLES] = dblocks[i].num_orig_particles;
+    hdrs[i][NUM_LOC_TETS] = dblocks[i].num_loc_tets;
+    hdrs[i][NUM_REM_TETS] = dblocks[i].num_rem_tets;
+
+  }
+
+}
+// --------------------------------------------------------------------------
+//
 //   creates and initializes blocks and headers
 //
 //   num_blocks: number of blocks
@@ -1574,6 +1975,45 @@ void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs) {
 }
 // ---------------------------------------------------------------------------
 //
+//   creates and initializes delaunay blocks and headers
+//
+//   num_blocks: number of blocks
+//   dblocks: local dblocks
+//   hdrs: block headers, pass NULL if not used
+//
+//   side effects: allocates memory for blocks and headers
+// 
+void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs) {
+
+  // allocate
+  dblocks = new dblock_t[num_blocks];
+  hdrs = new int*[num_blocks];
+  for (int i = 0; i < num_blocks; i++) {
+    hdrs[i] = new int[DIY_MAX_HDR_ELEMENTS];
+    memset(hdrs[i], 0, DIY_MAX_HDR_ELEMENTS * sizeof(int));
+  }
+
+  // initialize
+  for (int i = 0; i < num_blocks; i++) {
+
+    dblocks[i].num_orig_particles = 0;
+    dblocks[i].particles = NULL;
+    dblocks[i].num_complete_cells = 0;
+    dblocks[i].complete_cells = NULL;
+    dblocks[i].is_complete = NULL;
+    dblocks[i].num_loc_tets = 0;
+    dblocks[i].loc_tets = NULL;
+    dblocks[i].num_rem_tets = 0;
+    dblocks[i].rem_tets = NULL;
+    dblocks[i].rem_tet_gids = NULL;
+    dblocks[i].rem_tet_nids = NULL;
+    dblocks[i].rem_tet_wrap_dirs = NULL;
+
+  }
+
+}
+// ---------------------------------------------------------------------------
+//
 //   frees blocks and headers
 //
 //   num_blocks: number of blocks
@@ -1629,6 +2069,41 @@ void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs) {
 
   free(hdrs);
   free(vblocks);
+
+}
+// ---------------------------------------------------------------------------
+//
+//   frees delaunay blocks and headers
+//
+//   num_blocks: number of blocks
+//   dblocks: array of dblocks
+//   hdrs: pointer to array of headers, pass NULL if not used
+// 
+void destroy_dblocks(int num_blocks, struct dblock_t *dblocks, int **hdrs) {
+
+  for (int i = 0; i < num_blocks; i++) {
+    if (hdrs && hdrs[i])
+      delete[] hdrs[i];
+    if (dblocks[i].particles)
+      free(dblocks[i].particles);
+    if (dblocks[i].complete_cells)
+      free(dblocks[i].complete_cells);
+    if (dblocks[i].is_complete)
+      free(dblocks[i].is_complete);
+    if (dblocks[i].loc_tets)
+      free(dblocks[i].loc_tets);
+    if (dblocks[i].rem_tets)
+      free(dblocks[i].rem_tets);
+    if (dblocks[i].rem_tet_gids)
+      free(dblocks[i].rem_tet_gids);
+    if (dblocks[i].rem_tet_nids)
+      free(dblocks[i].rem_tet_nids);
+    if (dblocks[i].rem_tet_wrap_dirs)
+      free(dblocks[i].rem_tet_wrap_dirs);
+  }
+
+  delete[] hdrs;
+  delete[] dblocks;
 
 }
 // ---------------------------------------------------------------------------

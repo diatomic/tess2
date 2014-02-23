@@ -91,6 +91,43 @@ int SER_IO::ReadAllBlocks(const char *filename, vblock_t** &blocks,
 }
 //----------------------------------------------------------------------------
 //
+// reads all delauanay blocks in a file
+//
+// filename: input filename
+// blocks: pointers to blocks (output)
+// compress: whether file is compressed (optional, default = not compressed)
+//
+// side effects: allocates space for the new blocks
+//
+// returns: total number of blocks
+//
+int SER_IO::ReadAllBlocks(const char *filename, dblock_t** &blocks,
+			  bool compress) {
+
+  compress = compress; // quiet compiler warning
+
+  FILE *fd;
+  int64_t *ftr; // footer
+  int tb; // total number of blocks
+
+  fd = fopen(filename, "r");
+  assert(fd != NULL);
+
+  ReadFooter(fd, ftr, tb);
+
+  blocks = new dblock_t*[tb];
+
+  for (int i = 0; i < tb; i++)
+    ReadBlock(fd, blocks[i], ftr[i]);
+
+  fclose(fd);
+
+  delete[] ftr;
+  return tb;
+
+}
+//----------------------------------------------------------------------------
+//
 // reads the file footer
 // footer in file is always ordered by global block id
 // output footer is in the same order
@@ -260,6 +297,79 @@ void SER_IO::ReadBlock(FILE *fd, vblock_t* &v, int64_t ofst) {
     Swap((char *)v->cell_faces_start, v->num_orig_particles, sizeof(int));
     Swap((char *)v->cell_faces, v->tot_num_cell_faces, sizeof(int));
     Swap((char *)v->maxs, 3, sizeof(float));
+  }
+
+}
+//----------------------------------------------------------------------------
+//
+// reads one delaunay block from a file
+//
+// fd: open file
+// d: pointer to output block
+// ofst: file file pointer to start of header for this block
+//
+// side-effects: allocates block
+//
+void SER_IO::ReadBlock(FILE *fd, dblock_t* &d, int64_t ofst) {
+
+  // get header info
+  int hdr[DIY_MAX_HDR_ELEMENTS];
+  ReadHeader(fd, hdr, ofst);
+
+  // create block
+  d = new dblock_t;
+  d->num_orig_particles = hdr[NUM_ORIG_PARTICLES];
+  d->num_loc_tets = hdr[NUM_LOC_TETS];
+  d->num_rem_tets = hdr[NUM_REM_TETS];
+
+  if (d->num_orig_particles > 0)
+    d->particles = new float[3 * d->num_orig_particles];
+
+  if (d->num_complete_cells > 0)
+    d->complete_cells = new int[d->num_complete_cells];
+
+  if (d->num_loc_tets > 0)
+    d->loc_tets = new tet_t[d->num_loc_tets];
+  if (d->num_rem_tets > 0) {
+    d->rem_tets = new tet_t[d->num_rem_tets];
+    d->rem_tet_gids = new int[4 * d->num_rem_tets];
+    d->rem_tet_nids = new int[4 * d->num_rem_tets];
+    d->rem_tet_wrap_dirs = new unsigned char[4 * d->num_rem_tets];
+  }
+
+  fread(d->mins, sizeof(float), 3, fd);
+  fread(d->particles, sizeof(float), 3 * d->num_orig_particles, fd);
+  fread(d->complete_cells, sizeof(int), d->num_complete_cells, fd);
+  fread(d->loc_tets, sizeof(struct tet_t), d->num_loc_tets, fd);
+  fread(d->rem_tets, sizeof(struct tet_t), d->num_rem_tets, fd);
+  fread(d->rem_tet_gids, sizeof(int), 4 * d->num_rem_tets, fd);
+  fread(d->rem_tet_nids, sizeof(int), 4 * d->num_rem_tets, fd);
+  fread(d->rem_tet_wrap_dirs, sizeof(unsigned char), 4 * d->num_rem_tets, fd);
+  fread(d->maxs, sizeof(float), 3, fd);
+
+  if (swap_bytes) {
+
+    Swap((char *)d->mins, 3, sizeof(float));
+    Swap((char *)d->particles, 3 * d->num_orig_particles, sizeof(float));
+    Swap((char *)d->complete_cells, d->num_complete_cells, sizeof(int));
+    Swap((char *)d->rem_tet_gids, 4 * d->num_rem_tets, sizeof(int));
+    Swap((char *)d->rem_tet_nids, 4 * d->num_rem_tets, sizeof(int));
+
+    // no need to swap rem_tet_wrap_dirs, unsigned char
+
+    // loc_test and rem_tets contain struct tet_t, 
+    // need to swap items individually (annoying)
+    for (int i = 0; i < d->num_loc_tets; i++) {
+      Swap((char *)d->loc_tets[i].verts, 4, sizeof(int));
+      Swap((char *)d->loc_tets[i].tets, 4, sizeof(int));
+    }
+    for (int i = 0; i < d->num_rem_tets; i++) {
+      Swap((char *)d->rem_tets[i].verts, 4, sizeof(int));
+      Swap((char *)d->rem_tets[i].tets, 4, sizeof(int));
+    }
+
+    Swap((char *)d->maxs, 3, sizeof(float));
+
   }
 
 }

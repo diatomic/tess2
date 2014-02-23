@@ -4,4 +4,5 @@
 int gen_voronoi_output(facetT *facetlist, struct vblock_t *vblock,
 		       int num_particles);
 int gen_delaunay_output(facetT *facetlist, int **tet_verts);
+void qhull2dblock(facetT *facetlist, struct dblock_t *dblock);
 

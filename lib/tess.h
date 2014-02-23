@@ -16,11 +16,10 @@
 #define _TESS_H
 
 #include <stdlib.h>	// needed for RAND_MAX
-
+#include "delaunay.h"
 #include "voronoi.h"
 #include "swap.hpp"
 #include "diy.h"
-#include "tet.h"
 
 extern MPI_Comm comm; /* MPI communicator */
 
@@ -64,6 +63,8 @@ void tess(float **particles, int *num_particles, char *out_file);
 
 void voronoi_delaunay(int nblocks, float **particles, int *num_particles, 
 		      double *times, char *out_file);
+void delaunay(int nblocks, float **particles, int *num_particles, 
+	      double *times, char *out_file);
 int gen_particles(int lid, float **particles, float jitter);
 #ifdef __cplusplus
 extern "C"
@@ -92,12 +93,20 @@ extern "C"
 #endif
 void cell_faces(struct vblock_t *vblock);
 void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs);
+void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs);
+void destroy_dblocks(int num_blocks, struct dblock_t *dblocks, int **hdrs);
+void reset_blocks(int num_blocks, struct vblock_t *vblocks);
 #ifdef __cplusplus
 extern "C"
 #endif
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 		 int *num_particles, float **particles, void* ds,
 		 struct tet_t** tets, int* ntets);
+#ifdef __cplusplus
+extern "C"
+#endif
+void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
+		  int *num_particles, float **particles, void* ds);
 #ifdef __cplusplus
 extern "C"
 #endif
@@ -117,9 +126,8 @@ void neighbor_is_complete(int nblocks, struct vblock_t *vblocks,
 			  struct remote_ic_t **rics);
 void item_type(DIY_Datatype *type);
 void ic_type(DIY_Datatype *dtype);
-void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs);
-void reset_blocks(int num_blocks, struct vblock_t *vblocks);
 void collect_stats(int nblocks, struct vblock_t *vblocks, double *times);
+void collect_dstats(int nblocks, struct dblock_t *dblocks, double *times);
 void aggregate_stats(int nblocks, struct vblock_t *vblocks, 
 		     struct stats_t *loc_stats);
 void average(void *in, void *inout, int *len, MPI_Datatype *type);
@@ -127,9 +135,11 @@ void histogram(void *in, void *inout, int *len, MPI_Datatype *type);
 void print_block(struct vblock_t *vblock, int gid);
 void print_particles(float *particles, int num_particles, int gid);
 void prep_out(int nblocks, struct vblock_t *vblocks);
+void prep_d_out(int nblocks, struct dblock_t *dblocks, int **hdrs);
 void save_headers(int nblocks, struct vblock_t *vblocks, int **hdrs);
 void transform_particle(char *p, unsigned char wrap_dir);
-void delaunay(int num_blocks, struct vblock_t *vblocks);
+/* DEPRECATED */
+/* void delaunay(int num_blocks, struct vblock_t *vblocks); */
 void neigh_cells(struct vblock_t *vblock, int cell, int face, int cur_vert);
 int compare(const void *a, const void *b);
 #ifdef __cplusplus

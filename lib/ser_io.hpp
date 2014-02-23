@@ -16,6 +16,7 @@
 #ifndef _SER_IO
 #define _SER_IO
 
+#include "delaunay.h"
 #include "voronoi.h"
 #include <assert.h>
 #include <stdlib.h>
@@ -49,6 +50,8 @@ class SER_IO {
   ~SER_IO(){};
   int ReadAllBlocks(const char *filename, vblock_t** &blocks, 
 		    bool compress = false); 
+  int ReadAllBlocks(const char *filename, dblock_t** &blocks, 
+		    bool compress = false); 
 
  private:
 
@@ -56,6 +59,7 @@ class SER_IO {
   void ReadHeader(FILE *fd, int *hdr, int64_t ofst);
   int CopyHeader(unsigned char *in_buf, int *hdr);
   void ReadBlock(FILE *fd, vblock_t* &v, int64_t ofst);
+  void ReadBlock(FILE *fd, dblock_t* &v, int64_t ofst);
   void CopyBlock(unsigned char *in_buf, vblock_t* &v);
 
 #if 0 // not using compression for now

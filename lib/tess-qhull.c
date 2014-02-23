@@ -103,6 +103,80 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 }
 /*--------------------------------------------------------------------------*/
 /*
+  creates local delaunay cells
+
+  nblocks: number of blocks
+  dblocks: pointer to array of dblocks
+  dim: number of dimensions (eg. 3)
+  num_particles: number of particles in each block
+  particles: particles in each block, particles[block_num][particle]
+  where each particle is 3 values, px, py, pz
+  times: timing
+  ds: the delaunay data structures; unused in qhull
+*/
+void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
+		  int *num_particles, float **particles, void* ds) {
+
+  boolT ismalloc = False;    /* True if qhull should free points in
+				qh_freeqhull() or reallocation */
+  char flags[250];          /* option flags for qhull, see qh-quick.htm */
+  int exitcode;             /* 0 if no error from qhull */
+  int curlong, totlong;     /* memory remaining after qh_memfreeshort */
+  FILE *dev_null; /* file descriptor for writing to /dev/null */
+  int i, j;
+
+  ds = ds; /* quiet compiler warning about unused parameter */
+
+  dev_null = fopen("/dev/null", "w");
+  assert(dev_null != NULL);
+
+  /* for all blocks */
+  for (i = 0; i < nblocks; i++) {
+
+    /* fprintf(stderr, "Num particles (local): %d\n", num_particles[i]); */
+
+    /* deep copy from float to double (qhull API is double) */
+    double *pts = (double *)malloc(num_particles[i] * 3 * sizeof(double));
+    for (j = 0; j < 3 * num_particles[i]; j++)
+      pts[j] = particles[i][j];
+
+    /* compute delaunay */
+    sprintf (flags, "qhull d Qt"); /* print delaunay cells */
+
+    /* eat qhull output by sending it to dev/null */
+    exitcode = qh_new_qhull(dim, num_particles[i], pts, ismalloc,
+			    flags, dev_null, stderr);
+
+    free(pts);
+
+    /* process delaunay output */
+    if (!exitcode)
+      qhull2dblock(qh facet_list, &dblocks[i]);
+
+    /* allocate cell sites for original particles */
+    dblocks[i].num_orig_particles = num_particles[i];
+    dblocks[i].particles =
+      (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
+    for (j = 0; j < dblocks[i].num_orig_particles; j++) {
+      dblocks[i].particles[3 * j] = particles[i][3 * j];
+      dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
+      dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
+    }
+
+    /* clean up qhull */
+    qh_freeqhull(!qh_ALL);                 /* free long memory */
+    qh_memfreeshort(&curlong, &totlong);  /* free short memory */
+    if (curlong || totlong)
+      fprintf (stderr, "qhull internal warning: did not free %d bytes of "
+	       "long memory (%d pieces)\n", totlong, curlong);
+
+  } /* for all blocks */
+
+  fclose(dev_null);
+
+}
+/*--------------------------------------------------------------------------*/
+/*
   creates all final voronoi and delaunay cells
 
   nblocks: number of blocks
@@ -540,6 +614,69 @@ int gen_delaunay_output(facetT *facetlist, int **tet_verts) {
   assert(numfacets == v / 4); /* sanity */
 
   return numfacets;
+
+}
+/*--------------------------------------------------------------------------*/
+/*
+  generates delaunay output from qhull
+
+  facetlist: qhull list of convex hull facets
+  dblock: pointer to local dblock
+  (dblock memory allocated by this function, user's responsibility to free)
+
+*/
+void qhull2dblock(facetT *facetlist, struct dblock_t *dblock) {
+
+  facetT *facet, *neighbor, **neighborp;
+  vertexT *vertex, **vertexp;
+  int numfacets = 0;
+  int t, v, n; /* index in tets, tet verts, tet neighbors */
+
+  /* count number of facets (tets to us) */
+  FORALLfacet_(facetlist) {
+    if ((facet->visible && qh NEWfacets) || (qh_skipfacet(facet)))
+      facet->visitid= 0;
+    else
+      facet->visitid= ++numfacets;
+  }
+
+  dblock->num_loc_tets = numfacets;
+  dblock->loc_tets = (struct tet_t*)malloc(numfacets * sizeof(struct tet_t));
+
+  /* for all tets (facets to qhull) */
+  t = 0;
+  FORALLfacet_(facetlist) {
+
+    if (qh_skipfacet(facet) || (facet->visible && qh NEWfacets))
+      continue;
+
+    if (qh_setsize(facet->vertices) != 4) {
+      fprintf(stderr, "tet has %d vertices; skipping.\n",
+	      qh_setsize(facet->vertices));
+      continue;
+    }
+
+    /* for all vertices */
+    v = 0;
+    FOREACHvertexreverse12_(facet->vertices)
+      dblock->loc_tets[t].verts[v++] = qh_pointid(vertex->point);
+ 
+    /* for all neighbor tets */
+    n = 0;
+    FOREACHneighbor_(facet) {
+      if (neighbor->visitid)
+	dblock->loc_tets[t].tets[n++] = neighbor->visitid - 1;
+      else
+	dblock->loc_tets[t].tets[n++] = -1;
+      fprintf(stderr, "%d ", dblock->loc_tets[t].tets[n - 1]);
+    }
+    fprintf(stderr, "\n");
+
+    t++;
+
+  } /* for all tets */
+
+  assert(numfacets == t); /* sanity */
 
 }
 /*--------------------------------------------------------------------------*/
