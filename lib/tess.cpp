@@ -34,6 +34,7 @@
 #include <sys/resource.h>
 
 #include <vector>
+#include <set>
 #include "tet.h"
 #include "tet-neighbors.h"
 
@@ -52,6 +53,7 @@ static int walls_on;
 // c source files such as tess-qhull.c do not want to see
 // C++ arguments, so I hid these function prototypes here-TP
 void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs);
+void fill_vert_to_tet(dblock_t* dblock);
 void incomplete_dcells_initial(struct dblock_t *tblock, int lid,
 			       vector <sent_t> &sent_particles,
 			       vector <int> &convex_hull_particles);
@@ -676,6 +678,9 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // create local delaunay cells
   local_dcells(nblocks, dblocks, dim, num_particles, particles, ds);
   
+  for (int i = 0; i < nblocks; ++i)
+    fill_vert_to_tet(&dblocks[i]);
+
   #ifdef TIMING
   MPI_Barrier(comm);
   times[LOCAL_TIME] = MPI_Wtime() - times[LOCAL_TIME];
@@ -937,6 +942,17 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "15: done\n");
 #endif
 
+}
+// --------------------------------------------------------------------------
+// for each vertex saves a tet that contains it
+void fill_vert_to_tet(dblock_t* dblock) {
+  dblock->vert_to_tet = (int*) malloc(sizeof(int)*dblock->num_orig_particles);
+  for (int t = 0; t < dblock->num_tets; ++t) {
+    for (int v = 0; v < 4; ++v) {
+      int p = dblock->tets[t].verts[v];
+      dblock->vert_to_tet[p] = t;	// the last one wings
+    }
+  }
 }
 // --------------------------------------------------------------------------
 //
@@ -2012,6 +2028,7 @@ void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs) {
     dblocks[i].tets = NULL;
     dblocks[i].num_rem_tet_verts = 0;
     dblocks[i].rem_tet_verts = NULL;
+    dblocks[i].vert_to_tet = NULL;
 
   }
 
@@ -2096,6 +2113,8 @@ void destroy_dblocks(int num_blocks, struct dblock_t *dblocks, int **hdrs) {
       free(dblocks[i].tets);
     if (dblocks[i].rem_tet_verts)
       free(dblocks[i].rem_tet_verts);
+    if (dblocks[i].vert_to_tet)
+      free(dblocks[i].vert_to_tet);
   }
 
   delete[] hdrs;
@@ -2380,44 +2399,85 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
   struct gb_t all_neigh_gbs[MAX_NEIGHBORS];
   DIY_Get_neighbors(0, lid, all_neigh_gbs);
 
+  // keep track of where we have queued each particle
+  std::vector< std::set<int> >	destinations(dblock->num_orig_particles);
+
+  // identify and queue convex hull particles
+  for (int p = 0; p < dblock->num_orig_particles; ++p) {
+    vector<int> nbrs;
+    if (!neighbor_tets(nbrs, p, dblock->tets, dblock->vert_to_tet[p])) {
+      // add to list of convex hull particles
+      convex_hull_particles.push_back(p);
+
+      // incomplete cell goes to the closest neighbor 
+      unsigned char nearest_dir = 
+	nearest_neighbor(&(dblock->particles[3 * p]), &bounds);
+
+      // send the particle to the neighbor in direction nearest_dir
+      sent.num_gbs = 0;
+      for (int i = 0; i < num_all_neigh_gbs; i++) {
+
+	if (all_neigh_gbs[i].neigh_dir != 0x00 &&
+	    all_neigh_gbs[i].neigh_dir == nearest_dir) {
+	  sent.neigh_gbs[sent.num_gbs].gid = all_neigh_gbs[i].gid;
+	  sent.neigh_gbs[sent.num_gbs].neigh_dir = 
+	    all_neigh_gbs[i].neigh_dir;
+	  sent.num_gbs++;
+	}
+
+      }
+      assert(sent.num_gbs <= 1); // sanity 
+
+      rp.x = dblock->particles[3 * p];
+      rp.y = dblock->particles[3 * p + 1];
+      rp.z = dblock->particles[3 * p + 2];
+      rp.gid = DIY_Gid(0, lid);
+      rp.nid = p;
+      rp.dir = 0x00;
+
+      DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
+			   NULL, sizeof(struct remote_particle_t),
+			   sent.neigh_gbs, sent.num_gbs,
+			   &transform_particle);
+
+      destinations[p].insert(rp.gid);
+
+      // save the details of the sent particle
+      sent.particle = p;
+      sent_particles.push_back(sent);
+
+      dblock->is_complete[p] = 0;
+    } // incomplete
+    else // the voronoi cell for this vertex is complete
+      dblock->is_complete[p] = 1;
+  }
+
   // for all tets
   for (int t = 0; t < dblock->num_tets; t++) {
+    float center[3]; // circumcenter
+    circumcenter(center, &dblock->tets[t], dblock->particles);
 
-    // check completion of all 4 verts
-    int complete = 1; // will be set to 0 if any vertex is incomplete
+    // radius is distance from circumcenter to any tet vertex
+    int p = dblock->tets[t].verts[0];
+    float rad = distance(center, &dblock->particles[3 * p]);
+    DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
+			 MAX_NEIGHBORS, center, rad);
 
-    for (int v = 0; v < 4; v++) { // 4 tet verts
+    // there is at least one destination block
+    if (sent.num_gbs) {
 
-      int p = dblock->tets[t].verts[v]; // index of particle
+      // send all 4 verts
+      for (int v = 0; v < 4; v++) {
+	
+	int p = dblock->tets[t].verts[v];
 
-      vector<int> nbrs;
-
-      // the voronoi cell for this vertex is incomplete
-      if (!neighbor_tets(nbrs, v, dblock->tets, t)) {
-
-	// add to list of convex hull particles
-	convex_hull_particles.push_back(p);
-
-	// incomplete cell goes to the closest neighbor 
-	unsigned char nearest_dir = 
-	  nearest_neighbor(&(dblock->particles[3 * p]), &bounds);
-
-	// send the particle to the neighbor in direction dirs[smallest] 
-	sent.num_gbs = 0;
-	for (int i = 0; i < num_all_neigh_gbs; i++) {
-
-	  if (all_neigh_gbs[i].neigh_dir != 0x00 &&
-	      all_neigh_gbs[i].neigh_dir == nearest_dir) {
-	    sent.neigh_gbs[sent.num_gbs].gid = all_neigh_gbs[i].gid;
-	    sent.neigh_gbs[sent.num_gbs].neigh_dir = 
-	      all_neigh_gbs[i].neigh_dir;
-	    sent.num_gbs++;
+	// select neighbors we haven't sent to, yet
+	std::vector<gb_t> gbs;
+	for (int i = 0; i < sent.num_gbs; ++i) {
+	  if (destinations[p].find(sent.neigh_gbs[i].gid) == destinations[p].end()) {
+	    gbs.push_back(sent.neigh_gbs[i]);
 	  }
-
 	}
-	assert(sent.num_gbs <= 1); // sanity 
-
-	complete = 0;
 
 	rp.x = dblock->particles[3 * p];
 	rp.y = dblock->particles[3 * p + 1];
@@ -2428,66 +2488,21 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
 	DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
 			     NULL, sizeof(struct remote_particle_t),
-			     sent.neigh_gbs, sent.num_gbs,
+			     &gbs[0], gbs.size(),
 			     &transform_particle);
+	for (int i = 0; i < gbs.size(); ++i) {
+	  destinations[p].insert(i);
+	}
 
 	// save the details of the sent particle
 	sent.particle = p;
-	sent_particles.push_back(sent);
+	sent_particles.push_back(sent);	// XXX: this is probably unreliable at this point;
+					//	probably need to extract info
+					//	out of destinations
 
-	dblock->is_complete[p] = 0;
+      } // all 4 verts
 
-      } // incomplete
-
-      else // the voronoi cell for this vertex is complete
-
-	dblock->is_complete[p] = 1;
-
-    } // 4 tet verts
-
-    sent.num_gbs = 0;
-
-    // if all 4 voronoi cells are complete, add any neighbors
-    // within the delaunay circumsphere radius
-    if (complete) {
-
-      float center[3]; // circumcenter
-      circumcenter(center, &dblock->tets[t], dblock->particles);
-
-      // radius is distance from circumcenter to any tet vertex
-      int p = dblock->tets[t].verts[0];
-      float rad = distance(center, &dblock->particles[3 * p]);
-      DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
-			   MAX_NEIGHBORS, center, rad);
-
-      // there is at least one destination block
-      if (sent.num_gbs) {
-
-	// send all 4 verts
-	for (int v = 0; v < 4; v++) {
-
-	  int p = dblock->tets[t].verts[v];
-	  rp.x = dblock->particles[3 * p];
-	  rp.y = dblock->particles[3 * p + 1];
-	  rp.z = dblock->particles[3 * p + 2];
-	  rp.gid = DIY_Gid(0, lid);
-	  rp.nid = p;
-	  rp.dir = 0x00;
-
-	  DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
-			       NULL, sizeof(struct remote_particle_t),
-			       sent.neigh_gbs, sent.num_gbs,
-			       &transform_particle);
-
-	  // save the details of the sent particle
-	  sent.particle = p;
-	  sent_particles.push_back(sent);
-
-	} // all 4 verts
-
-      } // at least one destination block
-
-    } // complete
+    } // at least one destination block
 
   } // for all tets
 

@@ -100,9 +100,9 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
 
     // fill the tets
     int ntets =  Dt.number_of_finite_cells();
-    dblocks[i].num_loc_tets = ntets;
-    dblocks[i].loc_tets = (struct tet_t*)malloc(ntets * sizeof(struct tet_t));
-    gen_tets(Dt, dblocks[i].loc_tets);
+    dblocks[i].num_tets = ntets;
+    dblocks[i].tets = (struct tet_t*)malloc(ntets * sizeof(struct tet_t));
+    gen_tets(Dt, dblocks[i].tets);
     
     /* allocate cell sites for original particles */
     dblocks[i].num_orig_particles = num_particles[i];

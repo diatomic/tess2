@@ -35,6 +35,8 @@ struct dblock_t {
   int num_rem_tet_verts; /* number of remote delaunay vertices */
   struct remote_vert_t *rem_tet_verts; /* remote tet vertex (particle) info */
 
+  int* vert_to_tet; /* a tet that contains the vertex */
+
 
   /* min and max are separated so that DIY can omit some fields above in its
      datatype; not allowed to omit first or last field */
