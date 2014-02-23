@@ -108,6 +108,8 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
     dblocks[i].num_orig_particles = num_particles[i];
     dblocks[i].particles =
       (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
+    dblocks[i].is_complete =
+      (unsigned char *)malloc(dblocks[i].num_orig_particles);
     for (j = 0; j < dblocks[i].num_orig_particles; j++) {
       dblocks[i].particles[3 * j]     = particles[i][3 * j];
       dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
