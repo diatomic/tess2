@@ -71,6 +71,50 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 
   //std::cout << "Total particles in local_cells(): " << total << std::endl;
 }
+/*--------------------------------------------------------------------------*/
+/*
+  creates local delaunay cells
+
+  nblocks: number of blocks
+  dblocks: pointer to array of dblocks
+  dim: number of dimensions (eg. 3)
+  num_particles: number of particles in each block
+  particles: particles in each block, particles[block_num][particle]
+  where each particle is 3 values, px, py, pz
+  times: timing
+  ds: the delaunay data structures
+*/
+void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
+		  int *num_particles, float **particles, void* ds) {
+  int i,j;
+
+  unsigned total = 0;
+  Delaunay3D* Dts = (Delaunay3D*) ds;
+
+  /* for all blocks */
+  for (i = 0; i < nblocks; i++) {
+    Delaunay3D& Dt = Dts[i];
+    construct_delaunay(Dt, num_particles[i], particles[i]);
+    total += num_particles[i];
+    // std::cout << "Num particles (local): " << num_particles[i] << std::endl;
+
+    // fill the tets
+    int ntets =  Dt.number_of_finite_cells();
+    dblocks[i].num_loc_tets = ntets;
+    dblocks[i].loc_tets = (struct tet_t*)malloc(ntets * sizeof(struct tet_t));
+    gen_tets(Dt, dblocks[i].loc_tets);
+    
+    /* allocate cell sites for original particles */
+    dblocks[i].num_orig_particles = num_particles[i];
+    dblocks[i].particles =
+      (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
+    for (j = 0; j < dblocks[i].num_orig_particles; j++) {
+      dblocks[i].particles[3 * j]     = particles[i][3 * j];
+      dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
+      dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
+    }
+  }
+}
 //----------------------------------------------------------------------------
 //
 //   creates all final voronoi and delaunay cells
