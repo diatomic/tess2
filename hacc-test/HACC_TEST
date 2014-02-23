@@ -28,7 +28,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=32
+num_procs=8
 
 # procs per node
 ppn=8 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
@@ -46,7 +46,8 @@ exe=./hacc-voronoi
 infile="m000.mpicosmo.499"
 
 # output file
-outfile="hacc-vor.out"
+#outfile="hacc-vor.out"
+outfile="hacc-del.out"
 
 #volume range (-1.0: unused)
 minv=-1.0
@@ -56,10 +57,10 @@ maxv=-1.0
 wrap=0
 
 # redistribution blocking factor (1 1 1 if not used)
-bf="2 2 1"
+bf="1 1 1"
 
 # sample rate (1 = keep every particle, 10 = keep every 10th particle)
-sr=10
+sr=1
 
 #------
 #

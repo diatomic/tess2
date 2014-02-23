@@ -1473,6 +1473,18 @@ void PrepCellRendering(int &num_vis_cells) {
 
   num_vis_cells = 0; // numbe of visible cells
 
+  for (int b = 0; b < nblocks; b++) { // blocks
+
+    // local tets
+    for (int t = 0; t < blocks[b]->num_tets; t++) {
+
+      // start circulating
+      int start_vert = circulate_start(blocks[b]->tets, t, 0, 1);
+//       fprintf(stderr, "starting tet %d at vert %d\n", t, start_vert);
+
+    } // local tets
+
+  } // blocks
 
 }
 //--------------------------------------------------------------------------
@@ -1491,13 +1503,23 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
   for (int i = 0; i < nblocks; i++) { // blocks
 
     // local tets
-    for (int j = 0; j < blocks[i]->num_loc_tets; j++) {
+    for (int j = 0; j < blocks[i]->num_tets; j++) {
+
+      // check that tet has all neighbors, ie, not on convex hull
+      if (blocks[i]->tets[j].tets[0] == -1 ||
+	  blocks[i]->tets[j].tets[1] == -1 ||
+	  blocks[i]->tets[j].tets[2] == -1 ||
+	  blocks[i]->tets[j].tets[3] == -1) {
+	// debug
+// 	fprintf(stderr, "skipping tet %d (convex hull)\n", j);
+	continue;
+      }
 
       // site indices for tet vertices
-      int s0 = blocks[i]->loc_tets[j].verts[0];
-      int s1 = blocks[i]->loc_tets[j].verts[1];
-      int s2 = blocks[i]->loc_tets[j].verts[2];
-      int s3 = blocks[i]->loc_tets[j].verts[3];
+      int s0 = blocks[i]->tets[j].verts[0];
+      int s1 = blocks[i]->tets[j].verts[1];
+      int s2 = blocks[i]->tets[j].verts[2];
+      int s3 = blocks[i]->tets[j].verts[3];
 
       // coordinates for tet vertices
       vec3d p0, p1, p2, p3;
@@ -1523,6 +1545,8 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       num_loc_tets++;
 
     } // local tets
+
+#if 0
 
     // remote tets
     for (int j = 0; j < blocks[i]->num_rem_tets; j++) {
@@ -1628,6 +1652,8 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       num_rem_tets++;
 
     } // remote tets
+
+#endif
 
     // tet face normals
     for (int t = 0; t < (int)tet_verts.size() / 4; t++) {

@@ -157,6 +157,8 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
     dblocks[i].num_orig_particles = num_particles[i];
     dblocks[i].particles =
       (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
+    dblocks[i].is_complete =
+      (unsigned char *)malloc(dblocks[i].num_orig_particles);
     for (j = 0; j < dblocks[i].num_orig_particles; j++) {
       dblocks[i].particles[3 * j] = particles[i][3 * j];
       dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
@@ -640,8 +642,8 @@ void qhull2dblock(facetT *facetlist, struct dblock_t *dblock) {
       facet->visitid= ++numfacets;
   }
 
-  dblock->num_loc_tets = numfacets;
-  dblock->loc_tets = (struct tet_t*)malloc(numfacets * sizeof(struct tet_t));
+  dblock->num_tets = numfacets;
+  dblock->tets = (struct tet_t*)malloc(numfacets * sizeof(struct tet_t));
 
   /* for all tets (facets to qhull) */
   t = 0;
@@ -659,18 +661,21 @@ void qhull2dblock(facetT *facetlist, struct dblock_t *dblock) {
     /* for all vertices */
     v = 0;
     FOREACHvertexreverse12_(facet->vertices)
-      dblock->loc_tets[t].verts[v++] = qh_pointid(vertex->point);
+      dblock->tets[t].verts[v++] = qh_pointid(vertex->point);
  
     /* for all neighbor tets */
     n = 0;
     FOREACHneighbor_(facet) {
       if (neighbor->visitid)
-	dblock->loc_tets[t].tets[n++] = neighbor->visitid - 1;
+	dblock->tets[t].tets[n++] = neighbor->visitid - 1;
       else
-	dblock->loc_tets[t].tets[n++] = -1;
-      fprintf(stderr, "%d ", dblock->loc_tets[t].tets[n - 1]);
+	dblock->tets[t].tets[n++] = -1;
+      /* debug */
+/*       fprintf(stderr, "%d ", dblock->tets[t].tets[n - 1]); */
     }
-    fprintf(stderr, "\n");
+
+    /* debug */
+/*     fprintf(stderr, "\n"); */
 
     t++;
 

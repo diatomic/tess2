@@ -319,53 +319,42 @@ void SER_IO::ReadBlock(FILE *fd, dblock_t* &d, int64_t ofst) {
   // create block
   d = new dblock_t;
   d->num_orig_particles = hdr[NUM_ORIG_PARTICLES];
-  d->num_loc_tets = hdr[NUM_LOC_TETS];
-  d->num_rem_tets = hdr[NUM_REM_TETS];
+  d->num_tets = hdr[NUM_TETS];
+  d->num_rem_tet_verts = hdr[NUM_REM_TET_VERTS];
 
-  if (d->num_orig_particles > 0)
+  if (d->num_orig_particles > 0) {
     d->particles = new float[3 * d->num_orig_particles];
-
-  if (d->num_complete_cells > 0)
-    d->complete_cells = new int[d->num_complete_cells];
-
-  if (d->num_loc_tets > 0)
-    d->loc_tets = new tet_t[d->num_loc_tets];
-  if (d->num_rem_tets > 0) {
-    d->rem_tets = new tet_t[d->num_rem_tets];
-    d->rem_tet_gids = new int[4 * d->num_rem_tets];
-    d->rem_tet_nids = new int[4 * d->num_rem_tets];
-    d->rem_tet_wrap_dirs = new unsigned char[4 * d->num_rem_tets];
+    d->is_complete = new unsigned char[d->num_orig_particles];
   }
+  if (d->num_tets > 0)
+    d->tets = new tet_t[d->num_tets];
+  if (d->num_rem_tet_verts > 0)
+    d->rem_tet_verts = new remote_vert_t[d->num_rem_tet_verts];
 
   fread(d->mins, sizeof(float), 3, fd);
   fread(d->particles, sizeof(float), 3 * d->num_orig_particles, fd);
-  fread(d->complete_cells, sizeof(int), d->num_complete_cells, fd);
-  fread(d->loc_tets, sizeof(struct tet_t), d->num_loc_tets, fd);
-  fread(d->rem_tets, sizeof(struct tet_t), d->num_rem_tets, fd);
-  fread(d->rem_tet_gids, sizeof(int), 4 * d->num_rem_tets, fd);
-  fread(d->rem_tet_nids, sizeof(int), 4 * d->num_rem_tets, fd);
-  fread(d->rem_tet_wrap_dirs, sizeof(unsigned char), 4 * d->num_rem_tets, fd);
+  fread(d->is_complete, sizeof(unsigned char), d->num_orig_particles, fd);
+  fread(d->tets, sizeof(struct tet_t), d->num_tets, fd);
+  fread(d->rem_tet_verts, sizeof(struct remote_vert_t), 
+	d->num_rem_tet_verts, fd);
   fread(d->maxs, sizeof(float), 3, fd);
 
   if (swap_bytes) {
 
     Swap((char *)d->mins, 3, sizeof(float));
     Swap((char *)d->particles, 3 * d->num_orig_particles, sizeof(float));
-    Swap((char *)d->complete_cells, d->num_complete_cells, sizeof(int));
-    Swap((char *)d->rem_tet_gids, 4 * d->num_rem_tets, sizeof(int));
-    Swap((char *)d->rem_tet_nids, 4 * d->num_rem_tets, sizeof(int));
+    // no need to swap is_complete, unsigned char
 
-    // no need to swap rem_tet_wrap_dirs, unsigned char
-
-    // loc_test and rem_tets contain struct tet_t, 
+    // tets and rem_tet_verts are structs, need to swap each element
     // need to swap items individually (annoying)
-    for (int i = 0; i < d->num_loc_tets; i++) {
-      Swap((char *)d->loc_tets[i].verts, 4, sizeof(int));
-      Swap((char *)d->loc_tets[i].tets, 4, sizeof(int));
+    for (int i = 0; i < d->num_tets; i++) {
+      Swap((char *)d->tets[i].verts, 4, sizeof(int));
+      Swap((char *)d->tets[i].tets, 4, sizeof(int));
     }
-    for (int i = 0; i < d->num_rem_tets; i++) {
-      Swap((char *)d->rem_tets[i].verts, 4, sizeof(int));
-      Swap((char *)d->rem_tets[i].tets, 4, sizeof(int));
+    for (int i = 0; i < d->num_rem_tet_verts; i++) {
+      Swap((char *)d->rem_tet_verts[i].gid, 1, sizeof(int));
+      Swap((char *)d->rem_tet_verts[i].nid, 1, sizeof(int));
+      // no need to swap dir, unsigned char
     }
 
     Swap((char *)d->maxs, 3, sizeof(float));

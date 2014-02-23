@@ -867,33 +867,42 @@ void create_d_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype) {
   };
   DIY_Create_struct_datatype(0, 2, tet_map, &ttype);
 
+  /* datatype for remote tet vert */
+  DIY_Datatype rtype;
+  struct map_block_t rem_map[] = {
+
+    {DIY_INT,    OFST, 1,
+     offsetof(struct remote_vert_t, gid) },
+    {DIY_INT,    OFST, 1,
+     offsetof(struct remote_vert_t, nid) },
+    {DIY_BYTE,   OFST, 1,
+     offsetof(struct remote_vert_t, dir) },
+
+  };
+  DIY_Create_struct_datatype(0, 3, rem_map, &rtype);
+
   struct dblock_t *d = (struct dblock_t *)dblock;
   struct map_block_t map[] = {
 
     { DIY_FLOAT,  OFST, 3, 
-      offsetof(struct dblock_t, mins)                 },
+      offsetof(struct dblock_t, mins)             },
     { DIY_FLOAT, ADDR, d->num_orig_particles * 3,
-      DIY_Addr(d->particles)                          },
-    { DIY_INT,    ADDR, d->num_complete_cells, 
-      DIY_Addr(d->complete_cells)                     },
-    { ttype,    ADDR, d->num_loc_tets, 
-      DIY_Addr(d->loc_tets)                           },
-    { ttype,    ADDR, d->num_rem_tets, 
-      DIY_Addr(d->rem_tets)                           },
-    { DIY_INT,    ADDR, d->num_rem_tets * 4, 
-      DIY_Addr(d->rem_tet_gids)                       },
-    { DIY_INT,    ADDR, d->num_rem_tets * 4, 
-      DIY_Addr(d->rem_tet_nids)                       },
-    { DIY_BYTE,   ADDR, d->num_rem_tets * 4, 
-      DIY_Addr(d->rem_tet_wrap_dirs)                  },
+      DIY_Addr(d->particles)                      },
+    { DIY_BYTE,    ADDR, d->num_orig_particles, 
+      DIY_Addr(d->is_complete)                    },
+    { ttype,    ADDR, d->num_tets, 
+      DIY_Addr(d->tets)                           },
+    { rtype,    ADDR, d->num_rem_tet_verts, 
+      DIY_Addr(d->rem_tet_verts)                  },
     { DIY_FLOAT,  OFST, 3, 
-      offsetof(struct dblock_t, maxs)                 },
+      offsetof(struct dblock_t, maxs)             },
 
   };
 
-  DIY_Create_struct_datatype(DIY_Addr(dblock), 9, map, dtype);
+  DIY_Create_struct_datatype(DIY_Addr(dblock), 6, map, dtype);
 
   DIY_Destroy_datatype(&ttype);
+  DIY_Destroy_datatype(&rtype);
 
 }
 /*--------------------------------------------------------------------------*/

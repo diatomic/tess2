@@ -26,22 +26,15 @@ struct dblock_t {
   int num_orig_particles; /* number of original particles in this block
   			     before any neighbor exhcange */
   float *particles; /* original input points */
-  int num_complete_cells; /* number of complete cells */
-  int *complete_cells; /* sorted list of complete cells from raw tesselation
-			  can be used to index into sites 
-			  (ie, order of sites is same) */
-  unsigned char *is_complete; /* each cell's completion status 0 or 1 */
+  unsigned char *is_complete; /* whether each oiginal particle is the site of
+				 a complete voronoi cell or not */
 
-  /* info for delaunay tetrahedralization */
-  int num_loc_tets; /* number of delaunay tets with all local vertices */
-  struct tet_t *loc_tets; /* strictly local delaunay tetrahedra */
-  int num_rem_tets; /* number of  delaunay tets with >= 1 remote vertex */
-  struct tet_t *rem_tets; /* remote (at least one particle) 
-			     delaunay tetrahedra */
-  int *rem_tet_gids; /* global ids of owners of vertices in remote tets */
-  int *rem_tet_nids; /* native particle ids of vertices in remote tets */
-  unsigned char *rem_tet_wrap_dirs; /* wrapping directions of vertices in
-				       remote tets */
+  /* tets */
+  int num_tets; /* number of delaunay tetrahedra */
+  struct tet_t *tets; /* delaunay tets */
+  int num_rem_tet_verts; /* number of remote delaunay vertices */
+  struct remote_vert_t *rem_tet_verts; /* remote tet vertex (particle) info */
+
 
   /* min and max are separated so that DIY can omit some fields above in its
      datatype; not allowed to omit first or last field */

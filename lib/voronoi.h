@@ -27,6 +27,8 @@
 #define NUM_LOC_TETS 5
 #define NUM_REM_TETS 6
 #define NUM_FACES 7
+#define NUM_TETS 8
+#define NUM_REM_TET_VERTS 9
 
 #define MAX_HIST_BINS 256 /* maximum number of bins in cell volume histogram */
 #define MAX_FACE_VERTS 32 /* maximum number of vertices per face */
@@ -53,6 +55,13 @@ struct remote_ic_t {
   int is_complete; /* 0 or 1 indicates whether remote particle is complete */
   int gid; /* owner block global id */
   int nid; /* native index of particle in owner block */
+};
+
+/* remote tet vertex */
+struct remote_vert_t {
+  int gid; /* global ids of owner block */
+  int nid; /* native particle id in owner block */
+  unsigned char dir; /* wrapping direction */
 };
 
 /* sent particle */
