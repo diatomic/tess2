@@ -18,6 +18,7 @@
 #include "delaunay.h"
 #include "voronoi.h"
 #include "ser_io.hpp"
+#include "tet-neighbors.h"
 #include <math.h>
 
 #if defined(MAC_OSX)
@@ -1471,18 +1472,102 @@ void PrepRenderingData(int *gid2lid) {
 //
 void PrepCellRendering(int &num_vis_cells) {
 
-  num_vis_cells = 0; // numbe of visible cells
+  int v0; // starting vertex of the current face
+
+  num_vis_cells = 0; // number of visible cells
 
   for (int b = 0; b < nblocks; b++) { // blocks
 
-    // local tets
+    // tets
     for (int t = 0; t < blocks[b]->num_tets; t++) {
 
-      // start circulating
-      int start_vert = circulate_start(blocks[b]->tets, t, 0, 1);
-//       fprintf(stderr, "starting tet %d at vert %d\n", t, start_vert);
+      // tet verts
+      // equivalent of for all voronoi cells
+      for (int v = 0; v < 4; v++) {
 
-    } // local tets
+	// neighbor edges a vector of (vertex u, tet of vertex u) pairs 
+	// that neighbor vertex v
+	vector< pair<int, int> > nbrs;
+	bool finite = neighbor_edges(nbrs, v, blocks[b]->tets, t);
+
+	// skip tet vertices corresponding to incomplete voronoi cells
+	if (!finite) 
+	  continue;
+
+	// the following loop is the equivalent of
+	// for all faces in a voronoi cell
+	for (int i = 0; i < (int)nbrs.size(); ++i) {
+
+	  // debug
+	  fprintf(stderr, "1: nbrs.size() = %d\n", nbrs.size());
+
+	  int u  = nbrs[i].first;
+	  int ut = nbrs[i].second;
+	  int wi = circulate_start(blocks[b]->tets, ut, v, u);
+	  int t1  = ut;
+
+	  // the following loop is the equivalent of
+	  // for all vertices in a voronoi face
+	  while (true) {
+
+	    // push voronoi vertex for rendering
+	    // voronoi vertex is the circumcenter of the tet
+	    vec3d center;
+	    circumcenter((float *)&(center.x), 
+			 &(blocks[b]->tets[t1]), blocks[b]->particles);
+
+// 	    // todo: compute the volume
+// // 	    if (blocks[i]->vols[j] >= min_vol &&
+// // 		(max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol)) {
+// 	    verts.push_back(center);
+
+	    // debug
+	    fprintf(stderr, "%.3f %.3f %.3f\n", center.x, center.y, center.z);
+
+// 	    if (i == 0)
+// 	      v0 = (int)verts.size() - 1; // note starting vertex of this face
+
+	    // get next voronoi vertex
+	    int next_t, next_wi;
+	    circulate_next(&next_t, &next_wi, blocks[b]->tets, t1, wi, v, u);
+	    if (next_t == ut || next_t == -1)
+	      break;
+	    t1  = next_t;
+	    wi = next_wi;
+
+	  } // for all vertices in a voronoi face
+
+// 	  num_face_verts.push_back((int)verts.size() - v0);
+
+// 	  // face normal (flat shading, one normal per face)
+// 	  vec3d normal;
+// 	  Normal(&verts[v0], normal);
+
+// 	  // check sign of dot product of normal with vector from site 
+// 	  // to first face vertex to see if normal has correct direction
+// 	  // want outward normal
+// 	  vec3d vec;
+// 	  int p = blocks[b]->tets[t].verts[v];
+// 	  vec.x = verts[v0].x - sites[p].x;
+// 	  vec.y = verts[v0].y - sites[p].y;
+// 	  vec.z = verts[v0].z - sites[p].z;
+// 	  if (vec.x * normal.x + vec.y * normal.y + vec.z * normal.z < 0.0) {
+// 	    normal.x *= -1.0;
+// 	    normal.y *= -1.0;
+// 	    normal.z *= -1.0;
+// 	  }
+// 	  vor_normals.push_back(normal);
+
+	} // for all faces in a voronoi cell
+
+      } // tet verts
+
+      // todo: volume check
+// //       if (blocks[i]->vols[j] >= min_vol &&
+// // 	  (max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol))
+// 	num_vis_cells++;
+
+    } // tets
 
   } // blocks
 
