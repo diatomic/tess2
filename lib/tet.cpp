@@ -267,3 +267,48 @@ bool neighbor_tets(std::vector<int>& nbrs,
 
   return finite;
 }
+
+/**
+ * determines if v's Voronoi cell is finite
+ * (equivalently, whether v lies on the convex hull)
+ *
+ * v:	    vertex
+ * tets:    array of all tetrahedra
+ * t:	    tet that contains v
+ */
+bool complete(int	    v,
+	      tet_t*	    tets,
+	      int	    t
+	     )
+{
+  bool finite = true;
+  std::queue<int>   q;
+  std::set<int>	    visited_tets;
+  q.push(t);
+
+  // BFS in the star of v
+  while (!q.empty())
+  {
+    int t = q.front();
+    q.pop();
+
+    // already visited, continue
+    if (visited_tets.find(t) != visited_tets.end())
+      continue;
+    visited_tets.insert(t);
+
+    // queue neighbors
+    for (int i = 0; i < 4; ++i) {
+      int u = tets[t].verts[i];
+      if (u != v) {
+	int next = tets[t].tets[i];
+	if (next == -1)
+	  return false;
+	else
+	  q.push(next);
+      }
+    }
+  }
+
+  return true;
+}

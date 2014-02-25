@@ -13,3 +13,8 @@ bool neighbor_tets(std::vector<int>& nbrs,
 		   tet_t*  tets,
 		   int	    t
 		  );
+
+bool complete(int	    v,
+	      tet_t*	    tets,
+	      int	    t
+	     );
