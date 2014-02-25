@@ -47,9 +47,9 @@ tb=$[$num_procs * 1]
 #tb=4
 
 # data size x y z (always 3D)
-#dsize="3 3 3"
+dsize="3 3 3"
 #dsize="4 4 4"
-dsize="5 5 5"
+#dsize="5 5 5"
 #dsize="6 6 6"
 #dsize="8 8 8"
 #dsize="10 10 10"

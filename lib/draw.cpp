@@ -105,6 +105,7 @@ bool draw_particle = true;
 bool color_density = false;
 bool draw_tess = false;
 bool draw_del = false;
+bool draw_verts = false;
 
 // volume filtering
 float min_vol = 0.0; // desired min vol threshold
@@ -128,6 +129,7 @@ vec3d site_center;
 
 // voronoi vertices, faces, cells, normals
 vector<vec3d> verts;
+vector<vec3d> cell_verts;
 vector<int> num_face_verts;
 vector<vec3d> vor_normals;
 
@@ -176,6 +178,7 @@ void draw_spheres(vector<vec3d> &sites, float rad);
 void draw_sprites(vector<vec3d> &sites, float size);
 void draw_axes();
 void draw_tets();
+void draw_cell_verts();
 void reshape(int w, int h);
 void init_model();
 void init_viewport(bool reset);
@@ -190,6 +193,7 @@ void CellBounds(vblock_t *vblock, int cell,
 void PrepRenderingData(int *gid2lid);
 void PrepSiteRendering(int &num_sites);
 void PrepCellRendering(int &num_visible_cells);
+void PrepCellVertRendering();
 void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int* gid2lid);
 int compare(const void *a, const void *b);
 
@@ -340,6 +344,10 @@ void display() {
     for (int i = 0; i < nblocks; i++)
       draw_cube(blocks[i]->mins, blocks[i]->maxs, 1.0, 0.0, 1.0);
   }
+
+  // cell verts
+  if (draw_verts)
+    draw_cell_verts();
 
   // delaunay tets
   if (draw_del)
@@ -634,6 +642,25 @@ void init_display() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 5, 5, 0, GL_RGBA, 
 	       GL_UNSIGNED_BYTE, sprite_rgba);
+
+}
+//--------------------------------------------------------------------------
+//
+// draw cell vertices
+//
+void draw_cell_verts() {
+
+    glDisable(GL_LIGHTING);
+    glColor3f(0.9, 0.9, 0.0);
+    glEnable(GL_POINT_SMOOTH);
+    glPointSize(1.0);
+
+    glBegin(GL_POINTS);
+    for (int i = 0; i < (int)cell_verts.size(); i++)
+      glVertex3f(cell_verts[i].x, cell_verts[i].y, cell_verts[i].z);
+    glEnd();
+
+    glDisable(GL_COLOR_MATERIAL);
 
 }
 //--------------------------------------------------------------------------
@@ -950,6 +977,9 @@ void key(unsigned char key, int x, int y) {
   case 't':  // show voronoi tessellation
     draw_tess = !draw_tess;
     draw_del = false;
+    break;
+  case 'w':  // show voronoi cell vertices
+    draw_verts = !draw_verts;
     break;
   case 'y':  // show delaunay tets
     draw_del = !draw_del;
@@ -1439,6 +1469,9 @@ void PrepRenderingData(int *gid2lid) {
   // voronoi cells
   PrepCellRendering(num_vis_cells);
 
+  // voronoi cell verts (for debugging)
+  PrepCellVertRendering();
+
   // delauany tets
   PrepTetRendering(num_loc_tets, num_rem_tets, gid2lid);
 
@@ -1464,6 +1497,36 @@ void PrepRenderingData(int *gid2lid) {
 
 // prep rendering for newer dblock model
 
+//--------------------------------------------------------------------------
+//
+// package cell vertices for rendering
+// used for debugging
+//
+void PrepCellVertRendering() {
+
+  for (int b = 0; b < nblocks; b++) { // blocks
+
+    fprintf(stderr, "2: num_tets = %d\n", blocks[b]->num_tets);
+
+    // tets
+    for (int t = 0; t < blocks[b]->num_tets; t++) {
+
+      // push voronoi vertex for rendering
+      // voronoi vertex is the circumcenter of the tet
+      vec3d center;
+      circumcenter((float *)&(center.x), 
+		   &(blocks[b]->tets[t]), blocks[b]->particles);
+
+      cell_verts.push_back(center);
+
+      // debug
+      fprintf(stderr, "%.3f %.3f %.3f\n", center.x, center.y, center.z);
+
+    } // tets
+
+  } // blocks
+
+}
 //--------------------------------------------------------------------------
 //
 // package cell faces for rendering
@@ -1503,8 +1566,8 @@ void PrepCellRendering(int &num_vis_cells) {
 	bool finite = neighbor_edges(nbrs, v, blocks[b]->tets, t);
 
 	// debug
-	fprintf(stderr, "1: nbrs.size() = %d finite = %d \n", nbrs.size(),
-		finite);
+// 	fprintf(stderr, "1: nbrs.size() = %d finite = %d \n", nbrs.size(),
+// 		finite);
 
 	// skip tet vertices corresponding to incomplete voronoi cells
 	if (!finite) 
@@ -1535,7 +1598,7 @@ void PrepCellRendering(int &num_vis_cells) {
 	    verts.push_back(center);
 
 	    // debug
-	    fprintf(stderr, "%.3f %.3f %.3f\n", center.x, center.y, center.z);
+// 	    fprintf(stderr, "%.3f %.3f %.3f\n", center.x, center.y, center.z);
 
 	    if (i == 0)
 	      v0 = (int)verts.size() - 1; // note starting vertex of this face
@@ -1600,18 +1663,20 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
 
   for (int i = 0; i < nblocks; i++) { // blocks
 
+    fprintf(stderr, "1: num_tets = %d\n", blocks[i]->num_tets);
+
     // local tets
     for (int j = 0; j < blocks[i]->num_tets; j++) {
 
-      // check that tet has all neighbors, ie, not on convex hull
-      if (blocks[i]->tets[j].tets[0] == -1 ||
-	  blocks[i]->tets[j].tets[1] == -1 ||
-	  blocks[i]->tets[j].tets[2] == -1 ||
-	  blocks[i]->tets[j].tets[3] == -1) {
-	// debug
-// 	fprintf(stderr, "skipping tet %d (convex hull)\n", j);
-	continue;
-      }
+//       // check that tet has all neighbors, ie, not on convex hull
+//       if (blocks[i]->tets[j].tets[0] == -1 ||
+// 	  blocks[i]->tets[j].tets[1] == -1 ||
+// 	  blocks[i]->tets[j].tets[2] == -1 ||
+// 	  blocks[i]->tets[j].tets[3] == -1) {
+// 	// debug
+// // 	fprintf(stderr, "skipping tet %d (convex hull)\n", j);
+// 	continue;
+//       }
 
       // site indices for tet vertices
       int s0 = blocks[i]->tets[j].verts[0];
