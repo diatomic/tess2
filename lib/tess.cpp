@@ -2414,6 +2414,8 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
     int p0 = dblock->tets[t].verts[0];
     float rad = distance(center, &dblock->particles[3 * p0]);
 
+    bool all_v = false; // all 4 tet verts need to be sent
+
     // for all verts
     for (int v = 0; v < 4; v++) {
 
@@ -2424,13 +2426,16 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
       int p = dblock->tets[t].verts[v]; // particle id
 
-      // complettion status
+      // completion status
       vector<int> nbrs; // tet neighbors
-      bool complete = neighbor_tets(nbrs, p, dblock->tets, t);
+      bool complete = neighbor_tets(nbrs, v, dblock->tets, t);
       dblock->is_complete[p] = complete;
 
+      if (v == 0 && complete)
+	all_v = true;
+
       // complete or all tet verts need to be sent
-      if (complete) {
+      if (complete || all_v) {
 
 	sent.num_gbs = 0;
 	DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
@@ -2502,7 +2507,7 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
   } // for all tets
 
-    // sanity, check that all original particles were visited
+  // sanity, check that all original particles were visited
   for (int v = 0; v < (int)visited.size(); v++) {
     if (!visited[v])
       assert(0);
