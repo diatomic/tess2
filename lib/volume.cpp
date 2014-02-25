@@ -26,20 +26,7 @@ float volume(int v, int* verts_to_tets, tet_t* tets, int num_tets, float* partic
     std::vector<int>	edge_link;
     int u  = nbrs[i].first;
     int ut = nbrs[i].second;
-    int wi = circulate_start(tets, ut, v, u);
-    int t  = ut;
-    while (true)
-    {
-      edge_link.push_back(t);
-
-      int next_t, next_wi;
-      circulate_next(&next_t, &next_wi, tets, t, wi, v, u);
-      if (next_t == ut || next_t == -1)
-	break;
-
-      t  = next_t;
-      wi = next_wi;
-    }
+    fill_edge_link(edge_link,v,u,ut,tets);
 
     // area of the Voronoi facet dual to (u,v)
     float area = 0;

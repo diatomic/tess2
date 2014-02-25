@@ -312,3 +312,34 @@ bool complete(int	    v,
 
   return true;
 }
+ 
+/**
+ * Fills edge_link with all the tets containing edge (u,v),
+ * the tets are inserted in circular order, starting from ut
+ *
+ * edge_link:	    output vector
+ * v,u:		    vertices
+ * ut:		    a tet that contains edge (v,u)
+ * tets:	    array of tets
+ */
+void fill_edge_link(std::vector<int>&	edge_link,
+		    int			v,
+		    int			u,
+		    int			ut,
+		    tet_t*		tets)
+{
+  int wi = circulate_start(tets, ut, v, u);
+  int t  = ut;
+  while (true)
+  {
+    edge_link.push_back(t);
+
+    int next_t, next_wi;
+    circulate_next(&next_t, &next_wi, tets, t, wi, v, u);
+    if (next_t == ut || next_t == -1)
+      break;
+
+    t  = next_t;
+    wi = next_wi;
+  }
+}

@@ -18,3 +18,9 @@ bool complete(int	    v,
 	      tet_t*	    tets,
 	      int	    t
 	     );
+
+void fill_edge_link(std::vector<int>&	edge_link,
+		    int			v,
+		    int			u,
+		    int			ut,
+		    tet_t*		tets);
