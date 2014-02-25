@@ -1602,7 +1602,7 @@ void PrepCellRendering(int &num_vis_cells) {
 	  std::vector<int> edge_link;
 	  fill_edge_link(edge_link, v, u, ut, blocks[b]->tets);
 
-	  for (int j = 0; i < edge_link.size(); ++j) {
+	  for (int j = 0; j < edge_link.size(); ++j) {
 	    vec3d center;
 	    circumcenter((float *)&(center.x), 
 			 &(blocks[b]->tets[edge_link[j]]), blocks[b]->particles);
