@@ -1473,10 +1473,13 @@ void PrepRenderingData(int *gid2lid) {
 void PrepCellRendering(int &num_vis_cells) {
 
   int v0; // starting vertex of the current face
-
   num_vis_cells = 0; // number of visible cells
 
   for (int b = 0; b < nblocks; b++) { // blocks
+
+    // this delaunay vertex = particle was already done
+    vector<bool> visited;
+    visited.resize(blocks[b]->num_orig_particles, false);
 
     // tets
     for (int t = 0; t < blocks[b]->num_tets; t++) {
@@ -1485,10 +1488,23 @@ void PrepCellRendering(int &num_vis_cells) {
       // equivalent of for all voronoi cells
       for (int v = 0; v < 4; v++) {
 
+	// remote verts can cause visited to need to grow beyond
+	// number of original particles
+	// todo: this is not really handled right yet
+	if (v >= (int)visited.size())
+	  visited.resize(v + 1, false);
+	if (visited[blocks[b]->tets[t].verts[v]])
+	  continue;
+	visited[blocks[b]->tets[t].verts[v]] = true;
+
 	// neighbor edges a vector of (vertex u, tet of vertex u) pairs 
 	// that neighbor vertex v
 	vector< pair<int, int> > nbrs;
 	bool finite = neighbor_edges(nbrs, v, blocks[b]->tets, t);
+
+	// debug
+	fprintf(stderr, "1: nbrs.size() = %d finite = %d \n", nbrs.size(),
+		finite);
 
 	// skip tet vertices corresponding to incomplete voronoi cells
 	if (!finite) 
@@ -1497,9 +1513,6 @@ void PrepCellRendering(int &num_vis_cells) {
 	// the following loop is the equivalent of
 	// for all faces in a voronoi cell
 	for (int i = 0; i < (int)nbrs.size(); ++i) {
-
-	  // debug
-	  fprintf(stderr, "1: nbrs.size() = %d\n", nbrs.size());
 
 	  int u  = nbrs[i].first;
 	  int ut = nbrs[i].second;
@@ -1516,16 +1529,16 @@ void PrepCellRendering(int &num_vis_cells) {
 	    circumcenter((float *)&(center.x), 
 			 &(blocks[b]->tets[t1]), blocks[b]->particles);
 
-// 	    // todo: compute the volume
-// // 	    if (blocks[i]->vols[j] >= min_vol &&
-// // 		(max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol)) {
-// 	    verts.push_back(center);
+	    // todo: compute the volume
+// 	    if (blocks[i]->vols[j] >= min_vol &&
+// 		(max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol)) {
+	    verts.push_back(center);
 
 	    // debug
 	    fprintf(stderr, "%.3f %.3f %.3f\n", center.x, center.y, center.z);
 
-// 	    if (i == 0)
-// 	      v0 = (int)verts.size() - 1; // note starting vertex of this face
+	    if (i == 0)
+	      v0 = (int)verts.size() - 1; // note starting vertex of this face
 
 	    // get next voronoi vertex
 	    int next_t, next_wi;
@@ -1537,35 +1550,35 @@ void PrepCellRendering(int &num_vis_cells) {
 
 	  } // for all vertices in a voronoi face
 
-// 	  num_face_verts.push_back((int)verts.size() - v0);
+	  num_face_verts.push_back((int)verts.size() - v0);
 
-// 	  // face normal (flat shading, one normal per face)
-// 	  vec3d normal;
-// 	  Normal(&verts[v0], normal);
+	  // face normal (flat shading, one normal per face)
+	  vec3d normal;
+	  Normal(&verts[v0], normal);
 
-// 	  // check sign of dot product of normal with vector from site 
-// 	  // to first face vertex to see if normal has correct direction
-// 	  // want outward normal
-// 	  vec3d vec;
-// 	  int p = blocks[b]->tets[t].verts[v];
-// 	  vec.x = verts[v0].x - sites[p].x;
-// 	  vec.y = verts[v0].y - sites[p].y;
-// 	  vec.z = verts[v0].z - sites[p].z;
-// 	  if (vec.x * normal.x + vec.y * normal.y + vec.z * normal.z < 0.0) {
-// 	    normal.x *= -1.0;
-// 	    normal.y *= -1.0;
-// 	    normal.z *= -1.0;
-// 	  }
-// 	  vor_normals.push_back(normal);
+	  // check sign of dot product of normal with vector from site 
+	  // to first face vertex to see if normal has correct direction
+	  // want outward normal
+	  vec3d vec;
+	  int p = blocks[b]->tets[t].verts[v];
+	  vec.x = verts[v0].x - sites[p].x;
+	  vec.y = verts[v0].y - sites[p].y;
+	  vec.z = verts[v0].z - sites[p].z;
+	  if (vec.x * normal.x + vec.y * normal.y + vec.z * normal.z < 0.0) {
+	    normal.x *= -1.0;
+	    normal.y *= -1.0;
+	    normal.z *= -1.0;
+	  }
+	  vor_normals.push_back(normal);
 
 	} // for all faces in a voronoi cell
 
       } // tet verts
 
       // todo: volume check
-// //       if (blocks[i]->vols[j] >= min_vol &&
-// // 	  (max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol))
-// 	num_vis_cells++;
+//       if (blocks[i]->vols[j] >= min_vol &&
+// 	  (max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol))
+	num_vis_cells++;
 
     } // tets
 
