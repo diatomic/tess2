@@ -1495,6 +1495,8 @@ void PrepRenderingData(int *gid2lid) {
 
 #ifdef TET
 
+#include "tet.h"
+
 // prep rendering for newer dblock model
 
 //--------------------------------------------------------------------------
@@ -1514,8 +1516,19 @@ void PrepCellVertRendering() {
       // push voronoi vertex for rendering
       // voronoi vertex is the circumcenter of the tet
       vec3d center;
-      circumcenter((float *)&(center.x), 
+      circumcenter(&center.x,
 		   &(blocks[b]->tets[t]), blocks[b]->particles);
+
+#if 0	// debug purpuses only
+      const tet_t& tt = blocks[b]->tets[t];
+      float dist = distance(&center.x, &blocks[b]->particles[3*tt.verts[0]]);
+      for (int i = 1; i < 4; ++i) {
+	float dist2 = distance(&center.x, &blocks[b]->particles[3*tt.verts[i]]);
+	if (fabs(dist - dist2) > .00001) {
+	  fprintf(stderr, "Warning: %f %f\n", dist, dist2);
+	}
+      }
+#endif
 
       cell_verts.push_back(center);
 
@@ -1535,7 +1548,9 @@ void PrepCellVertRendering() {
 //
 void PrepCellRendering(int &num_vis_cells) {
 
-  int v0; // starting vertex of the current face
+  fprintf(stderr, "PrepCellRendering");
+
+  int v0 = 0; // starting vertex of the current face
   num_vis_cells = 0; // number of visible cells
 
   for (int b = 0; b < nblocks; b++) { // blocks
@@ -1549,16 +1564,20 @@ void PrepCellRendering(int &num_vis_cells) {
 
       // tet verts
       // equivalent of for all voronoi cells
-      for (int v = 0; v < 4; v++) {
+      for (int vv = 0; vv < 4; vv++) {
+
+	int v = blocks[b]->tets[t].verts[vv];
+
+	fprintf(stderr, "Vertex: %d", v);
 
 	// remote verts can cause visited to need to grow beyond
 	// number of original particles
 	// todo: this is not really handled right yet
 	if (v >= (int)visited.size())
 	  visited.resize(v + 1, false);
-	if (visited[blocks[b]->tets[t].verts[v]])
+	if (visited[v])
 	  continue;
-	visited[blocks[b]->tets[t].verts[v]] = true;
+	visited[v] = true;
 
 	// neighbor edges a vector of (vertex u, tet of vertex u) pairs 
 	// that neighbor vertex v
@@ -1579,19 +1598,20 @@ void PrepCellRendering(int &num_vis_cells) {
 
 	  int u  = nbrs[i].first;
 	  int ut = nbrs[i].second;
-	  int wi = circulate_start(blocks[b]->tets, ut, v, u);
-	  int t1  = ut;
 
-	  // the following loop is the equivalent of
-	  // for all vertices in a voronoi face
-	  while (true) {
+	  std::vector<int> edge_link;
+	  fill_edge_link(edge_link, v, u, ut, blocks[b]->tets);
 
-	    // push voronoi vertex for rendering
-	    // voronoi vertex is the circumcenter of the tet
+	  for (int j = 0; i < edge_link.size(); ++j) {
 	    vec3d center;
 	    circumcenter((float *)&(center.x), 
-			 &(blocks[b]->tets[t1]), blocks[b]->particles);
+			 &(blocks[b]->tets[edge_link[j]]), blocks[b]->particles);
+	    verts.push_back(center);
+	  }
+	  
+	  num_face_verts.push_back(edge_link.size());
 
+#if 0
 	    // todo: compute the volume
 // 	    if (blocks[i]->vols[j] >= min_vol &&
 // 		(max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol)) {
@@ -1602,18 +1622,7 @@ void PrepCellRendering(int &num_vis_cells) {
 
 	    if (i == 0)
 	      v0 = (int)verts.size() - 1; // note starting vertex of this face
-
-	    // get next voronoi vertex
-	    int next_t, next_wi;
-	    circulate_next(&next_t, &next_wi, blocks[b]->tets, t1, wi, v, u);
-	    if (next_t == ut || next_t == -1)
-	      break;
-	    t1  = next_t;
-	    wi = next_wi;
-
-	  } // for all vertices in a voronoi face
-
-	  num_face_verts.push_back((int)verts.size() - v0);
+#endif
 
 	  // face normal (flat shading, one normal per face)
 	  vec3d normal;
@@ -1633,6 +1642,8 @@ void PrepCellRendering(int &num_vis_cells) {
 	    normal.z *= -1.0;
 	  }
 	  vor_normals.push_back(normal);
+
+	  v0 += num_face_verts.back();
 
 	} // for all faces in a voronoi cell
 
