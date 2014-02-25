@@ -2370,7 +2370,7 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 
 }
 // ---------------------------------------------------------------------------
-#if 1
+#if 0
 // Tom's latest version
 //
 //   determines cells that are incomplete or too close to neighbor such that
@@ -2511,7 +2511,9 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 }
 // ---------------------------------------------------------------------------
 #else
-// Dimitriy's latest version
+
+bool operator<(const gb_t& x, const gb_t& y) { return x.gid < y.gid || (x.gid == y.gid && x.neigh_dir < y.neigh_dir); }
+// Dmitriy's latest version
 //
 //   determines cells that are incomplete or too close to neighbor such that
 //   they might change after neighbor exchange. The particles corresponding
@@ -2542,7 +2544,7 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
   DIY_Get_neighbors(0, lid, all_neigh_gbs);
 
   // keep track of where we have queued each particle
-  std::vector< std::set<int> > destinations(dblock->num_orig_particles);
+  std::vector< std::set<gb_t> > destinations(dblock->num_orig_particles);
 
   // identify and queue convex hull particles
   for (int p = 0; p < dblock->num_orig_particles; ++p) {
@@ -2571,24 +2573,9 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
       }
       assert(sent.num_gbs <= 1); // sanity 
 
-      rp.x = dblock->particles[3 * p];
-      rp.y = dblock->particles[3 * p + 1];
-      rp.z = dblock->particles[3 * p + 2];
-      rp.gid = DIY_Gid(0, lid);
-      rp.nid = p;
-      rp.dir = 0x00;
-
-      DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
-			   NULL, sizeof(struct remote_particle_t),
-			   sent.neigh_gbs, sent.num_gbs,
-			   &transform_particle);
-
       // save the desination so we don't duplicate later
-      destinations[p].insert(rp.gid);
-
-      // save the details of the sent particle
-      sent.particle = p;
-      sent_particles.push_back(sent);
+      if (sent.num_gbs > 0)
+	destinations[p].insert(sent.neigh_gbs[0]);
 
       dblock->is_complete[p] = 0;
     } // incomplete
@@ -2612,37 +2599,13 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
       // send all 4 verts
       for (int v = 0; v < 4; v++) {
-	
+
 	int p = dblock->tets[t].verts[v];
 
 	// select neighbors we haven't sent to, yet
-	std::vector<gb_t> gbs;
 	for (int i = 0; i < sent.num_gbs; ++i) {
-	  if (destinations[p].find(sent.neigh_gbs[i].gid) == destinations[p].end()) {
-	    gbs.push_back(sent.neigh_gbs[i]);
-	  }
+	  destinations[p].insert(sent.neigh_gbs[i]);
 	}
-
-	rp.x = dblock->particles[3 * p];
-	rp.y = dblock->particles[3 * p + 1];
-	rp.z = dblock->particles[3 * p + 2];
-	rp.gid = DIY_Gid(0, lid);
-	rp.nid = p;
-	rp.dir = 0x00;
-
-	DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
-			     NULL, sizeof(struct remote_particle_t),
-			     &gbs[0], gbs.size(),
-			     &transform_particle);
-	for (int i = 0; i < gbs.size(); ++i) {
-	  destinations[p].insert(i);
-	}
-
-	// save the details of the sent particle
-	sent.particle = p;
-	sent_particles.push_back(sent);	// XXX: this is probably unreliable at this point;
-					//	probably need to extract info
-					//	out of destinations
 
       } // all 4 verts
 
@@ -2650,6 +2613,29 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
   } // for all tets
 
+  // queue the actual particles
+  for (int p = 0; p < dblock->num_orig_particles; ++p) {
+    if (!destinations[p].empty()) {
+      std::vector<gb_t>	    gbs(destinations[p].begin(),
+				destinations[p].end());
+
+      rp.x = dblock->particles[3 * p];
+      rp.y = dblock->particles[3 * p + 1];
+      rp.z = dblock->particles[3 * p + 2];
+      rp.gid = DIY_Gid(0, lid);
+      rp.nid = p;
+      rp.dir = 0x00;
+
+      DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
+			   NULL, sizeof(struct remote_particle_t),
+			   &gbs[0], gbs.size(),
+			   &transform_particle);
+
+      // save the details of the sent particle
+      sent.particle = p;
+      sent_particles.push_back(sent);
+    }
+  }
 }
 
 #endif
