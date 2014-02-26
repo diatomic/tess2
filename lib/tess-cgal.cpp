@@ -115,6 +115,8 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
       dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
       dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
     }
+
+    fill_vert_to_tet(&dblocks[i]);
   }
 }
 //----------------------------------------------------------------------------

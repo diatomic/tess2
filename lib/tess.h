@@ -116,6 +116,11 @@ extern "C"
 #endif
 void clean_delaunay_data_strucutres(void* ds);
 
+#ifdef __cplusplus
+extern "C"
+#endif
+void fill_vert_to_tet(dblock_t* dblock);
+
 void neighbor_particles(int nblocks, float **particles,
 			int *num_particles, int *num_orig_particles,
 			int **gids, int **nids, unsigned char **dirs);
