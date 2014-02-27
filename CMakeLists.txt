@@ -75,6 +75,9 @@ find_library                (DIY_LIBRARY NAMES		diy)
 # PNetCDF
 find_path                   (PNetCDF_INCLUDE_DIR	pnetcdf.h)
 find_library                (PNetCDF_LIBRARY NAMES	pnetcdf)
+if			    (PNetCDF_LIBRARY)
+  add_definitions	    (-DPNETCDF_IO)
+endif			    (PNetCDF_LIBRARY)
 
 # GenericIO
 if			    (hacc_test)
