@@ -119,7 +119,7 @@ void clean_delaunay_data_strucutres(void* ds);
 #ifdef __cplusplus
 extern "C"
 #endif
-void fill_vert_to_tet(dblock_t* dblock);
+void fill_vert_to_tet(struct dblock_t *dblock);
 
 void neighbor_particles(int nblocks, float **particles,
 			int *num_particles, int *num_orig_particles,
@@ -180,4 +180,6 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
 			  int *num_mirror_particles, float **particles,
 			  int *num_particles, int *num_orig_particles,
 			  int **gids, int **nids, unsigned char **dirs);
+void get_mem(int breakpoint, int dwell);
+
 #endif

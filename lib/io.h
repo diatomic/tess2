@@ -56,9 +56,22 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
 #ifdef __cplusplus
 extern "C"
 #endif
+void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks, 
+		     char *out_file, MPI_Comm comm);
+
+#ifdef __cplusplus
+extern "C"
+#endif
 void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks, 
 		  char *in_file, MPI_Comm comm, int **gids, 
 		  int **num_neighbors, int ***neighbors, int ***neigh_procs);
+
+#ifdef __cplusplus
+extern "C"
+#endif
+void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks, 
+		    char *in_file, MPI_Comm comm, int **gids, 
+		    int **num_neighbors, int ***neighbors, int ***neigh_procs);
 
 #ifdef __cplusplus
 extern "C"

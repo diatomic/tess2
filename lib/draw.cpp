@@ -12,6 +12,13 @@
 // See COPYRIGHT in top-level directory.
 //
 //--------------------------------------------------------------------------
+
+// pnetcdf output 
+#define PNETCDF_IO
+
+// using new tet data model (eventually default)
+#define TET
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
@@ -28,13 +35,6 @@
 #else
 #include <GL/glut.h> 
 #include <GL/gl.h>
-#endif
-
-#define TET // new delaunay tetrahedra data model
-
-// pnetcdf not implemented for tet data model yet
-#ifndef TET
-#define PNETCDF_IO
 #endif
 
 #define SPHERE_RAD_FACTOR .002 // used to compute sphere radius
@@ -226,8 +226,15 @@ int main(int argc, char** argv) {
   int **neigh_procs; // procs of neighbors of each local block (unused)
   swap_bytes = swap_bytes; // quiet compiler warning, unused w/ pnetcdf
   MPI_Init(&argc, &argv);
+
+#ifdef TET
+  pnetcdf_d_read(&nblocks, &tot_blocks, &blocks, argv[1], MPI_COMM_WORLD,
+		 &gids, &num_neighbors, &neighbors, &neigh_procs);
+#else
   pnetcdf_read(&nblocks, &tot_blocks, &blocks, argv[1], MPI_COMM_WORLD,
 	       &gids, &num_neighbors, &neighbors, &neigh_procs);
+#endif
+
   MPI_Finalize();
   // mapping of gid to lid
   int gid2lid[nblocks]; 
@@ -1548,8 +1555,6 @@ void PrepCellVertRendering() {
 //
 void PrepCellRendering(int &num_vis_cells) {
 
-  fprintf(stderr, "PrepCellRendering");
-
   int v0 = 0; // starting vertex of the current face
   num_vis_cells = 0; // number of visible cells
 
@@ -1568,8 +1573,6 @@ void PrepCellRendering(int &num_vis_cells) {
 
 	int v = blocks[b]->tets[t].verts[vv];
 
-	fprintf(stderr, "Vertex: %d", v);
-
 	// remote verts can cause visited to need to grow beyond
 	// number of original particles
 	// todo: this is not really handled right yet
@@ -1584,10 +1587,6 @@ void PrepCellRendering(int &num_vis_cells) {
 	vector< pair<int, int> > nbrs;
 	bool finite = neighbor_edges(nbrs, v, blocks[b]->tets, t);
 
-	// debug
-// 	fprintf(stderr, "1: nbrs.size() = %d finite = %d \n", nbrs.size(),
-// 		finite);
-
 	// skip tet vertices corresponding to incomplete voronoi cells
 	if (!finite) 
 	  continue;
@@ -1596,33 +1595,26 @@ void PrepCellRendering(int &num_vis_cells) {
 	// for all faces in a voronoi cell
 	for (int i = 0; i < (int)nbrs.size(); ++i) {
 
+	  v0 = (int)verts.size(); // note starting vertex of this face
+
+	  // get edge link
 	  int u  = nbrs[i].first;
 	  int ut = nbrs[i].second;
-
 	  std::vector<int> edge_link;
 	  fill_edge_link(edge_link, v, u, ut, blocks[b]->tets);
 
-	  for (int j = 0; j < edge_link.size(); ++j) {
+	  // following is equivalent of all vertices in a face
+	  for (int j = 0; j < (int)edge_link.size(); ++j) {
 	    vec3d center;
 	    circumcenter((float *)&(center.x), 
 			 &(blocks[b]->tets[edge_link[j]]), blocks[b]->particles);
-	    verts.push_back(center);
-	  }
-	  
-	  num_face_verts.push_back(edge_link.size());
-
-#if 0
 	    // todo: compute the volume
 // 	    if (blocks[i]->vols[j] >= min_vol &&
 // 		(max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol)) {
 	    verts.push_back(center);
-
-	    // debug
-// 	    fprintf(stderr, "%.3f %.3f %.3f\n", center.x, center.y, center.z);
-
-	    if (i == 0)
-	      v0 = (int)verts.size() - 1; // note starting vertex of this face
-#endif
+	  }
+	  
+	  num_face_verts.push_back(edge_link.size());
 
 	  // face normal (flat shading, one normal per face)
 	  vec3d normal;
@@ -1642,8 +1634,6 @@ void PrepCellRendering(int &num_vis_cells) {
 	    normal.z *= -1.0;
 	  }
 	  vor_normals.push_back(normal);
-
-	  v0 += num_face_verts.back();
 
 	} // for all faces in a voronoi cell
 

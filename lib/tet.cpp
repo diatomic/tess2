@@ -281,7 +281,6 @@ bool complete(int	    v,
 	      int	    t
 	     )
 {
-  bool finite = true;
   std::queue<int>   q;
   std::set<int>	    visited_tets;
   q.push(t);

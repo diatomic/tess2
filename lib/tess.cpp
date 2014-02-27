@@ -14,7 +14,7 @@
 // --------------------------------------------------------------------------
 
 // pnetcdf output 
-#define PNETCDF_IO
+// #define PNETCDF_IO
 
 // MEMORY PROFILING 
 // #define MEMORY 
@@ -317,12 +317,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
 #ifdef MEMORY
   int dwell = 0;
-  struct rusage r_usage;
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "1: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "1: done\n");
+  get_mem(1, dwell);
 #endif
 
 #ifdef TIMING
@@ -344,11 +339,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "2: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "2: done\n");
+  get_mem(2, dwell);
 #endif
 
   // keep track of which particles lie on the convex hull of the local points 
@@ -364,11 +355,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 			     &num_convex_hull_particles[i]);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "3: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "3: done\n");
+  get_mem(3, dwell);
 #endif
 
   // cleanup local temporary blocks 
@@ -389,22 +376,14 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   }
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "4: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "4: done\n");
+  get_mem(4, dwell);
 #endif
 
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "5: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "5: done\n");
+  get_mem(5, dwell);
 #endif
 
   // Second, decisive phase 
@@ -421,11 +400,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds, &tets[0], &ntets[0]);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "6: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "6: done\n");
+  get_mem(6, dwell);
 #endif
 
   // CLP - Create  pointers to wall-mirror particles for each block 
@@ -445,22 +420,14 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 			   &mirror_particles[i], &num_mirror_particles[i]);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "7: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "7: done\n");
+  get_mem(7, dwell);
 #endif
 
   // cleanup local temporary blocks 
   destroy_blocks(nblocks, tblocks, NULL);
   
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "8: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "8: done\n");
+  get_mem(8, dwell);
 #endif
 
   // exchange particles with neighbors 
@@ -468,11 +435,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 		     gids, nids, dirs);
     
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "9: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "9: done\n");
+  get_mem(9, dwell);
 #endif
 
   // CLP - Function to add wall-mirror particles to particles 
@@ -506,11 +469,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "10: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "10: done\n");
+  get_mem(10, dwell);
 #endif
 
   // Clean-up tets; all_cells() will refill them
@@ -522,11 +481,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 	    particles, gids, nids, dirs, times, ds, &tets[0], &ntets[0]);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "11: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "11: done\n");
+  get_mem(11, dwell);
 #endif
 
   // cleanup 
@@ -548,11 +503,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "12: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "12: done\n");
+  get_mem(12, dwell);
 #endif
 
   // compute volume and surface area manually (not using convex hulls) 
@@ -574,11 +525,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   save_headers(nblocks, vblocks, hdrs);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "13: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "13: done\n");
+  get_mem(13, dwell);
 #endif
 
   // write output 
@@ -599,11 +546,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
  
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "14: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "14: done\n");
+  get_mem(14, dwell);
 #endif
 
   // collect stats 
@@ -618,11 +561,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
     free(tets[i]);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "15: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "15: done\n");
+  get_mem(15, dwell);
 #endif
 
 }
@@ -667,12 +606,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   
 #ifdef MEMORY
   int dwell = 10;
-  struct rusage r_usage;
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "1: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "1: done\n");
+  get_mem(1, dwell);
 #endif
 
 #ifdef TIMING
@@ -692,11 +626,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "2: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "2: done\n");
+  get_mem(2, dwell);
 #endif
 
   // particles on the convex hull of the local points 
@@ -711,12 +641,10 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 			      convex_hull_particles[i]);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "3: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "3: done\n");
+  get_mem(3, dwell);
 #endif
+
+#if 0
 
   // cleanup local temporary blocks 
   destroy_dblocks(nblocks, dblocks, NULL);
@@ -736,22 +664,14 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   }
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "4: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "4: done\n");
+  get_mem(4, dwell);
 #endif
 
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "5: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "5: done\n");
+  get_mem(5, dwell);
 #endif
 
   // Second, decisive phase 
@@ -763,11 +683,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   local_dcells(nblocks, dblocks, dim, num_particles, particles, ds);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "6: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "6: done\n");
+  get_mem(6, dwell);
 #endif
 
   // CLP - give walls and pointer for creating wall-mirror particles 
@@ -777,22 +693,14 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 			    convex_hull_particles[i]);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "7: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "7: done\n");
+  get_mem(7, dwell);
 #endif
 
   // cleanup local temporary blocks 
   destroy_dblocks(nblocks, dblocks, NULL);
   
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "8: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "8: done\n");
+  get_mem(8, dwell);
 #endif
 
   // exchange particles with neighbors 
@@ -800,11 +708,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 		     gids, nids, dirs);
     
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "9: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "9: done\n");
+  get_mem(9, dwell);
 #endif
   
   // cleanup convex hull particles and sent particles
@@ -824,11 +728,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "10: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "10: done\n");
+  get_mem(10, dwell);
 #endif
 
   // create all final voronoi cells 
@@ -836,11 +736,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   //          particles, gids, nids, dirs, times, ds, &tets[0], &ntets[0]);
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "11: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "11: done\n");
+  get_mem(11, dwell);
 #endif
 
   // cleanup 
@@ -862,50 +758,24 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "12: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "12: done\n");
+  get_mem(12, dwell);
 #endif
 
-#if 0
-  // compute volume and surface area manually (not using convex hulls) 
-  cell_vols(nblocks, vblocks, particles);
-
-#ifdef TIMING
-  // previously no barrier here; want min and max time;
-  //   changed to barrier and simple time now 
-  MPI_Barrier(comm);
-  times[VOL_TIME] = MPI_Wtime() - times[VOL_TIME];
-  // MPI_Barrier(comm); 
-  times[OUT_TIME] = MPI_Wtime();
-#endif
-
-#endif // if 0
+#endif // #if 0
 
   // prepare for output 
   prep_d_out(nblocks, dblocks, hdrs);
 
-#ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "13: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "13: done\n");
-#endif
-
   // write output 
   if (out_file[0]) {
-    // pnetcdf turned off for now in delaunay version
-// #ifdef PNETCDF_IO
-//     char out_ncfile[256];
-//     strncpy(out_ncfile, out_file, sizeof(out_ncfile));
-//     strncat(out_ncfile, ".nc", sizeof(out_file));
-//     pnetcdf_write(nblocks, vblocks, out_ncfile, comm);
-// #else
+#ifdef PNETCDF_IO
+    char out_ncfile[256];
+    strncpy(out_ncfile, out_file, sizeof(out_ncfile));
+    strncat(out_ncfile, ".nc", sizeof(out_file));
+    pnetcdf_d_write(nblocks, dblocks, out_ncfile, comm);
+#else
     diy_dwrite(nblocks, dblocks, hdrs, out_file);
-// #endif
+#endif
   }
 
 #ifdef TIMING
@@ -914,11 +784,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 #endif
  
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "14: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "14: done\n");
+  get_mem(13, dwell);
 #endif
 
   // collect stats 
@@ -929,11 +795,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   free(num_orig_particles);
   
 #ifdef MEMORY
-  getrusage(RUSAGE_SELF, &r_usage);
-  fprintf(stderr, "15: max memory = %ld MB, current memory in dashboard\n", 
-	  r_usage.ru_maxrss / 1048576);
-  sleep(dwell);
-  fprintf(stderr, "15: done\n");
+  get_mem(14, dwell);
 #endif
 
 }
@@ -2885,10 +2747,9 @@ void incomplete_dcells_final(struct dblock_t *dblock,
   DIY_Get_neighbors(0, lid, all_neigh_gbs);
 
   // identify and queue convex hull particles
-  int i = 0;
   int old_sent = 0;
   int last_sent = sent_particles.size();
-  for (int j = 0; j < convex_hull_particles.size(); ++j) {
+  for (int j = 0; j < (int)convex_hull_particles.size(); ++j) {
 
     int p = convex_hull_particles[j];
 
@@ -2909,9 +2770,9 @@ void incomplete_dcells_final(struct dblock_t *dblock,
 	  // NB: sent_particles[p].neigh_gbs is sorted (it was inserted from a set),
 	  // so we can use a binary search
 	  bool exists = std::binary_search(sent_particles[old_sent].neigh_gbs,
-					   sent_particles[old_sent].neigh_gbs + 
-					   sent_particles[old_sent].num_gbs,
-					   all_neigh_gbs[l]);
+				      sent_particles[old_sent].neigh_gbs + 
+				      sent_particles[old_sent].num_gbs,
+				      all_neigh_gbs[l]);
 	  if (!exists) {
 	    sent.neigh_gbs[sent.num_gbs].gid	    = all_neigh_gbs[l].gid;
 	    sent.neigh_gbs[sent.num_gbs].neigh_dir  = all_neigh_gbs[l].neigh_dir;
@@ -2925,7 +2786,7 @@ void incomplete_dcells_final(struct dblock_t *dblock,
     else { // complete
 
       std::set<gb_t> destinations;
-      for (int j = 0; j < nbrs.size(); ++j) {
+      for (int j = 0; j < (int)nbrs.size(); ++j) {
 	int t = nbrs[j];
 	float center[3];
 	circumcenter(center, &dblock->tets[t], dblock->particles);
@@ -4020,6 +3881,24 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
     } // if num_mirror_particles 
 
   }
+
+}
+// ---------------------------------------------------------------------------
+//
+// memory profile, prints max reseident usage and sleeps so that user
+// can read current usage some other way, eg. an OS tool or dashboard
+//
+// breakpoint: breakpoint number
+// dwell: sleep time in seconds
+//
+void get_mem(int breakpoint, int dwell) {
+
+  struct rusage r_usage;
+  getrusage(RUSAGE_SELF, &r_usage);
+  fprintf(stderr, "%d: max memory = %ld MB, current memory in dashboard\n", 
+	  breakpoint, r_usage.ru_maxrss / 1048576);
+  sleep(dwell);
+  fprintf(stderr, "%d: done\n", breakpoint);
 
 }
 // ---------------------------------------------------------------------------
