@@ -35,6 +35,7 @@
 
 #include <vector>
 #include <set>
+#include <algorithm>
 #include "tet.h"
 #include "tet-neighbors.h"
 
