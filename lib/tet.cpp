@@ -271,12 +271,13 @@ bool neighbor_tets(std::vector<int>& nbrs,
 /**
  * determines if v's Voronoi cell is finite
  * (equivalently, whether v lies on the convex hull)
+ * returning int instead of bool so that C can call complete
  *
  * v:	    vertex
  * tets:    array of all tetrahedra
  * t:	    tet that contains v
  */
-bool complete(int	    v,
+int complete(int	    v,
 	      tet_t*	    tets,
 	      int	    t
 	     )
@@ -302,14 +303,14 @@ bool complete(int	    v,
       if (u != v) {
 	int next = tets[t].tets[i];
 	if (next == -1)
-	  return false;
+	  return 0; // returning int instead of bool
 	else
 	  q.push(next);
       }
     }
   }
 
-  return true;
+  return 1; // returning int instead of bool
 }
  
 /**
@@ -341,4 +342,32 @@ void fill_edge_link(std::vector<int>&	edge_link,
     t  = next_t;
     wi = next_wi;
   }
+}
+//
+// marks a tet to be skiped
+//
+void skip_tet(struct tet_t *tet) {
+
+  tet->verts[0] = -1;
+  tet->verts[1] = -1;
+  tet->verts[2] = -1;
+  tet->verts[3] = -1;
+  tet->tets[0] = -1;
+  tet->tets[1] = -1;
+  tet->tets[2] = -1;
+  tet->tets[3] = -1;
+
+}
+//
+// checks if a tet is skiped
+//
+int is_skipped_tet(struct tet_t *tet) {
+
+  if (tet->verts[0] == -1 && tet->verts[1] == -1 && tet->verts[2] == -1 &&
+      tet->verts[3] == -1 && tet->tets[0] == -1 && tet->tets[1] == -1 &&
+      tet->tets[2] == -1 && tet->tets[3] == -1)
+    return 1;
+
+  return 0;
+
 }

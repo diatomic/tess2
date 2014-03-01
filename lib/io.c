@@ -160,12 +160,11 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
   dimids_2D[1] = dimids[9];
   err = ncmpi_def_var(ncid, "tets", NC_INT, 2, dimids_2D, 
 		      &varids[27]); ERR;
-  dimids_2D[0] = dimids[10];
-  err = ncmpi_def_var(ncid, "rem_tet_vert_gids", NC_INT, 2, dimids_2D, 
+  err = ncmpi_def_var(ncid, "rem_tet_vert_gids", NC_INT, 1, &dimids[10],
 		      &varids[30]); ERR;
-  err = ncmpi_def_var(ncid, "rem_tet_vert_nids", NC_INT, 2, dimids_2D, 
+  err = ncmpi_def_var(ncid, "rem_tet_vert_nids", NC_INT, 1, &dimids[10], 
 		      &varids[31]); ERR;
-  err = ncmpi_def_var(ncid, "rem_tet_vert_dirs", NC_UBYTE, 2, dimids_2D, 
+  err = ncmpi_def_var(ncid, "rem_tet_vert_dirs", NC_UBYTE, 1, &dimids[10], 
 		      &varids[32]); ERR;
 
   /* exit define mode */
@@ -260,10 +259,8 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
        an extra memory copy is needed because pnetcdf does not like structs
        with different field types */
     count[0] = d->num_rem_tet_verts;
-    count[1] = (count[0] ? 4 : 0);
     start[0] = (count[0] ? block_ofsts[NUM_REM_TETRAS] : 0);
-    start[1] = 0;
-    /* copy individual fields of struct into seaparate temp. arrays */
+    /* copy individual fields of struct into separate temp. arrays */
     int *ids = (int *)malloc(d->num_rem_tet_verts * sizeof(int));
     for (i = 0; i < d->num_rem_tet_verts; i++)
       ids[i] = d->rem_tet_verts[i].gid;
@@ -275,6 +272,8 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
 				 ids); ERR;
     free(ids);
     unsigned char *dirs = (unsigned char *)malloc(d->num_rem_tet_verts);
+    for (i = 0; i < d->num_rem_tet_verts; i++)
+      dirs[i] = d->rem_tet_verts[i].dir;
     err = ncmpi_put_vara_uchar_all(ncid, varids[32], start, count,
 				   dirs); ERR;
     free(dirs);
@@ -481,9 +480,7 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
       (struct remote_vert_t *)malloc(d->num_rem_tet_verts *
 				     sizeof(struct remote_vert_t));
     count[0] = d->num_rem_tet_verts;
-    count[1] = (count[0] ? 4 : 0);
     start[0] = (count[0] ? block_ofsts[start_block_ofst + b] : 0);
-    start[1] = 0;
     /* copy individual fields of struct into seaparate temp. arrays */
     int *ids = (int *)malloc(d->num_rem_tet_verts * sizeof(int));
     err = ncmpi_inq_varid(ncid, "rem_tet_gids", &varids[30]); ERR;

@@ -14,7 +14,11 @@ bool neighbor_tets(std::vector<int>& nbrs,
 		   int	    t
 		  );
 
-bool complete(int	    v,
+// returns int instead of bool so that C can call complete
+#ifdef __cplusplus
+extern "C"
+#endif
+int complete(int	    v,
 	      tet_t*	    tets,
 	      int	    t
 	     );
@@ -24,3 +28,7 @@ void fill_edge_link(std::vector<int>&	edge_link,
 		    int			u,
 		    int			ut,
 		    tet_t*		tets);
+
+void skip_tet(struct tet_t *tet);
+
+int is_skipped_tet(struct tet_t *tet);

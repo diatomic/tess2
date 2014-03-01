@@ -13,9 +13,6 @@
 //
 //--------------------------------------------------------------------------
 
-// pnetcdf output 
-#define PNETCDF_IO
-
 // using new tet data model (eventually default)
 #define TET
 
@@ -195,7 +192,6 @@ void PrepSiteRendering(int &num_sites);
 void PrepCellRendering(int &num_visible_cells);
 void PrepCellVertRendering();
 void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int* gid2lid);
-int compare(const void *a, const void *b);
 
 //--------------------------------------------------------------------------
 
@@ -1445,19 +1441,6 @@ void NewellNormal(vec3d *verts, int num_verts, vec3d &normal) {
 
 }
 //--------------------------------------------------------------------------
-// 
-// comparison function for qsort (debugging)
-//
-int compare(const void *a, const void *b) {
-
-  if (*((int*)a) < *((int*)b))
-    return -1;
-  if (*((int*)a) == *((int*)b))
-    return 0;
-  return 1;
-
-}
-//--------------------------------------------------------------------------
 //
 // package rendering data
 // gid2lid: mapping of gids to lids
@@ -1515,8 +1498,6 @@ void PrepCellVertRendering() {
 
   for (int b = 0; b < nblocks; b++) { // blocks
 
-    fprintf(stderr, "2: num_tets = %d\n", blocks[b]->num_tets);
-
     // tets
     for (int t = 0; t < blocks[b]->num_tets; t++) {
 
@@ -1538,9 +1519,6 @@ void PrepCellVertRendering() {
 #endif
 
       cell_verts.push_back(center);
-
-      // debug
-      fprintf(stderr, "%.3f %.3f %.3f\n", center.x, center.y, center.z);
 
     } // tets
 
@@ -1566,6 +1544,9 @@ void PrepCellRendering(int &num_vis_cells) {
 
     // tets
     for (int t = 0; t < blocks[b]->num_tets; t++) {
+
+      if (is_skipped_tet(&(blocks[b]->tets[t])))
+	  continue;
 
       // tet verts
       // equivalent of for all voronoi cells
@@ -1662,43 +1643,44 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
   num_loc_tets = 0;
   num_rem_tets = 0;
 
-  for (int i = 0; i < nblocks; i++) { // blocks
-
-    fprintf(stderr, "1: num_tets = %d\n", blocks[i]->num_tets);
+  for (int b = 0; b < nblocks; b++) { // blocks
 
     // local tets
-    for (int j = 0; j < blocks[i]->num_tets; j++) {
+    for (int t = 0; t < blocks[b]->num_tets; t++) {
+
+      if (is_skipped_tet(&(blocks[b]->tets[t])))
+	  continue;
 
 //       // check that tet has all neighbors, ie, not on convex hull
-//       if (blocks[i]->tets[j].tets[0] == -1 ||
-// 	  blocks[i]->tets[j].tets[1] == -1 ||
-// 	  blocks[i]->tets[j].tets[2] == -1 ||
-// 	  blocks[i]->tets[j].tets[3] == -1) {
+//       if (blocks[b]->tets[j].tets[0] == -1 ||
+// 	  blocks[b]->tets[j].tets[1] == -1 ||
+// 	  blocks[b]->tets[j].tets[2] == -1 ||
+// 	  blocks[b]->tets[j].tets[3] == -1) {
 // 	// debug
 // // 	fprintf(stderr, "skipping tet %d (convex hull)\n", j);
 // 	continue;
 //       }
 
       // site indices for tet vertices
-      int s0 = blocks[i]->tets[j].verts[0];
-      int s1 = blocks[i]->tets[j].verts[1];
-      int s2 = blocks[i]->tets[j].verts[2];
-      int s3 = blocks[i]->tets[j].verts[3];
+      int s0 = blocks[b]->tets[t].verts[0];
+      int s1 = blocks[b]->tets[t].verts[1];
+      int s2 = blocks[b]->tets[t].verts[2];
+      int s3 = blocks[b]->tets[t].verts[3];
 
       // coordinates for tet vertices
       vec3d p0, p1, p2, p3;
-      p0.x = blocks[i]->particles[3 * s0];
-      p0.y = blocks[i]->particles[3 * s0 + 1];
-      p0.z = blocks[i]->particles[3 * s0 + 2];
-      p1.x = blocks[i]->particles[3 * s1];
-      p1.y = blocks[i]->particles[3 * s1 + 1];
-      p1.z = blocks[i]->particles[3 * s1 + 2];
-      p2.x = blocks[i]->particles[3 * s2];
-      p2.y = blocks[i]->particles[3 * s2 + 1];
-      p2.z = blocks[i]->particles[3 * s2 + 2];
-      p3.x = blocks[i]->particles[3 * s3];
-      p3.y = blocks[i]->particles[3 * s3 + 1];
-      p3.z = blocks[i]->particles[3 * s3 + 2];
+      p0.x = blocks[b]->particles[3 * s0];
+      p0.y = blocks[b]->particles[3 * s0 + 1];
+      p0.z = blocks[b]->particles[3 * s0 + 2];
+      p1.x = blocks[b]->particles[3 * s1];
+      p1.y = blocks[b]->particles[3 * s1 + 1];
+      p1.z = blocks[b]->particles[3 * s1 + 2];
+      p2.x = blocks[b]->particles[3 * s2];
+      p2.y = blocks[b]->particles[3 * s2 + 1];
+      p2.z = blocks[b]->particles[3 * s2 + 2];
+      p3.x = blocks[b]->particles[3 * s3];
+      p3.y = blocks[b]->particles[3 * s3 + 1];
+      p3.z = blocks[b]->particles[3 * s3 + 2];
 
       // add the vertices
       tet_verts.push_back(p0);

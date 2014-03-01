@@ -91,11 +91,18 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 #ifdef __cplusplus
 extern "C"
 #endif
+void all_dcells(int nblocks, struct dblock_t *dblocks, int dim,
+		int *num_particles, int *num_orig_particles, 
+		float **particles, double *times, void* ds);
+#ifdef __cplusplus
+extern "C"
+#endif
 void cell_faces(struct vblock_t *vblock);
 void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs);
 void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs);
 void destroy_dblocks(int num_blocks, struct dblock_t *dblocks, int **hdrs);
 void reset_blocks(int num_blocks, struct vblock_t *vblocks);
+
 #ifdef __cplusplus
 extern "C"
 #endif
@@ -114,7 +121,7 @@ void* init_delaunay_data_structures(int nblocks);
 #ifdef __cplusplus
 extern "C"
 #endif
-void clean_delaunay_data_strucutres(void* ds);
+void clean_delaunay_data_structures(void* ds);
 
 #ifdef __cplusplus
 extern "C"
@@ -124,11 +131,16 @@ void fill_vert_to_tet(struct dblock_t *dblock);
 void neighbor_particles(int nblocks, float **particles,
 			int *num_particles, int *num_orig_particles,
 			int **gids, int **nids, unsigned char **dirs);
+void neighbor_d_particles(int nblocks, struct dblock_t *dblocks, 
+			  float **particles, int *num_particles, 
+			  int *num_orig_particles);
+
 #ifdef __cplusplus
 extern "C"
 #endif
 void neighbor_is_complete(int nblocks, struct vblock_t *vblocks,
 			  struct remote_ic_t **rics);
+
 void item_type(DIY_Datatype *type);
 void ic_type(DIY_Datatype *dtype);
 void collect_stats(int nblocks, struct vblock_t *vblocks, double *times);
@@ -171,6 +183,8 @@ extern "C"
 void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 	      int *gids, int *nids, unsigned char *dirs,
 	      struct remote_ic_t *rics, int lid, int num_recvd);
+void gen_d_tets(struct dblock_t *dblock,
+		struct remote_ic_t *rics, int lid, int num_recvd);
 
 void create_walls(int *num_walls, struct wall_t **walls);
 void destroy_walls(int num_walls, struct wall_t *walls);

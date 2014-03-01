@@ -20,7 +20,7 @@ LIBS = $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB) -L. -ltess
 
 ifeq ($(ARCH), MAC_OSX) # mac version
 
-CCFLAGS = -g -Wall -Wextra
+CCFLAGS += -g -Wall -Wextra
 CCFLAGS += -DMAC_OSX $(TIMING) -fopenmp
 CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS = -framework GLUT -framework OpenGL
@@ -31,7 +31,7 @@ endif
 
 ifeq ($(ARCH), LINUX) # linux version
 
-CCFLAGS = -g
+CCFLAGS += -g
 CCFLAGS += -DLINUX $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS = -lglut -lGLU -lGL
@@ -42,8 +42,8 @@ endif
 
 ifeq ($(ARCH), BGQ) # BG/Q version
 
-CCFLAGS = -O3
-#CCFLAGS = -g
+CCFLAGS += -O3
+#CCFLAGS += -g
 CCFLAGS += -DBGQ $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS =

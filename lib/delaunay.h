@@ -34,7 +34,6 @@ struct dblock_t {
   struct tet_t *tets; /* delaunay tets */
   int num_rem_tet_verts; /* number of remote delaunay vertices */
   struct remote_vert_t *rem_tet_verts; /* remote tet vertex (particle) info */
-
   int* vert_to_tet; /* a tet that contains the vertex */
 
 

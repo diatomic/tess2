@@ -57,6 +57,7 @@ PNETCDF_LIB = -L$(HOME)/software/parallel-netcdf-1.3.0/lib -lpnetcdf
 endif
 
 TIMING = -DTIMING
+CCFLAGS = -DPNETCDF_IO
 
 #----------------------------------------------------------------------------
 #

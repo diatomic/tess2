@@ -1,5 +1,6 @@
 #include "tess.h"
 #include "tess-cgal.h"
+#include "tet-neighbors.h"
 #include <vector>
 
 //----------------------------------------------------------------------------
@@ -11,7 +12,7 @@ void* init_delaunay_data_structures(int nblocks)
   return new Delaunay3D[nblocks];
 }
 
-void clean_delaunay_data_strucutres(void* ds)
+void clean_delaunay_data_structures(void* ds)
 {
   Delaunay3D* dds = (Delaunay3D*) ds;
   delete[] dds;
@@ -88,15 +89,13 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
 		  int *num_particles, float **particles, void* ds) {
   int i,j;
 
-  unsigned total = 0;
+
   Delaunay3D* Dts = (Delaunay3D*) ds;
 
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
     Delaunay3D& Dt = Dts[i];
     construct_delaunay(Dt, num_particles[i], particles[i]);
-    total += num_particles[i];
-    // std::cout << "Num particles (local): " << num_particles[i] << std::endl;
 
     // fill the tets
     int ntets =  Dt.number_of_finite_cells();
@@ -226,6 +225,62 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
   free(rics);
   free(tet_verts);
   free(num_tets);
+
+}
+//----------------------------------------------------------------------------
+//
+//   creates all final delaunay cells
+//
+//   nblocks: number of blocks
+//   dblocks: pointer to array of dblocks
+//   dim: number of dimensions (eg. 3)
+//   num_particles: number of particles in each block
+//   num_orig_particles: number of original particles in each block, before any
+//   neighbor exchange
+//   particles: particles in each block, particles[block_num][particle]
+//   where each particle is 3 values, px, py, pz
+//   times: timing
+//   ds: the delaunay data structures
+//
+void all_dcells(int nblocks, struct dblock_t *dblocks, int dim,
+		int *num_particles, int *num_orig_particles, 
+		float **particles, double *times, void* ds) {
+
+  Delaunay3D* Dts = (Delaunay3D*) ds;
+
+  // for all blocks 
+  for (int i = 0; i < nblocks; i++) {
+
+    // oompute delaunay
+    Delaunay3D& Dt = Dts[i];
+    construct_delaunay(Dt, num_particles[i], particles[i]);
+
+    // fill the tets
+    dblocks[i].num_tets = Dt.number_of_finite_cells();
+    dblocks[i].tets  = (tet_t*)malloc(sizeof(tet_t) * dblocks[i].num_tets);
+    gen_tets(Dt, dblocks[i].tets);
+
+    // allocate copy for original particles
+    dblocks[i].num_orig_particles = num_orig_particles[i];
+    dblocks[i].particles =
+      (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
+
+    // allocate lookup table for cells completion status
+    dblocks[i].is_complete = 
+      (unsigned char *)malloc(dblocks[i].num_orig_particles);
+
+    fill_vert_to_tet(&dblocks[i]);
+
+    // copy particles and get their completeion status
+    for (int j = 0; j < dblocks[i].num_orig_particles; j++) {
+      dblocks[i].particles[3 * j]     = particles[i][3 * j];
+      dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
+      dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
+      dblocks[i].is_complete[j] = complete(j, dblocks[i].tets, 
+					   dblocks[i].vert_to_tet[j]);
+    }
+
+  } // for all blocks 
 
 }
 //----------------------------------------------------------------------------
@@ -459,3 +514,4 @@ void gen_tets(Delaunay3D& Dt, tet_t* tets)
     ++idx;
   }
 }
+//----------------------------------------------------------------------------

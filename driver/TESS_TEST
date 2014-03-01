@@ -28,7 +28,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=1
+num_procs=2
 
 # procs per node
 ppn=8 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
@@ -49,13 +49,13 @@ tb=$[$num_procs * 1]
 # data size x y z (always 3D)
 #dsize="3 3 3"
 #dsize="4 4 4"
-#dsize="5 5 5"
+dsize="5 5 5"
 #dsize="6 6 6"
 #dsize="8 8 8"
 #dsize="10 10 10"
 #dsize="16 16 16"
 #dsize="32 32 32"
-dsize="64 64 64"
+#dsize="64 64 64"
 #dsize="128 128 128"
 #dsize="256 256 256"
 
@@ -89,11 +89,11 @@ args="$tb $dsize $jitter $minv $maxv $wrap $walls $outfile"
 
 if [ "$ARCH" = "MAC_OSX" ]; then
 
-mpiexec -l -n $num_procs $exe $args
+#mpiexec -l -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 
-#dsymutil $exe ; mpiexec -l -n $num_procs valgrind -q $exe $args
+dsymutil $exe ; mpiexec -l -n $num_procs valgrind -q $exe $args
 
 #dsymutil $exe ; mpiexec -n $num_procs valgrind -q --leak-check=yes $exe $args
 
