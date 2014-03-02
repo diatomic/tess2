@@ -324,7 +324,7 @@ void SER_IO::ReadBlock(FILE *fd, dblock_t* &d, int64_t ofst) {
 
   if (d->num_orig_particles > 0) {
     d->particles = new float[3 * d->num_orig_particles];
-    d->is_complete = new unsigned char[d->num_orig_particles];
+    d->vert_to_tet = new int[d->num_orig_particles];
   }
   if (d->num_tets > 0)
     d->tets = new tet_t[d->num_tets];
@@ -333,7 +333,7 @@ void SER_IO::ReadBlock(FILE *fd, dblock_t* &d, int64_t ofst) {
 
   fread(d->mins, sizeof(float), 3, fd);
   fread(d->particles, sizeof(float), 3 * d->num_orig_particles, fd);
-  fread(d->is_complete, sizeof(unsigned char), d->num_orig_particles, fd);
+  fread(d->vert_to_tet, sizeof(int), d->num_orig_particles, fd);
   fread(d->tets, sizeof(struct tet_t), d->num_tets, fd);
   fread(d->rem_tet_verts, sizeof(struct remote_vert_t), 
 	d->num_rem_tet_verts, fd);
@@ -343,7 +343,7 @@ void SER_IO::ReadBlock(FILE *fd, dblock_t* &d, int64_t ofst) {
 
     Swap((char *)d->mins, 3, sizeof(float));
     Swap((char *)d->particles, 3 * d->num_orig_particles, sizeof(float));
-    // no need to swap is_complete, unsigned char
+    Swap((char *)d->vert_to_tet, d->num_orig_particles, sizeof(int));
 
     // tets and rem_tet_verts are structs, need to swap each element
     // need to swap items individually (annoying)

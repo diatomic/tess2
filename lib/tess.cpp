@@ -2030,7 +2030,6 @@ void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs) {
 
     dblocks[i].num_orig_particles = 0;
     dblocks[i].particles = NULL;
-    dblocks[i].is_complete = NULL;
     dblocks[i].num_tets = 0;
     dblocks[i].tets = NULL;
     dblocks[i].num_rem_tet_verts = 0;
@@ -2114,8 +2113,6 @@ void destroy_dblocks(int num_blocks, struct dblock_t *dblocks, int **hdrs) {
       delete[] hdrs[i];
     if (dblocks[i].particles)
       free(dblocks[i].particles);
-    if (dblocks[i].is_complete)
-      free(dblocks[i].is_complete);
     if (dblocks[i].tets)
       free(dblocks[i].tets);
     if (dblocks[i].rem_tet_verts)
@@ -2247,7 +2244,6 @@ void reset_dblocks(int num_blocks, struct dblock_t* &dblocks) {
 
 //     dblocks[i].num_orig_particles = 0;
 //     dblocks[i].particles = NULL;
-    dblocks[i].is_complete = NULL;
     dblocks[i].num_tets = 0;
     dblocks[i].tets = NULL;
 //     dblocks[i].num_rem_tet_verts = 0;
@@ -2492,10 +2488,8 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
       if (sent.num_gbs > 0)
 	destinations[p].insert(sent.neigh_gbs[0]);
 
-      dblock->is_complete[p] = 0;
     } // incomplete
-    else // the voronoi cell for this vertex is complete
-      dblock->is_complete[p] = 1;
+
   }
 
   // for all tets

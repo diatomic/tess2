@@ -157,8 +157,6 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
     dblocks[i].num_orig_particles = num_particles[i];
     dblocks[i].particles =
       (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
-    dblocks[i].is_complete =
-      (unsigned char *)malloc(dblocks[i].num_orig_particles);
     for (j = 0; j < dblocks[i].num_orig_particles; j++) {
       dblocks[i].particles[3 * j] = particles[i][3 * j];
       dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
@@ -392,10 +390,6 @@ void all_dcells(int nblocks, struct dblock_t *dblocks, int dim,
     dblocks[i].particles =
       (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
 
-    /* allocate lookup table for cells completion status */
-    dblocks[i].is_complete = 
-      (unsigned char *)malloc(dblocks[i].num_orig_particles);
-
     fill_vert_to_tet(&dblocks[i]);
 
     /* copy particles and their completion status */
@@ -403,8 +397,6 @@ void all_dcells(int nblocks, struct dblock_t *dblocks, int dim,
       dblocks[i].particles[3 * j] = particles[i][3 * j];
       dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
       dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
-      dblocks[i].is_complete[j] = complete(j, dblocks[i].tets, 
-					   dblocks[i].vert_to_tet[j]);
     }
 
     /* clean up qhull */

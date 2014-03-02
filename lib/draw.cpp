@@ -1541,108 +1541,89 @@ void PrepCellRendering(int &num_vis_cells) {
 
   for (int b = 0; b < nblocks; b++) { // blocks
 
-    // this delaunay vertex = particle was already done
-    vector<bool> visited;
-    visited.resize(blocks[b]->num_orig_particles, false);
+    // for all voronoi cells
+    for (int p = 0; p < blocks[b]->num_orig_particles; p++) {
 
-    // tets
-    for (int t = 0; t < blocks[b]->num_tets; t++) {
+      // tet
+      int t = blocks[b]->vert_to_tet[p];
 
-      if (is_skipped_tet(&(blocks[b]->tets[t])))
-	  continue;
+//       if (is_skipped_tet(&(blocks[b]->tets[t])))
+// 	continue;
 
-      // tet verts
-      // equivalent of for all voronoi cells
-      for (int vv = 0; vv < 4; vv++) {
+      // neighbor edges a vector of (vertex u, tet of vertex u) pairs 
+      // that neighbor vertex v
+      vector< pair<int, int> > nbrs;
+      bool finite = neighbor_edges(nbrs, p, blocks[b]->tets, t);
 
-	int v = blocks[b]->tets[t].verts[vv];
+      // skip tet vertices corresponding to incomplete voronoi cells
+//       if (!finite) 
+// 	continue;
 
-	// remote verts can cause visited to need to grow beyond
-	// number of original particles
-	// todo: this is not really handled right yet
-	if (v >= (int)visited.size())
-	  visited.resize(v + 1, false);
-	if (visited[v])
-	  continue;
-	visited[v] = true;
+      bool keep = true; // this cell passes all tests, volume, data extents
+      vector <vec3d> temp_verts; // verts in this cell
+      vector <int> temp_num_face_verts;  // number of face verts in this call
+      vector <vec3d> temp_vor_normals; // face normals in this cell
 
-	// neighbor edges a vector of (vertex u, tet of vertex u) pairs 
-	// that neighbor vertex v
-	vector< pair<int, int> > nbrs;
-	bool finite = neighbor_edges(nbrs, v, blocks[b]->tets, t);
+      // the following loop is the equivalent of
+      // for all faces in a voronoi cell
+      for (int i = 0; i < (int)nbrs.size(); ++i) {
 
-	// skip tet vertices corresponding to incomplete voronoi cells
-	if (!finite) 
-	  continue;
+	v0 = (int)temp_verts.size(); // note starting vertex of this face
 
-	bool keep = true; // this cell passes all tests, volume, data extents
-	vector <vec3d> temp_verts; // verts in this cell
-	vector <int> temp_num_face_verts;  // number of face verts in this call
-	vector <vec3d> temp_vor_normals; // face normals in this cell
+	// get edge link
+	int u  = nbrs[i].first;
+	int ut = nbrs[i].second;
+	std::vector<int> edge_link;
+	fill_edge_link(edge_link, p, u, ut, blocks[b]->tets);
 
-	// the following loop is the equivalent of
-	// for all faces in a voronoi cell
-	for (int i = 0; i < (int)nbrs.size(); ++i) {
+	// following is equivalent of all vertices in a face
+	for (int j = 0; j < (int)edge_link.size(); ++j) {
+	  vec3d center;
+	  circumcenter((float *)&(center.x), 
+		       &(blocks[b]->tets[edge_link[j]]), blocks[b]->particles);
+	  // filter out cells far outside the overal extents
+	  if (center.x < data_min.x * ds || center.x > data_max.x * ds ||
+	      center.y < data_min.y * ds || center.y > data_max.y * ds ||
+	      center.z < data_min.z * ds || center.z > data_max.z * ds)
+	    keep = false;
+	  temp_verts.push_back(center);
+	}
 
-	  v0 = (int)temp_verts.size(); // note starting vertex of this face
+	temp_num_face_verts.push_back(edge_link.size());
 
-	  // get edge link
-	  int u  = nbrs[i].first;
-	  int ut = nbrs[i].second;
-	  std::vector<int> edge_link;
-	  fill_edge_link(edge_link, v, u, ut, blocks[b]->tets);
+	// face normal (flat shading, one normal per face)
+	vec3d normal;
+	Normal(&temp_verts[v0], normal);
 
-	  // following is equivalent of all vertices in a face
-	  for (int j = 0; j < (int)edge_link.size(); ++j) {
-	    vec3d center;
-	    circumcenter((float *)&(center.x), 
-			 &(blocks[b]->tets[edge_link[j]]), blocks[b]->particles);
-	    // filter out cells far outside the overal extents
-	    if (center.x < data_min.x * ds || center.x > data_max.x * ds ||
-		center.y < data_min.y * ds || center.y > data_max.y * ds ||
-		center.z < data_min.z * ds || center.z > data_max.z * ds)
-	      keep = false;
-	    temp_verts.push_back(center);
-	  }
+	// check sign of dot product of normal with vector from site 
+	// to first face vertex to see if normal has correct direction
+	// want outward normal
+	vec3d vec;
+	vec.x = temp_verts[v0].x - sites[p].x;
+	vec.y = temp_verts[v0].y - sites[p].y;
+	vec.z = temp_verts[v0].z - sites[p].z;
+	if (vec.x * normal.x + vec.y * normal.y + vec.z * normal.z < 0.0) {
+	  normal.x *= -1.0;
+	  normal.y *= -1.0;
+	  normal.z *= -1.0;
+	}
+	temp_vor_normals.push_back(normal);
 
-	  temp_num_face_verts.push_back(edge_link.size());
-
-	  // face normal (flat shading, one normal per face)
-	  vec3d normal;
-	  Normal(&temp_verts[v0], normal);
-
-	  // check sign of dot product of normal with vector from site 
-	  // to first face vertex to see if normal has correct direction
-	  // want outward normal
-	  vec3d vec;
-	  int p = blocks[b]->tets[t].verts[v];
-	  vec.x = temp_verts[v0].x - sites[p].x;
-	  vec.y = temp_verts[v0].y - sites[p].y;
-	  vec.z = temp_verts[v0].z - sites[p].z;
-	  if (vec.x * normal.x + vec.y * normal.y + vec.z * normal.z < 0.0) {
-	    normal.x *= -1.0;
-	    normal.y *= -1.0;
-	    normal.z *= -1.0;
-	  }
-	  temp_vor_normals.push_back(normal);
-
-	} // for all faces in a voronoi cell
+      } // for all faces in a voronoi cell
 
 	// keep the cell
 	// todo: check the cell volume here against min,max thresholds
-	if (keep) {
-	  for (int k = 0; k < (int)temp_verts.size(); k++)
-	    verts.push_back(temp_verts[k]);
-	  for (int k = 0; k < (int)temp_num_face_verts.size(); k++)
-	    num_face_verts.push_back(temp_num_face_verts[k]);
-	  for (int k = 0; k < (int)temp_vor_normals.size(); k++)
-	    vor_normals.push_back(temp_vor_normals[k]);
-	  num_vis_cells++;
-	}
+      if (keep) {
+	for (int k = 0; k < (int)temp_verts.size(); k++)
+	  verts.push_back(temp_verts[k]);
+	for (int k = 0; k < (int)temp_num_face_verts.size(); k++)
+	  num_face_verts.push_back(temp_num_face_verts[k]);
+	for (int k = 0; k < (int)temp_vor_normals.size(); k++)
+	  vor_normals.push_back(temp_vor_normals[k]);
+	num_vis_cells++;
+      }
 
-      } // tet verts
-
-    } // tets
+    } // voronoi cells
 
   } // blocks
 

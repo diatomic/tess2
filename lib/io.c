@@ -45,13 +45,13 @@
  *              float mins(tot_blocks, XYZ) ;
  *              float maxs(tot_blocks, XYZ) ;
  *              float particles(num_g_orig_particles) ;
- *              unsigned char is_complete(num_g_orig_particles) ;
  *              int num_neighbors(num_g_blocks) ;
  *              int neighbors(num_g_neighbors) ;
  *              int neigh_procs(num_g_neighbors) ;
  *              int g_block_ids(num_g_blocks) ;
  *              int tets(8 * num_g_tets) ; (verts and neighbors combined)
  *              int rem_tet_verts(num_g_rem_tet_verts) ;
+ *              int vert_to_tet(num_g_orig_particles);
  *
 ---------------------------------------------------------------------------*/
 /*
@@ -166,6 +166,8 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
 		      &varids[31]); ERR;
   err = ncmpi_def_var(ncid, "rem_tet_vert_dirs", NC_UBYTE, 1, &dimids[10], 
 		      &varids[32]); ERR;
+  err = ncmpi_def_var(ncid, "vert_to_tet", NC_INT, 1, &dimids[6], 
+		      &varids[33]); ERR;
 
   /* exit define mode */
   err = ncmpi_enddef(ncid); ERR;
@@ -277,6 +279,12 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
     err = ncmpi_put_vara_uchar_all(ncid, varids[32], start, count,
 				   dirs); ERR;
     free(dirs);
+
+    /* vert_to_tet */
+    start[0] = block_ofsts[NUM_ORIG_PARTS];
+    count[0] = d->num_orig_particles;
+    err = ncmpi_put_vara_int_all(ncid, varids[33], start, count, 
+				 d->vert_to_tet); ERR;
 
     /* update block offsets */
     block_ofsts[NUM_ORIG_PARTS] += d->num_orig_particles;
@@ -502,6 +510,18 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
       d->rem_tet_verts[i].dir = dirs[i];
     free(dirs);
     
+    /* vert_to_tet */
+    start[0] = 0;
+    count[0] = *tot_blocks;
+    err = ncmpi_get_vara_longlong_all(ncid, varids[9], start, count, 
+				      (long long *)block_ofsts); ERR;
+    d->vert_to_tet = (int *)malloc(d->num_orig_particles * sizeof(int));
+    start[0] = block_ofsts[start_block_ofst + b];
+    count[0] = d->num_orig_particles;
+    err = ncmpi_inq_varid(ncid, "vert_to_tet", &varids[33]); ERR;
+    err = ncmpi_get_vara_int_all(ncid, varids[33], start, count, 
+				   d->vert_to_tet); ERR;
+
     /* save the block */
     (*dblocks)[b] = d;
 
@@ -560,17 +580,17 @@ void create_d_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype) {
   struct dblock_t *d = (struct dblock_t *)dblock;
   struct map_block_t map[] = {
 
-    { DIY_FLOAT,  OFST, 3, 
+    { DIY_FLOAT, OFST, 3, 
       offsetof(struct dblock_t, mins)             },
     { DIY_FLOAT, ADDR, d->num_orig_particles * 3,
       DIY_Addr(d->particles)                      },
-    { DIY_BYTE,    ADDR, d->num_orig_particles, 
-      DIY_Addr(d->is_complete)                    },
-    { ttype,    ADDR, d->num_tets, 
+    { ttype,     ADDR, d->num_tets, 
       DIY_Addr(d->tets)                           },
-    { rtype,    ADDR, d->num_rem_tet_verts, 
+    { rtype,     ADDR, d->num_rem_tet_verts, 
       DIY_Addr(d->rem_tet_verts)                  },
-    { DIY_FLOAT,  OFST, 3, 
+    { DIY_INT,   ADDR, d->num_orig_particles,
+      DIY_Addr(d->vert_to_tet)                    },
+    { DIY_FLOAT, OFST, 3, 
       offsetof(struct dblock_t, maxs)             },
 
   };
@@ -584,7 +604,7 @@ void create_d_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype) {
 /*--------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------
- *  pnetcdf voronois and delaunay file schema
+ *  pnetcdf voronoi and delaunay file schema
  *
  *      dimensions:
  *              num_g_blocks; ie, tot_blocks

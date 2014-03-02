@@ -26,8 +26,6 @@ struct dblock_t {
   int num_orig_particles; /* number of original particles in this block
   			     before any neighbor exhcange */
   float *particles; /* original input points */
-  unsigned char *is_complete; /* whether each oiginal particle is the site of
-				 a complete voronoi cell or not */
 
   /* tets */
   int num_tets; /* number of delaunay tetrahedra */

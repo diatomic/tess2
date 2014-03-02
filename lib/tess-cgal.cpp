@@ -87,13 +87,12 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 */
 void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
 		  int *num_particles, float **particles, void* ds) {
-  int i,j;
-
 
   Delaunay3D* Dts = (Delaunay3D*) ds;
 
   /* for all blocks */
-  for (i = 0; i < nblocks; i++) {
+  for (int i = 0; i < nblocks; i++) {
+
     Delaunay3D& Dt = Dts[i];
     construct_delaunay(Dt, num_particles[i], particles[i]);
 
@@ -107,16 +106,16 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
     dblocks[i].num_orig_particles = num_particles[i];
     dblocks[i].particles =
       (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
-    dblocks[i].is_complete =
-      (unsigned char *)malloc(dblocks[i].num_orig_particles);
-    for (j = 0; j < dblocks[i].num_orig_particles; j++) {
+    for (int j = 0; j < dblocks[i].num_orig_particles; j++) {
       dblocks[i].particles[3 * j]     = particles[i][3 * j];
       dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
       dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
     }
 
     fill_vert_to_tet(&dblocks[i]);
+
   }
+
 }
 //----------------------------------------------------------------------------
 //
@@ -265,10 +264,6 @@ void all_dcells(int nblocks, struct dblock_t *dblocks, int dim,
     dblocks[i].particles =
       (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
 
-    // allocate lookup table for cells completion status
-    dblocks[i].is_complete = 
-      (unsigned char *)malloc(dblocks[i].num_orig_particles);
-
     fill_vert_to_tet(&dblocks[i]);
 
     // copy particles and get their completeion status
@@ -276,8 +271,6 @@ void all_dcells(int nblocks, struct dblock_t *dblocks, int dim,
       dblocks[i].particles[3 * j]     = particles[i][3 * j];
       dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
       dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
-      dblocks[i].is_complete[j] = complete(j, dblocks[i].tets, 
-					   dblocks[i].vert_to_tet[j]);
     }
 
   } // for all blocks 
