@@ -2466,7 +2466,7 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 // 	      dblock->num_orig_particles);
 
     // on convex hull = less than 4 neighbors
-    if (!complete(p, dblock->tets, dblock->vert_to_tet[p])) {
+    if (dblock->num_tets == 0 || !complete(p, dblock->tets, dblock->vert_to_tet[p])) {
 
       // add to list of convex hull particles
       convex_hull_particles.push_back(p);
