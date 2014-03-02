@@ -725,29 +725,29 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // cleanup delaunay data structure and sent particles
   clean_delaunay_data_structures(ds);
 
-  // is_complete status of received particles 
-  struct remote_ic_t **rics =
-    (struct remote_ic_t **)malloc(nblocks * 
-				  sizeof(struct remote_ic_t *));
-  // exchange complete cell status for exchanged particles
-  neighbor_d_is_complete(nblocks, dblocks, rics, sent_particles);
+//   // is_complete status of received particles 
+//   struct remote_ic_t **rics =
+//     (struct remote_ic_t **)malloc(nblocks * 
+// 				  sizeof(struct remote_ic_t *));
+//   // exchange complete cell status for exchanged particles
+//   neighbor_d_is_complete(nblocks, dblocks, rics, sent_particles);
 
-  // convert delaunay output to dblock for all blocks
-  for (i = 0; i < nblocks; i++)
-    gen_d_tets(&dblocks[i], rics[i], i, 
-	       num_particles[i] - num_orig_particles[i]);
+//   // convert delaunay output to dblock for all blocks
+//   for (i = 0; i < nblocks; i++)
+//     gen_d_tets(&dblocks[i], rics[i], i, 
+// 	       num_particles[i] - num_orig_particles[i]);
 
   // cleanup sent particles
   for (i = 0; i < nblocks; ++i)
     sent_particles[i].clear();
   delete[] sent_particles;
 
-  // cleanup
-  for (i = 0; i < nblocks; i++) {
-    if (rics[i])
-      free(rics[i]);
-  }
-  free(rics);
+//   // cleanup
+//   for (i = 0; i < nblocks; i++) {
+//     if (rics[i])
+//       free(rics[i]);
+//   }
+//   free(rics);
 
 #ifdef TIMING
   // previously no barrier here; want min and max time;
@@ -1195,71 +1195,72 @@ void neighbor_is_complete(int nblocks, struct vblock_t *vblocks,
 
 }
 // --------------------------------------------------------------------------
-//
-//   exchanges is_complete list for exchanged particles with neighbors
-//
-//   nblocks: number of blocks
-//   dblocks: local blocks
-//   rics: completion satus of received particles in each of my blocks
-//    (allocated by this function, user's responsibility to free)
-//   sent_particles: sent particles for each block
-// 
-void neighbor_d_is_complete(int nblocks, struct dblock_t *dblocks,
-			    struct remote_ic_t **rics,
-			    vector <struct sent_t> *sent_particles) {
+// // DEPRECATED
+// //
+// //   exchanges is_complete list for exchanged particles with neighbors
+// //
+// //   nblocks: number of blocks
+// //   dblocks: local blocks
+// //   rics: completion satus of received particles in each of my blocks
+// //    (allocated by this function, user's responsibility to free)
+// //   sent_particles: sent particles for each block
+// // 
+// void neighbor_d_is_complete(int nblocks, struct dblock_t *dblocks,
+// 			    struct remote_ic_t **rics,
+// 			    vector <struct sent_t> *sent_particles) {
 
-  void ***recv_ics; // pointers to is_complete entries in ecah block 
-                    //  that are received from neighbors 
-  int *num_recv_ics; // number of received is_completes for each block 
-  int i, j;
-  struct remote_ic_t ic; // completion status being sent or received 
+//   void ***recv_ics; // pointers to is_complete entries in ecah block 
+//                     //  that are received from neighbors 
+//   int *num_recv_ics; // number of received is_completes for each block 
+//   int i, j;
+//   struct remote_ic_t ic; // completion status being sent or received 
 
-  recv_ics = (void ***)malloc(nblocks * sizeof(void **));
-  num_recv_ics = (int *)malloc(nblocks * sizeof(int));
+//   recv_ics = (void ***)malloc(nblocks * sizeof(void **));
+//   num_recv_ics = (int *)malloc(nblocks * sizeof(int));
 
-  // for all blocks 
-  for (i = 0; i < nblocks; i++) {
+//   // for all blocks 
+//   for (i = 0; i < nblocks; i++) {
 
-    // for all particles in the current block 
-    for (j = 0; j < (int)(sent_particles[i].size()); j++) {
-      int p = sent_particles[i][j].particle;
-      ic.is_complete = dblocks[i].is_complete[p];
-      ic.gid = DIY_Gid(0, i);
-      ic.nid = p;
-      DIY_Enqueue_item_gbs(0, i, (void *)&ic,
-			   NULL, sizeof(struct remote_ic_t),
-			   sent_particles[i][j].neigh_gbs,
-			   sent_particles[i][j].num_gbs, NULL);
-    }
+//     // for all particles in the current block 
+//     for (j = 0; j < (int)(sent_particles[i].size()); j++) {
+//       int p = sent_particles[i][j].particle;
+//       ic.is_complete = dblocks[i].is_complete[p];
+//       ic.gid = DIY_Gid(0, i);
+//       ic.nid = p;
+//       DIY_Enqueue_item_gbs(0, i, (void *)&ic,
+// 			   NULL, sizeof(struct remote_ic_t),
+// 			   sent_particles[i][j].neigh_gbs,
+// 			   sent_particles[i][j].num_gbs, NULL);
+//     }
 
-  } // for all blocks 
+//   } // for all blocks 
 
-  // exchange neighbors 
-  DIY_Exchange_neighbors(0, recv_ics, num_recv_ics, 1.0, &ic_type);
+//   // exchange neighbors 
+//   DIY_Exchange_neighbors(0, recv_ics, num_recv_ics, 1.0, &ic_type);
 
-  // copy received is_completed entries 
-  for (i = 0; i < nblocks; i++) {
+//   // copy received is_completed entries 
+//   for (i = 0; i < nblocks; i++) {
 
-    rics[i] = (struct remote_ic_t *)malloc(num_recv_ics[i] * 
-					   sizeof(struct remote_ic_t));
+//     rics[i] = (struct remote_ic_t *)malloc(num_recv_ics[i] * 
+// 					   sizeof(struct remote_ic_t));
 
-    for (j = 0; j < num_recv_ics[i]; j++) {
-      rics[i][j].is_complete = 
-	DIY_Exchd_item(struct remote_ic_t, recv_ics, i, j)->is_complete;
-      rics[i][j].gid = 
-	DIY_Exchd_item(struct remote_ic_t, recv_ics, i, j)->gid;
-      rics[i][j].nid = 
-	DIY_Exchd_item(struct remote_ic_t, recv_ics, i, j)->nid;
-    }
+//     for (j = 0; j < num_recv_ics[i]; j++) {
+//       rics[i][j].is_complete = 
+// 	DIY_Exchd_item(struct remote_ic_t, recv_ics, i, j)->is_complete;
+//       rics[i][j].gid = 
+// 	DIY_Exchd_item(struct remote_ic_t, recv_ics, i, j)->gid;
+//       rics[i][j].nid = 
+// 	DIY_Exchd_item(struct remote_ic_t, recv_ics, i, j)->nid;
+//     }
 
-  }
+//   }
 
-  // clean up 
-  DIY_Flush_neighbors(0, recv_ics, num_recv_ics, &ic_type);
-  free(num_recv_ics);
-  free(recv_ics);
+//   // clean up 
+//   DIY_Flush_neighbors(0, recv_ics, num_recv_ics, &ic_type);
+//   free(num_recv_ics);
+//   free(recv_ics);
 
-}
+// }
 // --------------------------------------------------------------------------
 //
 //  makes DIY datatype for sending / receiving one item
@@ -2418,157 +2419,9 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 
 }
 // ---------------------------------------------------------------------------
-#if 0
-// Tom's latest version
-//
-//   determines cells that are incomplete or too close to neighbor such that
-//   they might change after neighbor exchange. The particles corresponding
-//   to sites of these cells are enqueued for exchange with neighors
-//
-//   tblock: one temporary voronoi block
-//   vblock: one voronoi block
-//   lid: local id of block
-//   convex_hull_particles: pointer to convex hull particles to recheck later
-//   num_convex_hull_particles: number of convex hull particles
-// 
-void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
-			       vector <sent_t> &sent_particles,
-			       vector <int> &convex_hull_particles) {
-
-  struct bb_t bounds; // block bounds 
-  struct remote_particle_t rp; // particle being sent or received 
-  struct sent_t sent; // info about one sent particle
-
-  DIY_Block_bounds(0, lid, &bounds);
-
-  // get gids of all neighbors, in case a particle needs to be
-  //   sent to all neighbors
-  //   (enumerating all gids manually (not via DIY_Enqueue_Item_all)
-  //   to be consisent with enumerating particular neighbors) 
-  int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
-  struct gb_t all_neigh_gbs[MAX_NEIGHBORS];
-  DIY_Get_neighbors(0, lid, all_neigh_gbs);
-
-  // this delaunay vertex = particle was already done
-  vector<bool> visited;
-  visited.resize(dblock->num_orig_particles, false);
-
-  // for all tets
-  for (int t = 0; t < dblock->num_tets; t++) {
-
-    float center[3]; // circumcenter
-    circumcenter(center, &dblock->tets[t], dblock->particles);
-    // radius is distance from circumcenter to any (first) tet vertex
-    int p0 = dblock->tets[t].verts[0];
-    float rad = distance(center, &dblock->particles[3 * p0]);
-
-    bool all_v = false; // all 4 tet verts need to be sent
-
-    // for all verts
-    for (int v = 0; v < 4; v++) {
-
-      int p = dblock->tets[t].verts[v]; // particle id
-
-      // don't duplicate
-      if (visited[p])
-	continue;
-      visited[p] = true;
-
-      // completion status
-      vector<int> nbrs; // tet neighbors
-      bool complete = neighbor_tets(nbrs, v, dblock->tets, t);
-      dblock->is_complete[p] = complete;
-
-      if (v == 0 && complete)
-	all_v = true;
-
-      // complete or all tet verts need to be sent
-      if (complete || all_v) {
-
-	sent.num_gbs = 0;
-	DIY_Add_gbs_all_near(0, lid, sent.neigh_gbs, &(sent.num_gbs),
-			     MAX_NEIGHBORS, center, rad);
-	if (sent.num_gbs) { // at least one destination block
-	
-	  rp.x = dblock->particles[3 * p];
-	  rp.y = dblock->particles[3 * p + 1];
-	  rp.z = dblock->particles[3 * p + 2];
-	  rp.gid = DIY_Gid(0, lid);
-	  rp.nid = p;
-	  rp.dir = 0x00;
-
-	  DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
-			       NULL, sizeof(struct remote_particle_t),
-			       sent.neigh_gbs, sent.num_gbs,
-			       &transform_particle);
-
-	  // save the details of the sent particle
-	  sent.particle = p;
-	  sent_particles.push_back(sent);
-
-	} // at least one destination block
-
-      } // complete
-
-      // incomplete
-      if (!complete) {
-
-	// add to list of convex hull particles
-	convex_hull_particles.push_back(p);
-
-	// incomplete cell goes to the closest neighbor 
-	unsigned char nearest_dir = 
-	  nearest_neighbor(&(dblock->particles[3 * p]), &bounds);
-
-	// send the particle to the neighbor in direction nearest_dir
-	sent.num_gbs = 0;
-	for (int i = 0; i < num_all_neigh_gbs; i++) {
-	  if (all_neigh_gbs[i].neigh_dir != 0x00 &&
-	      all_neigh_gbs[i].neigh_dir == nearest_dir) {
-	    sent.neigh_gbs[sent.num_gbs].gid = all_neigh_gbs[i].gid;
-	    sent.neigh_gbs[sent.num_gbs].neigh_dir = 
-	      all_neigh_gbs[i].neigh_dir;
-	    sent.num_gbs++;
-	  }
-	}
-	assert(sent.num_gbs <= 1); // sanity 
-
-	rp.x = dblock->particles[3 * p];
-	rp.y = dblock->particles[3 * p + 1];
-	rp.z = dblock->particles[3 * p + 2];
-	rp.gid = DIY_Gid(0, lid);
-	rp.nid = p;
-	rp.dir = 0x00;
-
-	DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
-			     NULL, sizeof(struct remote_particle_t),
-			     sent.neigh_gbs, sent.num_gbs,
-			     &transform_particle);
-
-	// save the details of the sent particle
-	sent.particle = p;
-	sent_particles.push_back(sent);
-
-      } // incomplete
-
-    } // for all verts
-
-  } // for all tets
-
-  // sanity, check that all original particles were visited
-  for (int v = 0; v < (int)visited.size(); v++) {
-    if (!visited[v])
-      assert(0);
-  }
-
-}
-// ---------------------------------------------------------------------------
-#else
 
 bool operator<(const gb_t& x, const gb_t& y) { return x.gid < y.gid || (x.gid == y.gid && x.neigh_dir < y.neigh_dir); }
 
-// Dmitriy's latest version
-//
 //   determines cells that are incomplete or too close to neighbor such that
 //   they might change after neighbor exchange. The particles corresponding
 //   to sites of these cells are enqueued for exchange with neighors
@@ -2602,6 +2455,15 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
   // identify and queue convex hull particles
   for (int p = 0; p < dblock->num_orig_particles; ++p) {
+
+    // debug
+//     int rank;
+//     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+//     if (rank == 7)
+//       fprintf(stderr, "%p %p %p p = %d num_tets = %d "
+// 	      "num_orig_particles = %d\n", 
+// 	      dblock, dblock->tets, dblock->vert_to_tet, p, dblock->num_tets,
+// 	      dblock->num_orig_particles);
 
     // on convex hull = less than 4 neighbors
     if (!complete(p, dblock->tets, dblock->vert_to_tet[p])) {
@@ -2690,8 +2552,6 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
     }
   }
 }
-
-#endif
 
 // ---------------------------------------------------------------------------
 //
@@ -2963,10 +2823,15 @@ void incomplete_dcells_final(struct dblock_t *dblock,
 	if (all_neigh_gbs[l].neigh_dir != 0x00) {
 	  // sent_particles[p].neigh_gbs is sorted (was inserted from a set),
 	  // so we can use a binary search
-	  bool exists = std::binary_search(sent_particles[old_sent].neigh_gbs,
-				      sent_particles[old_sent].neigh_gbs + 
-				      sent_particles[old_sent].num_gbs,
-				      all_neigh_gbs[l]);
+	  bool exists;
+	  if (sent_particles.size())
+	    exists = 
+	      std::binary_search(sent_particles[old_sent].neigh_gbs,
+				 sent_particles[old_sent].neigh_gbs + 
+				 sent_particles[old_sent].num_gbs,
+				 all_neigh_gbs[l]);
+	  else
+	    exists = false;
 	  if (!exists) {
 	    sent.neigh_gbs[sent.num_gbs].gid	    = all_neigh_gbs[l].gid;
 	    sent.neigh_gbs[sent.num_gbs].neigh_dir  = all_neigh_gbs[l].neigh_dir;
@@ -3850,99 +3715,100 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 
 }
 // --------------------------------------------------------------------------
-//
-//    for all tets, lcoal and remote, checks whether any should be skipped
-//    because another block owns them or some of their verts correspond
-//    to incomplete voronoi cells and if so marks them accordingly
-//
-//    todo: still need to deal with remote neighboring tets somehow
-//  
-//    ddblock: local block
-//    rics: is complete status of received particles
-//    lid: local id of this block
-//    num_recv: number of received particles
-// 
-void gen_d_tets(struct dblock_t *dblock,
-		struct remote_ic_t *rics, int lid, int num_recvd) {
+// // DEPRECATED
+// //
+// //    for all tets, lcoal and remote, checks whether any should be skipped
+// //    because another block owns them or some of their verts correspond
+// //    to incomplete voronoi cells and if so marks them accordingly
+// //
+// //    todo: still need to deal with remote neighboring tets somehow
+// //  
+// //    ddblock: local block
+// //    rics: is complete status of received particles
+// //    lid: local id of this block
+// //    num_recv: number of received particles
+// // 
+// void gen_d_tets(struct dblock_t *dblock,
+// 		struct remote_ic_t *rics, int lid, int num_recvd) {
 
-  int v; // tet vert index (0-3)
+//   int v; // tet vert index (0-3)
 
-  // for all tets 
-  for (int t = 0; t < dblock->num_tets; t++) {
+//   // for all tets 
+//   for (int t = 0; t < dblock->num_tets; t++) {
 
-    // partly but not entirely local, at least one vertex is local and at
-    // least one vertex is remote
-    if ((dblock->tets[t].verts[0] >= dblock->num_orig_particles ||
-	 dblock->tets[t].verts[1] >= dblock->num_orig_particles ||
-	 dblock->tets[t].verts[2] >= dblock->num_orig_particles ||
-	 dblock->tets[t].verts[3] >= dblock->num_orig_particles) &&
-	(dblock->tets[t].verts[0] < dblock->num_orig_particles ||
-	 dblock->tets[t].verts[1] < dblock->num_orig_particles ||
-	 dblock->tets[t].verts[2] < dblock->num_orig_particles ||
-	 dblock->tets[t].verts[3] < dblock->num_orig_particles)) {
+//     // partly but not entirely local, at least one vertex is local and at
+//     // least one vertex is remote
+//     if ((dblock->tets[t].verts[0] >= dblock->num_orig_particles ||
+// 	 dblock->tets[t].verts[1] >= dblock->num_orig_particles ||
+// 	 dblock->tets[t].verts[2] >= dblock->num_orig_particles ||
+// 	 dblock->tets[t].verts[3] >= dblock->num_orig_particles) &&
+// 	(dblock->tets[t].verts[0] < dblock->num_orig_particles ||
+// 	 dblock->tets[t].verts[1] < dblock->num_orig_particles ||
+// 	 dblock->tets[t].verts[2] < dblock->num_orig_particles ||
+// 	 dblock->tets[t].verts[3] < dblock->num_orig_particles)) {
 
-      // decide whether I should own this tet, owner will be minimum
-      // block gid of all contributors to this tet 
-      int sort_gids[4]; // gids of 4 vertices 
-      for (v = 0; v < 4; v++) {
-	int p = dblock->tets[t].verts[v]; // index of particle at tet vert
-	if (p < dblock->num_orig_particles)
-	  sort_gids[v] = DIY_Gid(0, lid);
-	else
-	  sort_gids[v] = 
-	    dblock->rem_tet_verts[p - dblock->num_orig_particles].gid;
-      }
-      qsort(sort_gids, 4, sizeof(int), &compare);
+//       // decide whether I should own this tet, owner will be minimum
+//       // block gid of all contributors to this tet 
+//       int sort_gids[4]; // gids of 4 vertices 
+//       for (v = 0; v < 4; v++) {
+// 	int p = dblock->tets[t].verts[v]; // index of particle at tet vert
+// 	if (p < dblock->num_orig_particles)
+// 	  sort_gids[v] = DIY_Gid(0, lid);
+// 	else
+// 	  sort_gids[v] = 
+// 	    dblock->rem_tet_verts[p - dblock->num_orig_particles].gid;
+//       }
+//       qsort(sort_gids, 4, sizeof(int), &compare);
 
-      // I will own the tet 
-      if (sort_gids[0] == DIY_Gid(0, lid)) {
+//       // I will own the tet 
+//       if (sort_gids[0] == DIY_Gid(0, lid)) {
 
-	// filter out tets that touch local incomplete voronoi cells 
-	for (v = 0; v < 4; v++) {
+// 	// filter out tets that touch local incomplete voronoi cells 
+// 	for (v = 0; v < 4; v++) {
 
-	  int p = dblock->tets[t].verts[v]; // index of particle at tet vert
+// 	  int p = dblock->tets[t].verts[v]; // index of particle at tet vert
 
-	  // if this vertex is local, check its completion status 
-	  if (p < dblock->num_orig_particles && !dblock->is_complete[p]) {
-	    skip_tet(&(dblock->tets[t]));
-	    break; // for v = 0
-	  }
+// 	  // if this vertex is local, check its completion status 
+// 	  if (p < dblock->num_orig_particles && !dblock->is_complete[p]) {
+// 	    skip_tet(&(dblock->tets[t]));
+// 	    break; // for v = 0
+// 	  }
 
-	  // if this vertex is remote, check its completion status 
-	  if (p >= dblock->num_orig_particles) {
+// 	  // if this vertex is remote, check its completion status 
+// 	  if (p >= dblock->num_orig_particles) {
 
-	    // find the correct entry in the completion status
-	    //    todo: linear search for now, accelerate later 
-	    int i;
-	    for (i = 0; i < num_recvd; i++) {
-	      if (rics[i].gid == 
-		  dblock->rem_tet_verts[p - dblock->num_orig_particles].gid &&
-		  rics[i].nid == 
-		  dblock->rem_tet_verts[p - dblock->num_orig_particles].nid)
-		break; // for i = 0
-	    }
-	    assert(i < num_recvd); // sanity 
-	    if (!rics[i].is_complete) {
-	      skip_tet(&(dblock->tets[t]));
-	      break; // for v = 0
-	    }
+// 	    // find the correct entry in the completion status
+// 	    //    todo: linear search for now, accelerate later 
+// 	    int i;
+// 	    for (i = 0; i < num_recvd; i++) {
+// 	      if (rics[i].gid == 
+// 		  dblock->rem_tet_verts[p - dblock->num_orig_particles].gid &&
+// 		  rics[i].nid == 
+// 		  dblock->rem_tet_verts[p - dblock->num_orig_particles].nid)
+// 		break; // for i = 0
+// 	    }
+// 	    assert(i < num_recvd); // sanity 
+// 	    if (!rics[i].is_complete) {
+// 	      skip_tet(&(dblock->tets[t]));
+// 	      break; // for v = 0
+// 	    }
 
-	  } // if vertex is remote 
+// 	  } // if vertex is remote 
 
-	} // for four vertices 
+// 	} // for four vertices 
 
-      } // I will own this tet 
+//       } // I will own this tet 
 
-      else // another block will own this tet
+//       else // another block will own this tet
 
-	// mark the tet to be skipped
-	skip_tet(&(dblock->tets[t]));
+// 	// mark the tet to be skipped
+// 	skip_tet(&(dblock->tets[t]));
 
-    } // partly but not entirely local 
+//     } // partly but not entirely local 
 
-  } // for all tets 
+//   } // for all tets 
 
-}
+// }
 // --------------------------------------------------------------------------
 //
 //  writes particles to a file in interleaved x,y,z order
