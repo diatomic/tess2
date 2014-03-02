@@ -1582,12 +1582,16 @@ void PrepCellRendering(int &num_vis_cells) {
 	  circumcenter((float *)&(center.x), 
 		       &(blocks[b]->tets[edge_link[j]]), blocks[b]->particles);
 	  // filter out cells far outside the overal extents
-	  if (center.x < data_min.x * ds || center.x > data_max.x * ds ||
-	      center.y < data_min.y * ds || center.y > data_max.y * ds ||
-	      center.z < data_min.z * ds || center.z > data_max.z * ds)
+	  if (center.x > data_max.x + (data_max.x - data_min.x) * (ds - 1) ||
+	      center.x < data_min.x - (data_max.x - data_min.x) * (ds - 1) ||
+	      center.y > data_max.y + (data_max.y - data_min.y) * (ds - 1) ||
+	      center.y < data_min.y - (data_max.y - data_min.y) * (ds - 1) ||
+	      center.z > data_max.z + (data_max.z - data_min.z) * (ds - 1) ||
+	      center.z < data_min.z - (data_max.z - data_min.z) * (ds - 1))
 	    keep = false;
 	  temp_verts.push_back(center);
 	}
+
 
 	temp_num_face_verts.push_back(edge_link.size());
 
