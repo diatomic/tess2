@@ -172,6 +172,8 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
       fprintf (stderr, "qhull internal warning: did not free %d bytes of "
 	       "long memory (%d pieces)\n", totlong, curlong);
 
+    fill_vert_to_tet(&dblocks[i]);
+
   } /* for all blocks */
 
   fclose(dev_null);

@@ -3851,8 +3851,11 @@ void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
 }
 // --------------------------------------------------------------------------
 //
-//    for all tets, determines local, and records the necessary 
-//    information in the block
+//    for all tets, lcoal and remote, checks whether any should be skipped
+//    because another block owns them or some of their verts correspond
+//    to incomplete voronoi cells and if so marks them accordingly
+//
+//    todo: still need to deal with remote neighboring tets somehow
 //  
 //    ddblock: local block
 //    rics: is complete status of received particles
@@ -3863,10 +3866,6 @@ void gen_d_tets(struct dblock_t *dblock,
 		struct remote_ic_t *rics, int lid, int num_recvd) {
 
   int v; // tet vert index (0-3)
-
-  // this delaunay vertex = particle was already done
-  vector<bool> visited;
-  visited.resize(num_recvd, false);
 
   // for all tets 
   for (int t = 0; t < dblock->num_tets; t++) {
@@ -3904,8 +3903,10 @@ void gen_d_tets(struct dblock_t *dblock,
 	  int p = dblock->tets[t].verts[v]; // index of particle at tet vert
 
 	  // if this vertex is local, check its completion status 
-	  if (p < dblock->num_orig_particles && !dblock->is_complete[p])
-	    break;
+	  if (p < dblock->num_orig_particles && !dblock->is_complete[p]) {
+	    skip_tet(&(dblock->tets[t]));
+	    break; // for v = 0
+	  }
 
 	  // if this vertex is remote, check its completion status 
 	  if (p >= dblock->num_orig_particles) {
@@ -3918,30 +3919,22 @@ void gen_d_tets(struct dblock_t *dblock,
 		  dblock->rem_tet_verts[p - dblock->num_orig_particles].gid &&
 		  rics[i].nid == 
 		  dblock->rem_tet_verts[p - dblock->num_orig_particles].nid)
-		break;
+		break; // for i = 0
 	    }
 	    assert(i < num_recvd); // sanity 
-	    if (!rics[i].is_complete)
-	      break;
+	    if (!rics[i].is_complete) {
+	      skip_tet(&(dblock->tets[t]));
+	      break; // for v = 0
+	    }
 
 	  } // if vertex is remote 
 
 	} // for four vertices 
 
-	if (v == 4) { // complete 
-
-	  // remote verts are already done but still need to 
-	  // do something about remote neighboring tets
-
-	} // complete 
-
-	else 
-	  // mark the tet to be skipped
-	  skip_tet(&(dblock->tets[t]));
-
       } // I will own this tet 
 
-      else
+      else // another block will own this tet
+
 	// mark the tet to be skipped
 	skip_tet(&(dblock->tets[t]));
 

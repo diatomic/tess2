@@ -483,19 +483,19 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
     start[0] = (count[0] ? block_ofsts[start_block_ofst + b] : 0);
     /* copy individual fields of struct into seaparate temp. arrays */
     int *ids = (int *)malloc(d->num_rem_tet_verts * sizeof(int));
-    err = ncmpi_inq_varid(ncid, "rem_tet_gids", &varids[30]); ERR;
+    err = ncmpi_inq_varid(ncid, "rem_tet_vert_gids", &varids[30]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[30], start, count,
 				 ids); ERR;
     for (i = 0; i < d->num_rem_tet_verts; i++)
       d->rem_tet_verts[i].gid = ids[i];
-    err = ncmpi_inq_varid(ncid, "rem_tet_nids", &varids[31]); ERR;
+    err = ncmpi_inq_varid(ncid, "rem_tet_vert_nids", &varids[31]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[31], start, count,
 				 ids); ERR;
     for (i = 0; i < d->num_rem_tet_verts; i++)
       d->rem_tet_verts[i].nid = ids[i];
     free(ids);
     unsigned char *dirs = (unsigned char *)malloc(d->num_rem_tet_verts);
-    err = ncmpi_inq_varid(ncid, "rem_tet_wrap_dirs", &varids[32]); ERR;
+    err = ncmpi_inq_varid(ncid, "rem_tet_vert_dirs", &varids[32]); ERR;
     err = ncmpi_get_vara_uchar_all(ncid, varids[32], start, count,
 				   dirs); ERR;
     for (i = 0; i < d->num_rem_tet_verts; i++)
