@@ -28,7 +28,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=2
+num_procs=1
 
 # procs per node
 ppn=8 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
@@ -89,11 +89,11 @@ args="$tb $dsize $jitter $minv $maxv $wrap $walls $outfile"
 
 if [ "$ARCH" = "MAC_OSX" ]; then
 
-#mpiexec -l -n $num_procs $exe $args
+mpiexec -l -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 
-dsymutil $exe ; mpiexec -l -n $num_procs valgrind -q $exe $args
+#dsymutil $exe ; mpiexec -l -n $num_procs valgrind -q $exe $args
 
 #dsymutil $exe ; mpiexec -n $num_procs valgrind -q --leak-check=yes $exe $args
 

@@ -651,10 +651,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // cleanup local temporary blocks 
   reset_dblocks(nblocks, dblocks);
 
-#ifdef MEMORY
-  get_mem(4, dwell);
-#endif
-
+  // exhcange particles
   neighbor_d_particles(nblocks, dblocks, particles, num_particles, 
 		       num_orig_particles);
 
@@ -662,7 +659,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "5: num_particles[0] = %d\n", num_particles[0]);
 
 #ifdef MEMORY
-  get_mem(5, dwell);
+  get_mem(4, dwell);
 #endif
 
   // Second, decisive phase 
@@ -671,7 +668,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   local_dcells(nblocks, dblocks, dim, num_particles, particles, ds);
 
 #ifdef MEMORY
-  get_mem(6, dwell);
+  get_mem(5, dwell);
 #endif
 
   for (i = 0; i < nblocks; i++)
@@ -679,22 +676,18 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 			    convex_hull_particles[i]);
 
 #ifdef MEMORY
-  get_mem(7, dwell);
+  get_mem(6, dwell);
 #endif
 
   // cleanup local temporary blocks 
   reset_dblocks(nblocks, dblocks);
   
-#ifdef MEMORY
-  get_mem(8, dwell);
-#endif
-
   // exchange particles with neighbors 
   neighbor_d_particles(nblocks, dblocks, particles, num_particles, 
 		       num_orig_particles);
     
 #ifdef MEMORY
-  get_mem(9, dwell);
+  get_mem(7, dwell);
 #endif
   
   // cleanup convex hull particles
@@ -710,16 +703,12 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   times[CELL_TIME] = MPI_Wtime();
 #endif
 
-#ifdef MEMORY
-  get_mem(10, dwell);
-#endif
-
   // create all final cells 
   all_dcells(nblocks, dblocks, dim, num_particles, num_orig_particles,
 	     particles, times, ds);
 
 #ifdef MEMORY
-  get_mem(11, dwell);
+  get_mem(8, dwell);
 #endif
 
   // cleanup delaunay data structure and sent particles
@@ -759,7 +748,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
 #ifdef MEMORY
-  get_mem(12, dwell);
+  get_mem(9, dwell);
 #endif
 
   // prepare for output 
@@ -782,10 +771,6 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   times[OUT_TIME] = MPI_Wtime() - times[OUT_TIME];
 #endif
  
-#ifdef MEMORY
-  get_mem(13, dwell);
-#endif
-
   // collect stats 
   collect_dstats(nblocks, dblocks, times);
 
@@ -794,7 +779,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   free(num_orig_particles);
   
 #ifdef MEMORY
-  get_mem(14, dwell);
+  get_mem(10, dwell);
 #endif
 
 }
