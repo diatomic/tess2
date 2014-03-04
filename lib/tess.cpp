@@ -317,10 +317,8 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   if (!wrap_neighbors && walls_on)
     create_walls(&num_walls,&walls);
 
-#ifdef MEMORY
   int dwell = 0;
   get_mem(1, dwell);
-#endif
 
 #ifdef TIMING
   MPI_Barrier(comm);
@@ -340,9 +338,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   times[EXCH_TIME] = MPI_Wtime();
 #endif
 
-#ifdef MEMORY
   get_mem(2, dwell);
-#endif
 
   // keep track of which particles lie on the convex hull of the local points 
   int** convex_hull_particles	  = (int**) malloc(nblocks * sizeof(int*));
@@ -356,9 +352,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 			     &convex_hull_particles[i],
 			     &num_convex_hull_particles[i]);
 
-#ifdef MEMORY
   get_mem(3, dwell);
-#endif
 
   // cleanup local temporary blocks 
   destroy_blocks(nblocks, tblocks, NULL);
@@ -377,16 +371,12 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
     dirs[i] = NULL;
   }
 
-#ifdef MEMORY
   get_mem(4, dwell);
-#endif
 
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
 
-#ifdef MEMORY
   get_mem(5, dwell);
-#endif
 
   // Second, decisive phase 
 
@@ -401,9 +391,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   // Recompute local cells
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds, &tets[0], &ntets[0]);
 
-#ifdef MEMORY
   get_mem(6, dwell);
-#endif
 
   // CLP - Create  pointers to wall-mirror particles for each block 
   float** mirror_particles;
@@ -421,24 +409,18 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 			   num_convex_hull_particles[i], walls, num_walls, 
 			   &mirror_particles[i], &num_mirror_particles[i]);
 
-#ifdef MEMORY
   get_mem(7, dwell);
-#endif
 
   // cleanup local temporary blocks 
   destroy_blocks(nblocks, tblocks, NULL);
   
-#ifdef MEMORY
   get_mem(8, dwell);
-#endif
 
   // exchange particles with neighbors 
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
     
-#ifdef MEMORY
   get_mem(9, dwell);
-#endif
 
   // CLP - Function to add wall-mirror particles to particles 
   //   (see neighbor_particles()) 
@@ -470,9 +452,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   times[CELL_TIME] = MPI_Wtime();
 #endif
 
-#ifdef MEMORY
   get_mem(10, dwell);
-#endif
 
   // Clean-up tets; all_cells() will refill them
   for(int i = 0; i < nblocks; ++i)
@@ -482,9 +462,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   all_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
 	    particles, gids, nids, dirs, times, ds, &tets[0], &ntets[0]);
 
-#ifdef MEMORY
   get_mem(11, dwell);
-#endif
 
   // cleanup 
   for (i = 0; i < nblocks; i++) {
@@ -504,9 +482,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   times[VOL_TIME] = MPI_Wtime();
 #endif
 
-#ifdef MEMORY
   get_mem(12, dwell);
-#endif
 
   // compute volume and surface area manually (not using convex hulls) 
   cell_vols(nblocks, vblocks, particles);
@@ -526,9 +502,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   // save headers 
   save_headers(nblocks, vblocks, hdrs);
 
-#ifdef MEMORY
   get_mem(13, dwell);
-#endif
 
   // write output 
   if (out_file[0]) {
@@ -547,9 +521,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   times[OUT_TIME] = MPI_Wtime() - times[OUT_TIME];
 #endif
  
-#ifdef MEMORY
   get_mem(14, dwell);
-#endif
 
   // collect stats 
   collect_stats(nblocks, vblocks, times);
@@ -562,9 +534,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   for(int i = 0; i < nblocks; ++i)
     free(tets[i]);
 
-#ifdef MEMORY
   get_mem(15, dwell);
-#endif
 
 }
 // --------------------------------------------------------------------------
@@ -597,10 +567,8 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   ds = init_delaunay_data_structures(nblocks);
   create_dblocks(nblocks, dblocks, hdrs, particles, num_particles);
   
-#ifdef MEMORY
   int dwell = 10;
   get_mem(1, dwell);
-#endif
 
 #ifdef TIMING
   MPI_Barrier(comm);
@@ -618,9 +586,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   times[EXCH_TIME] = MPI_Wtime();
 #endif
 
-#ifdef MEMORY
   get_mem(2, dwell);
-#endif
 
   // particles on the convex hull of the local points 
   vector <int> *convex_hull_particles  = new vector<int>[nblocks];
@@ -636,9 +602,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // debug
   fprintf(stderr, "3: num_particles[0] = %d\n", dblocks[0].num_particles);
 
-#ifdef MEMORY
   get_mem(3, dwell);
-#endif
 
   // cleanup local temporary blocks 
   reset_dblocks(nblocks, dblocks);
@@ -649,26 +613,20 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // debug
   fprintf(stderr, "5: num_particles[0] = %d\n", dblocks[0].num_particles);
 
-#ifdef MEMORY
   get_mem(4, dwell);
-#endif
 
   // Second, decisive phase 
 
   // Recompute local cells
   local_dcells(nblocks, dblocks, dim, ds);
 
-#ifdef MEMORY
   get_mem(5, dwell);
-#endif
 
   for (int i = 0; i < nblocks; i++)
     incomplete_dcells_final(&dblocks[i], i, sent_particles[i],
 			    convex_hull_particles[i]);
 
-#ifdef MEMORY
   get_mem(6, dwell);
-#endif
 
   // cleanup local temporary blocks 
   reset_dblocks(nblocks, dblocks);
@@ -676,9 +634,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // exchange particles with neighbors 
   neighbor_d_particles(nblocks, dblocks);
     
-#ifdef MEMORY
   get_mem(7, dwell);
-#endif
   
   // cleanup convex hull particles
   for (int i = 0; i < nblocks; ++i)
@@ -696,9 +652,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // create all final cells 
   local_dcells(nblocks, dblocks, dim, ds);
 
-#ifdef MEMORY
   get_mem(8, dwell);
-#endif
 
   // cleanup delaunay data structure and sent particles
   clean_delaunay_data_structures(ds);
@@ -717,9 +671,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   times[VOL_TIME] = MPI_Wtime();
 #endif
 
-#ifdef MEMORY
   get_mem(9, dwell);
-#endif
 
   // prepare for output 
   prep_d_out(nblocks, dblocks, hdrs);
@@ -747,9 +699,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // cleanup 
   destroy_dblocks(nblocks, dblocks, hdrs);
   
-#ifdef MEMORY
   get_mem(10, dwell);
-#endif
 
 }
 // --------------------------------------------------------------------------
@@ -3834,7 +3784,7 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
 // dwell: sleep time in seconds
 //
 void get_mem(int breakpoint, int dwell) {
-
+#ifdef MEMORY
   struct rusage r_usage;
   getrusage(RUSAGE_SELF, &r_usage);
 
@@ -3848,6 +3798,6 @@ void get_mem(int breakpoint, int dwell) {
 	  breakpoint, r_usage.ru_maxrss / to_mb);
   //sleep(dwell);
   fprintf(stderr, "%d: done\n", breakpoint);
-
+#endif
 }
 // ---------------------------------------------------------------------------
