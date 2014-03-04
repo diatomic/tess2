@@ -212,37 +212,6 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 
 }
 //----------------------------------------------------------------------------
-// DEPRECATED
-// //
-// //   creates all final delaunay cells
-// //
-// //   nblocks: number of blocks
-// //   dblocks: pointer to array of dblocks
-// //   dim: number of dimensions (eg. 3)
-// //   ds: the delaunay data structures
-// //
-// void all_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) {
-
-//   Delaunay3D* Dts = (Delaunay3D*) ds;
-
-//   // for all blocks 
-//   for (int i = 0; i < nblocks; i++) {
-
-//     // oompute delaunay
-//     Delaunay3D& Dt = Dts[i];
-//     construct_delaunay(Dt, dblocks[i].num_particles, dblocks[i].particles);
-
-//     // fill the tets
-//     dblocks[i].num_tets = Dt.number_of_finite_cells();
-//     dblocks[i].tets  = (tet_t*)malloc(sizeof(tet_t) * dblocks[i].num_tets);
-//     gen_tets(Dt, dblocks[i].tets);
-
-//     fill_vert_to_tet(&dblocks[i]);
-
-//   } // for all blocks 
-
-// }
-// //----------------------------------------------------------------------------
 //
 //   generates voronoi output from CGAL
 //
@@ -285,10 +254,6 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
   for(Vertex_iterator vit = Dt.finite_vertices_begin(); vit != Dt.finite_vertices_end(); ++vit)
       vertices.push_back(std::make_pair(vit->info(), vit));
   std::sort(vertices.begin(), vertices.end());
-
-  // DEPRECATED, malloc moved to calling function instead TP
-//   vblock->num_cell_verts = (int *)malloc(sizeof(int) * num_particles);
-//   memset(vblock->num_cell_verts, 0, sizeof(int) * num_particles);
 
   /* number of vertices in each cell; size is number of particles; 
      if a cell is skipped, the number of vertices will be 0 */

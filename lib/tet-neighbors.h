@@ -28,7 +28,3 @@ void fill_edge_link(std::vector<int>&	edge_link,
 		    int			u,
 		    int			ut,
 		    tet_t*		tets);
-
-void skip_tet(struct tet_t *tet);
-
-int is_skipped_tet(struct tet_t *tet);

@@ -343,31 +343,3 @@ void fill_edge_link(std::vector<int>&	edge_link,
     wi = next_wi;
   }
 }
-//
-// marks a tet to be skiped
-//
-void skip_tet(struct tet_t *tet) {
-
-  tet->verts[0] = -1;
-  tet->verts[1] = -1;
-  tet->verts[2] = -1;
-  tet->verts[3] = -1;
-  tet->tets[0] = -1;
-  tet->tets[1] = -1;
-  tet->tets[2] = -1;
-  tet->tets[3] = -1;
-
-}
-//
-// checks if a tet is skiped
-//
-int is_skipped_tet(struct tet_t *tet) {
-
-  if (tet->verts[0] == -1 && tet->verts[1] == -1 && tet->verts[2] == -1 &&
-      tet->verts[3] == -1 && tet->tets[0] == -1 && tet->tets[1] == -1 &&
-      tet->tets[2] == -1 && tet->tets[3] == -1)
-    return 1;
-
-  return 0;
-
-}
