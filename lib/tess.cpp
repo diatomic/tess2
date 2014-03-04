@@ -3837,8 +3837,15 @@ void get_mem(int breakpoint, int dwell) {
 
   struct rusage r_usage;
   getrusage(RUSAGE_SELF, &r_usage);
+
+#ifdef __APPLE__
+  const int to_mb = 1048576;
+#else
+  const int to_mb = 1024;
+#endif
+
   fprintf(stderr, "%d: max memory = %ld MB, current memory in dashboard\n", 
-	  breakpoint, r_usage.ru_maxrss / 1048576);
+	  breakpoint, r_usage.ru_maxrss / to_mb);
   sleep(dwell);
   fprintf(stderr, "%d: done\n", breakpoint);
 
