@@ -3846,7 +3846,7 @@ void get_mem(int breakpoint, int dwell) {
 
   fprintf(stderr, "%d: max memory = %ld MB, current memory in dashboard\n", 
 	  breakpoint, r_usage.ru_maxrss / to_mb);
-  sleep(dwell);
+  //sleep(dwell);
   fprintf(stderr, "%d: done\n", breakpoint);
 
 }
