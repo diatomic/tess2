@@ -1547,8 +1547,11 @@ void PrepCellRendering(int &num_vis_cells) {
       // tet
       int t = blocks[b]->vert_to_tet[p];
 
-//       if (is_skipped_tet(&(blocks[b]->tets[t])))
-// 	continue;
+      // skip tets with missing neighbors
+      if (blocks[b]->tets[t].tets[0] == -1 || blocks[b]->tets[t].tets[1] == -1 ||
+	  blocks[b]->tets[t].tets[2] == -1 || blocks[b]->tets[t].tets[3] == -1)  {
+	continue;
+      }
 
       // neighbor edges a vector of (vertex u, tet of vertex u) pairs 
       // that neighbor vertex v
@@ -1556,8 +1559,8 @@ void PrepCellRendering(int &num_vis_cells) {
       bool finite = neighbor_edges(nbrs, p, blocks[b]->tets, t);
 
       // skip tet vertices corresponding to incomplete voronoi cells
-//       if (!finite) 
-// 	continue;
+      if (!finite) 
+	continue;
 
       bool keep = true; // this cell passes all tests, volume, data extents
       vector <vec3d> temp_verts; // verts in this cell
@@ -1591,7 +1594,6 @@ void PrepCellRendering(int &num_vis_cells) {
 	    keep = false;
 	  temp_verts.push_back(center);
 	}
-
 
 	temp_num_face_verts.push_back(edge_link.size());
 
@@ -1650,15 +1652,20 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
     // local tets
     for (int t = 0; t < blocks[b]->num_tets; t++) {
 
-      // check that tet should be skipped because this block does not own it
-      // or because it is missing some neighbors, ie, on convex hull
-      if (is_skipped_tet(&(blocks[b]->tets[t])) ||
-	  blocks[b]->tets[t].tets[0] == -1 ||
+      // skip tets with missing neighbors
+      if (blocks[b]->tets[t].tets[0] == -1 ||
 	  blocks[b]->tets[t].tets[1] == -1 ||
 	  blocks[b]->tets[t].tets[2] == -1 ||
 	  blocks[b]->tets[t].tets[3] == -1) {
-	// debug
-// 	fprintf(stderr, "skipping tet %d (convex hull)\n", j);
+	continue;
+      }
+
+      // skip tet tets with vertices corresponding to incomplete voronoi cells
+      vector< pair<int, int> > nbrs;
+      if (!neighbor_edges(nbrs, blocks[b]->tets[t].verts[0], blocks[b]->tets, t) ||
+	  !neighbor_edges(nbrs, blocks[b]->tets[t].verts[1], blocks[b]->tets, t) ||
+	  !neighbor_edges(nbrs, blocks[b]->tets[t].verts[2], blocks[b]->tets, t) ||
+	  !neighbor_edges(nbrs, blocks[b]->tets[t].verts[3], blocks[b]->tets, t)) {
 	continue;
       }
 
