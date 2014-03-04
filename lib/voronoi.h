@@ -29,6 +29,7 @@
 #define NUM_FACES 7
 #define NUM_TETS 8
 #define NUM_REM_TET_VERTS 9
+#define NUM_PARTICLES 10
 
 #define MAX_HIST_BINS 256 /* maximum number of bins in cell volume histogram */
 #define MAX_FACE_VERTS 32 /* maximum number of vertices per face */

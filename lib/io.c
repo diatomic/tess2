@@ -84,7 +84,7 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
   /* sum quantities over local blocks */
   int b;
   for (b = 0; b < nblocks; b++) {
-    proc_quants[NUM_ORIG_PARTS] += dblocks[b].num_orig_particles;
+    proc_quants[NUM_PARTS] += dblocks[b].num_particles;
     proc_quants[NUM_NEIGHBORS] += DIY_Num_neighbors(0, b);
     /* 2x because I converted array of structs to array of ints */
     proc_quants[NUM_LOC_TETRAS] += 2 * dblocks[b].num_tets;
@@ -107,7 +107,7 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
   err = ncmpi_def_dim(ncid, "num_g_blocks", tot_quants[NUM_BLOCKS], 
 		      &dimids[0]); ERR;
   err = ncmpi_def_dim(ncid, "XYZ", 3, &dimids[1]); ERR;
-  err = ncmpi_def_dim(ncid, "num_g_orig_particles", tot_quants[NUM_ORIG_PARTS], 
+  err = ncmpi_def_dim(ncid, "num_g_particles", tot_quants[NUM_PARTS], 
 		      &dimids[6]); ERR;
   err = ncmpi_def_dim(ncid, "num_g_neighbors", tot_quants[NUM_NEIGHBORS],
 		      &dimids[7]); ERR;
@@ -122,6 +122,8 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
   /* quantities */
   err = ncmpi_def_var(ncid, "num_orig_particles", NC_INT, 1, &dimids[0], 
 		      &varids[4]); ERR;
+  err = ncmpi_def_var(ncid, "num_particles", NC_INT, 1, &dimids[0], 
+		      &varids[5]); ERR;
   err = ncmpi_def_var(ncid, "num_tets", NC_INT, 1, &dimids[0], 
 		      &varids[25]); ERR;
   err = ncmpi_def_var(ncid, "num_rem_tet_verts", NC_INT, 1, &dimids[0], 
@@ -130,7 +132,7 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
   /* block offsets
      encode the offset in the full array of each variable wheree the first
      block of each process starts */
-  err = ncmpi_def_var(ncid, "block_off_num_orig_particles", NC_INT64, 1, 
+  err = ncmpi_def_var(ncid, "block_off_num_particles", NC_INT64, 1, 
 		      &dimids[0], &varids[9]); ERR;
   err = ncmpi_def_var(ncid, "block_off_num_tets", NC_INT64, 1, 
 		      &dimids[0], &varids[26]); ERR;
@@ -184,6 +186,8 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
     count[0] = 1;
     err = ncmpi_put_vara_int_all(ncid, varids[4], start, count, 
 				 &d->num_orig_particles); ERR;
+    err = ncmpi_put_vara_int_all(ncid, varids[5], start, count, 
+				 &d->num_particles); ERR;
     err = ncmpi_put_vara_int_all(ncid, varids[25], start, count, 
 				 &d->num_tets); ERR;
     err = ncmpi_put_vara_int_all(ncid, varids[28], start, count, 
@@ -191,7 +195,7 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
 
     /* block offsets */
     err = ncmpi_put_vara_longlong_all(ncid, varids[9], start, count, 
-				      &block_ofsts[NUM_ORIG_PARTS]); ERR;
+				      &block_ofsts[NUM_PARTS]); ERR;
     err = ncmpi_put_vara_longlong_all(ncid, varids[26], start, count, 
 				      &block_ofsts[NUM_LOC_TETRAS]); ERR;
     err = ncmpi_put_vara_longlong_all(ncid, varids[29], start, count, 
@@ -210,9 +214,9 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
 				   d->maxs); ERR;
 
     /* particles */
-    start[0] = block_ofsts[NUM_ORIG_PARTS];
+    start[0] = block_ofsts[NUM_PARTS];
     start[1] = 0;
-    count[0] = d->num_orig_particles;
+    count[0] = d->num_particles;
     count[1] = 3;
     err = ncmpi_put_vara_float_all(ncid, varids[14], start, count, 
 				   d->particles); ERR;
@@ -281,13 +285,13 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
     free(dirs);
 
     /* vert_to_tet */
-    start[0] = block_ofsts[NUM_ORIG_PARTS];
-    count[0] = d->num_orig_particles;
+    start[0] = block_ofsts[NUM_PARTS];
+    count[0] = d->num_particles;
     err = ncmpi_put_vara_int_all(ncid, varids[33], start, count, 
 				 d->vert_to_tet); ERR;
 
     /* update block offsets */
-    block_ofsts[NUM_ORIG_PARTS] += d->num_orig_particles;
+    block_ofsts[NUM_PARTS] += d->num_particles;
     block_ofsts[NUM_NEIGHBORS] += num_neighbors;
     block_ofsts[NUM_BLOCKS]++;
     /* 2x because I converted array of structs to array of ints */
@@ -340,7 +344,7 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
   /* open file for reading */
   err = ncmpi_open(comm, in_file, NC_NOWRITE, MPI_INFO_NULL, &ncid); ERR;
 
-  err = ncmpi_inq_varid(ncid, "block_off_num_orig_particles", &varids[9]); ERR;
+  err = ncmpi_inq_varid(ncid, "block_off_num_particles", &varids[9]); ERR;
   err = ncmpi_inq_varid(ncid, "block_off_num_tets", &varids[26]); ERR;
   err = ncmpi_inq_varid(ncid, "block_off_num_rem_tet_verts", &varids[29]); ERR;
   err = ncmpi_inq_varid(ncid, "block_off_num_neighbors", &varids[40]); ERR;
@@ -396,6 +400,9 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
     err = ncmpi_inq_varid(ncid, "num_orig_particles", &varids[4]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[4], start, count, 
 				 &(d->num_orig_particles)); ERR;
+    err = ncmpi_inq_varid(ncid, "num_particles", &varids[5]); ERR;
+    err = ncmpi_get_vara_int_all(ncid, varids[5], start, count, 
+				 &(d->num_particles)); ERR;
     err = ncmpi_inq_varid(ncid, "num_tets", &varids[25]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[25], start, count, 
 				 &(d->num_tets)); ERR;
@@ -420,10 +427,10 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
     count[0] = *tot_blocks;
     err = ncmpi_get_vara_longlong_all(ncid, varids[9], start, count, 
 				      (long long *)block_ofsts); ERR;
-    d->particles = (float *)malloc(d->num_orig_particles * 3 * sizeof(float));
+    d->particles = (float *)malloc(d->num_particles * 3 * sizeof(float));
     start[0] = block_ofsts[start_block_ofst + b];
     start[1] = 0;
-    count[0] = d->num_orig_particles;
+    count[0] = d->num_particles;
     count[1] = 3;
     err = ncmpi_inq_varid(ncid, "particles", &varids[14]); ERR;
     err = ncmpi_get_vara_float_all(ncid, varids[14], start, count, 
@@ -515,9 +522,9 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
     count[0] = *tot_blocks;
     err = ncmpi_get_vara_longlong_all(ncid, varids[9], start, count, 
 				      (long long *)block_ofsts); ERR;
-    d->vert_to_tet = (int *)malloc(d->num_orig_particles * sizeof(int));
+    d->vert_to_tet = (int *)malloc(d->num_particles * sizeof(int));
     start[0] = block_ofsts[start_block_ofst + b];
-    count[0] = d->num_orig_particles;
+    count[0] = d->num_particles;
     err = ncmpi_inq_varid(ncid, "vert_to_tet", &varids[33]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[33], start, count, 
 				   d->vert_to_tet); ERR;
@@ -582,13 +589,13 @@ void create_d_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype) {
 
     { DIY_FLOAT, OFST, 3, 
       offsetof(struct dblock_t, mins)             },
-    { DIY_FLOAT, ADDR, d->num_orig_particles * 3,
+    { DIY_FLOAT, ADDR, d->num_particles * 3,
       DIY_Addr(d->particles)                      },
     { ttype,     ADDR, d->num_tets, 
       DIY_Addr(d->tets)                           },
     { rtype,     ADDR, d->num_rem_tet_verts, 
       DIY_Addr(d->rem_tet_verts)                  },
-    { DIY_INT,   ADDR, d->num_orig_particles,
+    { DIY_INT,   ADDR, d->num_particles,
       DIY_Addr(d->vert_to_tet)                    },
     { DIY_FLOAT, OFST, 3, 
       offsetof(struct dblock_t, maxs)             },

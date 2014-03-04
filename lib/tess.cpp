@@ -759,14 +759,12 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 void fill_vert_to_tet(dblock_t* dblock) {
 
   dblock->vert_to_tet = 
-    (int*)malloc(sizeof(int) * dblock->num_orig_particles);
+    (int*)realloc(dblock->vert_to_tet, sizeof(int) * dblock->num_particles);
 
   for (int t = 0; t < dblock->num_tets; ++t) {
     for (int v = 0; v < 4; ++v) {
       int p = dblock->tets[t].verts[v];
-      // some verts can be remote, skip those
-      if (p < dblock->num_orig_particles)
-	dblock->vert_to_tet[p] = t;	// the last one wins
+      dblock->vert_to_tet[p] = t;	// the last one wins
     }
   }
 
@@ -1887,6 +1885,7 @@ void prep_d_out(int nblocks, struct dblock_t *dblocks, int **hdrs) {
     dblocks[i].maxs[2] = bounds.max[2];
 
     hdrs[i][NUM_ORIG_PARTICLES] = dblocks[i].num_orig_particles;
+    hdrs[i][NUM_PARTICLES] = dblocks[i].num_particles;
     hdrs[i][NUM_TETS] = dblocks[i].num_tets;
     hdrs[i][NUM_REM_TET_VERTS] = dblocks[i].num_rem_tet_verts;
 

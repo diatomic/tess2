@@ -24,7 +24,7 @@
 #define ERR {if(err!=NC_NOERR)printf("Error at line %d in %s: %s\n", __LINE__, __FILE__, ncmpi_strerror(err));}
 
 /* quantity vector */
-#define NUM_QUANTS 9
+#define NUM_QUANTS 10
 #define NUM_VERTICES 0
 #define NUM_COMP_CELLS 1
 #define NUM_CELL_FACES 2
@@ -34,6 +34,7 @@
 #define NUM_LOC_TETRAS 6
 #define NUM_REM_TETRAS 7
 #define NUM_UNIQUE_FACES 8
+#define NUM_PARTS 9
 
 #ifdef __cplusplus
 extern "C"
