@@ -25,6 +25,10 @@ struct dblock_t {
   /* input particles */
   int num_orig_particles; /* number of original particles in this block
   			     before any neighbor exhcange */
+  int num_particles; /* current number of particles in this block after any
+			neighbor exchange; original particles appear first 
+			followed by received particles; 
+			only original particles are saved to disk */
   float *particles; /* original input points */
 
   /* tets */

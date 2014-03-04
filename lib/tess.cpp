@@ -50,7 +50,8 @@ static int walls_on;
 
 // c source files such as tess-qhull.c do not want to see
 // C++ arguments, so I hid these function prototypes here-TP
-void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs);
+void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs,
+		    float **particles, int *num_particles);
 void reset_dblocks(int num_blocks, struct dblock_t* &dblocks);
 void fill_vert_to_tet(dblock_t* dblock);
 void incomplete_dcells_initial(struct dblock_t *tblock, int lid,
@@ -580,30 +581,21 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 void delaunay(int nblocks, float **particles, int *num_particles, 
 	      double *times, char *out_file) {
 
-  int *num_orig_particles; // number of original particles, before any
-			   // neighbor exchange 
   int dim = 3; // 3D 
   int rank; // MPI rank 
-  int i;
   void* ds; // persistent delaunay data structures
 
   MPI_Comm_rank(comm, &rank);
 
   // init timing 
-  for (i = 0; i < MAX_TIMES; i++)
+  for (int i = 0; i < MAX_TIMES; i++)
     times[i] = 0.0;
 
+  // initialize data structures
   int **hdrs; // headers 
   struct dblock_t *dblocks; // voronoi blocks 
-
-  num_orig_particles = (int *)malloc(nblocks * sizeof(int));
-  for (i = 0; i < nblocks; i++)
-    num_orig_particles[i] = num_particles[i];
-
   ds = init_delaunay_data_structures(nblocks);
-
-  // allocate and initialize blocks 
-  create_dblocks(nblocks, dblocks, hdrs);
+  create_dblocks(nblocks, dblocks, hdrs, particles, num_particles);
   
 #ifdef MEMORY
   int dwell = 10;
@@ -616,7 +608,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
   // create local delaunay cells
-  local_dcells(nblocks, dblocks, dim, num_particles, particles, ds);
+  local_dcells(nblocks, dblocks, dim, ds);
 
   #ifdef TIMING
   MPI_Barrier(comm);
@@ -637,12 +629,12 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   vector <sent_t> *sent_particles = new vector<sent_t>[nblocks];
 
   // determine which cells are incomplete or too close to neighbor 
-  for (i = 0; i < nblocks; i++)
+  for (int i = 0; i < nblocks; i++)
     incomplete_dcells_initial(&dblocks[i], i, sent_particles[i],
 			      convex_hull_particles[i]);
 
   // debug
-  fprintf(stderr, "3: num_particles[0] = %d\n", num_particles[0]);
+  fprintf(stderr, "3: num_particles[0] = %d\n", dblocks[0].num_particles);
 
 #ifdef MEMORY
   get_mem(3, dwell);
@@ -652,11 +644,10 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   reset_dblocks(nblocks, dblocks);
 
   // exhcange particles
-  neighbor_d_particles(nblocks, dblocks, particles, num_particles, 
-		       num_orig_particles);
+  neighbor_d_particles(nblocks, dblocks);
 
   // debug
-  fprintf(stderr, "5: num_particles[0] = %d\n", num_particles[0]);
+  fprintf(stderr, "5: num_particles[0] = %d\n", dblocks[0].num_particles);
 
 #ifdef MEMORY
   get_mem(4, dwell);
@@ -665,13 +656,13 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // Second, decisive phase 
 
   // Recompute local cells
-  local_dcells(nblocks, dblocks, dim, num_particles, particles, ds);
+  local_dcells(nblocks, dblocks, dim, ds);
 
 #ifdef MEMORY
   get_mem(5, dwell);
 #endif
 
-  for (i = 0; i < nblocks; i++)
+  for (int i = 0; i < nblocks; i++)
     incomplete_dcells_final(&dblocks[i], i, sent_particles[i],
 			    convex_hull_particles[i]);
 
@@ -683,15 +674,14 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   reset_dblocks(nblocks, dblocks);
   
   // exchange particles with neighbors 
-  neighbor_d_particles(nblocks, dblocks, particles, num_particles, 
-		       num_orig_particles);
+  neighbor_d_particles(nblocks, dblocks);
     
 #ifdef MEMORY
   get_mem(7, dwell);
 #endif
   
   // cleanup convex hull particles
-  for (i = 0; i < nblocks; ++i)
+  for (int i = 0; i < nblocks; ++i)
     convex_hull_particles[i].clear();
   delete[] convex_hull_particles;
 
@@ -704,8 +694,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 #endif
 
   // create all final cells 
-  all_dcells(nblocks, dblocks, dim, num_particles, num_orig_particles,
-	     particles, times, ds);
+  local_dcells(nblocks, dblocks, dim, ds);
 
 #ifdef MEMORY
   get_mem(8, dwell);
@@ -714,29 +703,10 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // cleanup delaunay data structure and sent particles
   clean_delaunay_data_structures(ds);
 
-//   // is_complete status of received particles 
-//   struct remote_ic_t **rics =
-//     (struct remote_ic_t **)malloc(nblocks * 
-// 				  sizeof(struct remote_ic_t *));
-//   // exchange complete cell status for exchanged particles
-//   neighbor_d_is_complete(nblocks, dblocks, rics, sent_particles);
-
-//   // convert delaunay output to dblock for all blocks
-//   for (i = 0; i < nblocks; i++)
-//     gen_d_tets(&dblocks[i], rics[i], i, 
-// 	       num_particles[i] - num_orig_particles[i]);
-
   // cleanup sent particles
-  for (i = 0; i < nblocks; ++i)
+  for (int i = 0; i < nblocks; ++i)
     sent_particles[i].clear();
   delete[] sent_particles;
-
-//   // cleanup
-//   for (i = 0; i < nblocks; i++) {
-//     if (rics[i])
-//       free(rics[i]);
-//   }
-//   free(rics);
 
 #ifdef TIMING
   // previously no barrier here; want min and max time;
@@ -776,7 +746,6 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 
   // cleanup 
   destroy_dblocks(nblocks, dblocks, hdrs);
-  free(num_orig_particles);
   
 #ifdef MEMORY
   get_mem(10, dwell);
@@ -1043,13 +1012,8 @@ void neighbor_particles(int nblocks, float **particles,
 //
 //   nblocks: local number of blocks
 //   dblocks: local blocks
-//   particles: particles before and after neighbor exchange (input / output)
-//   num_particles: number of new particles in each block (input / output)
 //
-//   to send the site to the neighbor
-// 
-void neighbor_d_particles(int nblocks, dblock_t *dblocks, float **particles,
-			  int *num_particles, int *num_orig_particles) {
+void neighbor_d_particles(int nblocks, dblock_t *dblocks) {
 
   void ***recv_particles; // pointers to particles in ecah block 
 			  //   that are received from neighbors 
@@ -1064,10 +1028,10 @@ void neighbor_d_particles(int nblocks, dblock_t *dblocks, float **particles,
   DIY_Exchange_neighbors(0, recv_particles, num_recv_particles, 1.0, 
 			 &item_type);
 
-  // copy received particles to particles 
+  // copy received particles to dblock
   for (i = 0; i < nblocks; i++) {
 
-    int n = (num_particles[i] - num_orig_particles[i]);
+    int n = (dblocks[i].num_particles - dblocks[i].num_orig_particles);
     int new_remote_particles = num_recv_particles[i] + n;
     dblocks[i].num_rem_tet_verts = new_remote_particles;
     dblocks[i].rem_tet_verts = 
@@ -1078,19 +1042,19 @@ void neighbor_d_particles(int nblocks, dblock_t *dblocks, float **particles,
     if (num_recv_particles[i]) {
 
       // grow space 
-      particles[i] = 
-	(float *)realloc(particles[i], 
-			 (num_particles[i] + num_recv_particles[i]) *
+      dblocks[i].particles = 
+	(float *)realloc(dblocks[i].particles, 
+			 (dblocks[i].num_particles + num_recv_particles[i]) *
 			 3 * sizeof(float));
 
       // copy received particles 
       for (j = 0; j < num_recv_particles[i]; j++) { 
 
-	particles[i][3 * num_particles[i]] =
+	dblocks[i].particles[3 * dblocks[i].num_particles] =
 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->x;
-	particles[i][3 * num_particles[i] + 1] =
+	dblocks[i].particles[3 * dblocks[i].num_particles + 1] =
 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->y;
-	particles[i][3 * num_particles[i] + 2] =
+	dblocks[i].particles[3 * dblocks[i].num_particles + 2] =
 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->z;
 	dblocks[i].rem_tet_verts[n].gid = 
 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->gid;
@@ -1099,7 +1063,7 @@ void neighbor_d_particles(int nblocks, dblock_t *dblocks, float **particles,
 	dblocks[i].rem_tet_verts[n].dir = 
 	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->dir;
 
-	num_particles[i]++;
+	dblocks[i].num_particles++;
 	n++;
 
       } // copy received particles 
@@ -1993,14 +1957,19 @@ void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs) {
 // ---------------------------------------------------------------------------
 //
 //   creates and initializes delaunay blocks and headers
+//   copies original particles into the blocks
 //
 //   num_blocks: number of blocks
 //   dblocks: local dblocks
 //   hdrs: block headers, pass NULL if not used
+//   particles: particles[block_num][particle] 
+//   where each particle is 3 values, px, py, pz
+//   num_particles; number of particles in each block
 //
 //   side effects: allocates memory for blocks and headers
 // 
-void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs) {
+void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs,
+		    float **particles, int *num_particles) {
 
   // allocate
   dblocks = new dblock_t[num_blocks];
@@ -2013,8 +1982,15 @@ void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs) {
   // initialize
   for (int i = 0; i < num_blocks; i++) {
 
-    dblocks[i].num_orig_particles = 0;
-    dblocks[i].particles = NULL;
+    dblocks[i].num_orig_particles = num_particles[i];
+    dblocks[i].num_particles = num_particles[i];
+    // malloc instead of new so that can be realloc'ed later
+    dblocks[i].particles = (float*)malloc(num_particles[i] * 3 * sizeof(float));
+    for (int j = 0; j < num_particles[i]; j++) {
+      dblocks[i].particles[3 * j] = particles[i][3 * j];
+      dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
+      dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
+    }
     dblocks[i].num_tets = 0;
     dblocks[i].tets = NULL;
     dblocks[i].num_rem_tet_verts = 0;
@@ -2759,8 +2735,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 //    sent_particles: convex hull particles to check
 //    convex_hull_particles: convex hull particles to check
 // 
-void incomplete_dcells_final(struct dblock_t *dblock,
-			    int lid,
+void incomplete_dcells_final(struct dblock_t *dblock, int lid,
 			    vector <sent_t> &sent_particles,
 			    vector <int> &convex_hull_particles) {
 

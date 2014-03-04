@@ -79,14 +79,9 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
   nblocks: number of blocks
   dblocks: pointer to array of dblocks
   dim: number of dimensions (eg. 3)
-  num_particles: number of particles in each block
-  particles: particles in each block, particles[block_num][particle]
-  where each particle is 3 values, px, py, pz
-  times: timing
   ds: the delaunay data structures
 */
-void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
-		  int *num_particles, float **particles, void* ds) {
+void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) {
 
   Delaunay3D* Dts = (Delaunay3D*) ds;
 
@@ -94,7 +89,7 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
   for (int i = 0; i < nblocks; i++) {
 
     Delaunay3D& Dt = Dts[i];
-    construct_delaunay(Dt, num_particles[i], particles[i]);
+    construct_delaunay(Dt, dblocks[i].num_particles, dblocks[i].particles);
 
     // fill the tets
     int ntets =  Dt.number_of_finite_cells();
@@ -102,16 +97,6 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
     dblocks[i].tets = (struct tet_t*)malloc(ntets * sizeof(struct tet_t));
     gen_tets(Dt, dblocks[i].tets);
     
-    /* allocate cell sites for original particles */
-    dblocks[i].num_orig_particles = num_particles[i];
-    dblocks[i].particles =
-      (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
-    for (int j = 0; j < dblocks[i].num_orig_particles; j++) {
-      dblocks[i].particles[3 * j]     = particles[i][3 * j];
-      dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
-      dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
-    }
-
     fill_vert_to_tet(&dblocks[i]);
 
   }
@@ -227,56 +212,37 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 
 }
 //----------------------------------------------------------------------------
-//
-//   creates all final delaunay cells
-//
-//   nblocks: number of blocks
-//   dblocks: pointer to array of dblocks
-//   dim: number of dimensions (eg. 3)
-//   num_particles: number of particles in each block
-//   num_orig_particles: number of original particles in each block, before any
-//   neighbor exchange
-//   particles: particles in each block, particles[block_num][particle]
-//   where each particle is 3 values, px, py, pz
-//   times: timing
-//   ds: the delaunay data structures
-//
-void all_dcells(int nblocks, struct dblock_t *dblocks, int dim,
-		int *num_particles, int *num_orig_particles, 
-		float **particles, double *times, void* ds) {
+// DEPRECATED
+// //
+// //   creates all final delaunay cells
+// //
+// //   nblocks: number of blocks
+// //   dblocks: pointer to array of dblocks
+// //   dim: number of dimensions (eg. 3)
+// //   ds: the delaunay data structures
+// //
+// void all_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) {
 
-  Delaunay3D* Dts = (Delaunay3D*) ds;
+//   Delaunay3D* Dts = (Delaunay3D*) ds;
 
-  // for all blocks 
-  for (int i = 0; i < nblocks; i++) {
+//   // for all blocks 
+//   for (int i = 0; i < nblocks; i++) {
 
-    // oompute delaunay
-    Delaunay3D& Dt = Dts[i];
-    construct_delaunay(Dt, num_particles[i], particles[i]);
+//     // oompute delaunay
+//     Delaunay3D& Dt = Dts[i];
+//     construct_delaunay(Dt, dblocks[i].num_particles, dblocks[i].particles);
 
-    // fill the tets
-    dblocks[i].num_tets = Dt.number_of_finite_cells();
-    dblocks[i].tets  = (tet_t*)malloc(sizeof(tet_t) * dblocks[i].num_tets);
-    gen_tets(Dt, dblocks[i].tets);
+//     // fill the tets
+//     dblocks[i].num_tets = Dt.number_of_finite_cells();
+//     dblocks[i].tets  = (tet_t*)malloc(sizeof(tet_t) * dblocks[i].num_tets);
+//     gen_tets(Dt, dblocks[i].tets);
 
-    // allocate copy for original particles
-    dblocks[i].num_orig_particles = num_orig_particles[i];
-    dblocks[i].particles =
-      (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
+//     fill_vert_to_tet(&dblocks[i]);
 
-    fill_vert_to_tet(&dblocks[i]);
+//   } // for all blocks 
 
-    // copy particles and get their completeion status
-    for (int j = 0; j < dblocks[i].num_orig_particles; j++) {
-      dblocks[i].particles[3 * j]     = particles[i][3 * j];
-      dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
-      dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
-    }
-
-  } // for all blocks 
-
-}
-//----------------------------------------------------------------------------
+// }
+// //----------------------------------------------------------------------------
 //
 //   generates voronoi output from CGAL
 //

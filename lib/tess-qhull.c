@@ -108,14 +108,10 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
   nblocks: number of blocks
   dblocks: pointer to array of dblocks
   dim: number of dimensions (eg. 3)
-  num_particles: number of particles in each block
-  particles: particles in each block, particles[block_num][particle]
-  where each particle is 3 values, px, py, pz
   times: timing
   ds: the delaunay data structures; unused in qhull
 */
-void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
-		  int *num_particles, float **particles, void* ds) {
+void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void* ds) {
 
   boolT ismalloc = False;    /* True if qhull should free points in
 				qh_freeqhull() or reallocation */
@@ -133,18 +129,18 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
   /* for all blocks */
   for (i = 0; i < nblocks; i++) {
 
-    /* fprintf(stderr, "Num particles (local): %d\n", num_particles[i]); */
-
     /* deep copy from float to double (qhull API is double) */
-    double *pts = (double *)malloc(num_particles[i] * 3 * sizeof(double));
-    for (j = 0; j < 3 * num_particles[i]; j++)
-      pts[j] = particles[i][j];
+    double *pts = 
+      (double *)malloc(dblocks[i].num_particles * 3 * sizeof(double));
+    for (j = 0; j < 3 * dblocks[i].num_particles; j++)
+      pts[j] = dblocks[i].particles[j];
 
     /* compute delaunay */
+/*     sprintf(flags, "qhull v d o Fv Fo"); /\* Fv prints voronoi faces *\/ */
     sprintf (flags, "qhull d Qt"); /* print delaunay cells */
 
     /* eat qhull output by sending it to dev/null */
-    exitcode = qh_new_qhull(dim, num_particles[i], pts, ismalloc,
+    exitcode = qh_new_qhull(dim, dblocks[i].num_particles, pts, ismalloc,
 			    flags, dev_null, stderr);
 
     free(pts);
@@ -152,16 +148,7 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
     /* process delaunay output */
     if (!exitcode)
       gen_d_delaunay_output(qh facet_list, &dblocks[i]);
-
-    /* allocate cell sites for original particles */
-    dblocks[i].num_orig_particles = num_particles[i];
-    dblocks[i].particles =
-      (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
-    for (j = 0; j < dblocks[i].num_orig_particles; j++) {
-      dblocks[i].particles[3 * j] = particles[i][3 * j];
-      dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
-      dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
-    }
+    fill_vert_to_tet(&dblocks[i]);
 
     /* clean up qhull */
     qh_freeqhull(!qh_ALL);                 /* free long memory */
@@ -169,8 +156,6 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
     if (curlong || totlong)
       fprintf (stderr, "qhull internal warning: did not free %d bytes of "
 	       "long memory (%d pieces)\n", totlong, curlong);
-
-    fill_vert_to_tet(&dblocks[i]);
 
   } /* for all blocks */
 
@@ -320,97 +305,67 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 
 }
 /*--------------------------------------------------------------------------*/
-/*
-  creates all final voronoi and delaunay cells
+/* DEPRECATED */
+/* /\* */
+/*   creates all final voronoi and delaunay cells */
 
-  nblocks: number of blocks
-  dblocks: pointer to array of dblocks
-  dim: number of dimensions (eg. 3)
-  num_particles: number of particles in each block
-  num_orig_particles: number of original particles in each block, before any
-  neighbor exchange
-  particles: particles in each block, particles[block_num][particle]
-  where each particle is 3 values, px, py, pz
-  times: timing
-  ds: the delaunay data structures; unused in qhull
-*/
-void all_dcells(int nblocks, struct dblock_t *dblocks, int dim,
-		int *num_particles, int *num_orig_particles, 
-		float **particles, double *times, void* ds) {
+/*   nblocks: number of blocks */
+/*   dblocks: pointer to array of dblocks */
+/*   dim: number of dimensions (eg. 3) */
+/*   times: timing */
+/*   ds: the delaunay data structures; unused in qhull */
+/* *\/ */
+/* void all_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) { */
 
-  boolT ismalloc = False;    /* True if qhull should free points in
-				qh_freeqhull() or reallocation */
-  char flags[250];          /* option flags for qhull, see qh-quick.htm */
-  int exitcode;             /* 0 if no error from qhull */
-  int curlong, totlong;     /* memory remaining after qh_memfreeshort */
-  FILE *dev_null; /* file descriptor for writing to /dev/null */
-  int i, j;
+/*   boolT ismalloc = False;    /\* True if qhull should free points in */
+/* 				qh_freeqhull() or reallocation *\/ */
+/*   char flags[250];          /\* option flags for qhull, see qh-quick.htm *\/ */
+/*   int exitcode;             /\* 0 if no error from qhull *\/ */
+/*   int curlong, totlong;     /\* memory remaining after qh_memfreeshort *\/ */
+/*   FILE *dev_null; /\* file descriptor for writing to /dev/null *\/ */
+/*   int i, j; */
 
-  /* quiet compiler warnings about unused parameters */
-  times = times;
-  ds = ds;
+/*   ds = ds; /\* quiet compiler warning about unused parameter *\/ */
 
-  dev_null = fopen("/dev/null", "w");
-  assert(dev_null != NULL);
+/*   dev_null = fopen("/dev/null", "w"); */
+/*   assert(dev_null != NULL); */
 
-  /* delaunay vertices */
-  int **tet_verts = (int **)malloc(nblocks * sizeof(int *));
-  int *num_tets = (int *)malloc(nblocks * sizeof(int));
-  for (i = 0; i < nblocks; i++) {
-    tet_verts[i] =  NULL;
-    num_tets[i] = 0;
-  }
-
-  /* for all blocks */
-  for (i = 0; i < nblocks; i++) {
+/*   /\* for all blocks *\/ */
+/*   for (i = 0; i < nblocks; i++) { */
     
-    /* deep copy from float to double (qhull API is double) */
-    double *pts = (double *)malloc(num_particles[i] * 3 * sizeof(double));
-    for (j = 0; j < 3 * num_particles[i]; j++)
-      pts[j] = particles[i][j];
+/*     /\* deep copy from float to double (qhull API is double) *\/ */
+/*     double *pts =  */
+/*       (double *)malloc(dblocks[i].num_particles * 3 * sizeof(double)); */
+/*     for (j = 0; j < 3 * dblocks[i].num_particles; j++) */
+/*       pts[j] = dblocks[i].particles[j]; */
 
-    /* compute voronoi */
-/*     sprintf(flags, "qhull v d o Fv Fo"); /\* Fv prints voronoi faces *\/ */
-    sprintf(flags, "qhull d Qt"); /* print delaunay cells */
+/*     /\* compute delaunay *\/ */
+/* /\*     sprintf(flags, "qhull v d o Fv Fo"); /\\* Fv prints voronoi faces *\\/ *\/ */
+/*     sprintf(flags, "qhull d Qt"); /\* print delaunay cells *\/ */
 
-    /* eat qhull output by sending it to dev/null
-       need to see how this behaves on BG/P, will get I/O forwarded but will 
-       stop there and not proceed to storage */
-    exitcode = qh_new_qhull(dim, num_particles[i], pts, ismalloc,
-			    flags, dev_null, stderr);
+/*     /\* eat qhull output by sending it to dev/null *\/ */
+/*     exitcode = qh_new_qhull(dim, dblocks[i].num_particles, pts, ismalloc, */
+/* 			    flags, dev_null, stderr); */
 
-    free(pts);
+/*     free(pts); */
 
-    /* process delaunay output */
-    if (!exitcode)
-      gen_d_delaunay_output(qh facet_list, &dblocks[i]);
+/*     /\* process delaunay output *\/ */
+/*     if (!exitcode) */
+/*       gen_d_delaunay_output(qh facet_list, &dblocks[i]); */
+/*     fill_vert_to_tet(&dblocks[i]); */
 
-    /* allocate copy for original particles */
-    dblocks[i].num_orig_particles = num_orig_particles[i];
-    dblocks[i].particles =
-      (float *)malloc(3 * sizeof(float) * dblocks[i].num_orig_particles);
+/*     /\* clean up qhull *\/ */
+/*     qh_freeqhull(!qh_ALL);                 /\* free long memory *\/ */
+/*     qh_memfreeshort(&curlong, &totlong);  /\* free short memory *\/ */
+/*     if (curlong || totlong) */
+/*       fprintf (stderr, "qhull internal warning: did not free %d bytes of " */
+/* 	       "long memory (%d pieces)\n", totlong, curlong); */
 
-    fill_vert_to_tet(&dblocks[i]);
+/*   } /\* for all blocks *\/ */
 
-    /* copy particles and their completion status */
-    for (j = 0; j < dblocks[i].num_orig_particles; j++) {
-      dblocks[i].particles[3 * j] = particles[i][3 * j];
-      dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
-      dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
-    }
+/*   fclose(dev_null); */
 
-    /* clean up qhull */
-    qh_freeqhull(!qh_ALL);                 /* free long memory */
-    qh_memfreeshort(&curlong, &totlong);  /* free short memory */
-    if (curlong || totlong)
-      fprintf (stderr, "qhull internal warning: did not free %d bytes of "
-	       "long memory (%d pieces)\n", totlong, curlong);
-
-  } /* for all blocks */
-
-  fclose(dev_null);
-
-}
+/* } */
 /*--------------------------------------------------------------------------*/
 /*
   generates voronoi output from qhull

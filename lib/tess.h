@@ -88,12 +88,12 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 	       float **particles, int **gids, int **nids, 
 	       unsigned char **dirs, double *times, void* ds,
 	       struct tet_t** tets, int* ntets);
-#ifdef __cplusplus
-extern "C"
-#endif
-void all_dcells(int nblocks, struct dblock_t *dblocks, int dim,
-		int *num_particles, int *num_orig_particles, 
-		float **particles, double *times, void* ds);
+/* DEPRECATED */
+/* #ifdef __cplusplus */
+/* extern "C" */
+/* #endif */
+/* void all_dcells(int nblocks, struct dblock_t *dblocks, int dim, */
+/* 		double *times, void* ds); */
 #ifdef __cplusplus
 extern "C"
 #endif
@@ -112,8 +112,8 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 #ifdef __cplusplus
 extern "C"
 #endif
-void local_dcells(int nblocks, struct dblock_t *dblocks, int dim,
-		  int *num_particles, float **particles, void* ds);
+void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds);
+
 #ifdef __cplusplus
 extern "C"
 #endif
@@ -131,9 +131,7 @@ void fill_vert_to_tet(struct dblock_t *dblock);
 void neighbor_particles(int nblocks, float **particles,
 			int *num_particles, int *num_orig_particles,
 			int **gids, int **nids, unsigned char **dirs);
-void neighbor_d_particles(int nblocks, struct dblock_t *dblocks, 
-			  float **particles, int *num_particles, 
-			  int *num_orig_particles);
+void neighbor_d_particles(int nblocks, struct dblock_t *dblocks);
 
 #ifdef __cplusplus
 extern "C"
