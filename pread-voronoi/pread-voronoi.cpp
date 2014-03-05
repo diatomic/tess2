@@ -109,7 +109,12 @@ void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
 
   tb = atoi(argv[1]);
   strcpy(infile, argv[2]);
-  strcpy(outfile, argv[3]);
+
+  if (argv[3][0] =='!')
+    strcpy(outfile, "");
+  else
+    strcpy(outfile, argv[3]);
+
   coordinates.resize(3);
   coordinates[0] = argv[4];
   coordinates[1] = argv[5];
