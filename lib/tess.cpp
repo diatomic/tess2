@@ -614,6 +614,13 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   fprintf(stderr, "5: num_particles[0] = %d\n", dblocks[0].num_particles);
 
   get_mem(4, dwell);
+  
+#ifdef DEBUG
+  int max_particles;
+  MPI_Reduce( &dblocks[0].num_particles, &max_particles, 1, MPI_INT, MPI_MAX, 0, comm);
+  if (rank == 0)
+    fprintf(stderr, "phase 1: max_particles = %d\n", max_particles);
+#endif
 
   // Second, decisive phase 
 
@@ -2355,6 +2362,7 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
   // for all tets
   for (int t = 0; t < dblock->num_tets; t++) {
+    sent.num_gbs = 0;
     float center[3]; // circumcenter
     circumcenter(center, &dblock->tets[t], dblock->particles);
 
@@ -2656,6 +2664,20 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
   // identify and queue convex hull particles
   int old_sent = 0;
   int last_sent = sent_particles.size();
+
+#ifdef DEBUG
+  fprintf(stderr, "num_sent: %d\n", last_sent);
+  int max_sent_size = 0;
+  int min_sent_size = MAX_NEIGHBORS;
+  for (int i = 0; i < last_sent; ++i) {
+    if (sent_particles[i].num_gbs > max_sent_size)
+      max_sent_size = sent_particles[i].num_gbs;
+    if (sent_particles[i].num_gbs < min_sent_size)
+      min_sent_size = sent_particles[i].num_gbs;
+  }
+  fprintf(stderr, "destinations: [%d, %d]\n", min_sent_size, max_sent_size);
+#endif
+
   for (int j = 0; j < (int)convex_hull_particles.size(); ++j) {
 
     int p = convex_hull_particles[j];
