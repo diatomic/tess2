@@ -1354,8 +1354,6 @@ void collect_dstats(int nblocks, struct dblock_t *dblocks, double *times) {
   int rank;
 
   MPI_Comm_rank(comm, &rank);
-    
-  fprintf(stderr, "collecting stats\n");
 
   double max_times[MAX_TIMES];
   MPI_Reduce( times, max_times, MAX_TIMES, MPI_DOUBLE, MPI_MAX, 0, comm);
