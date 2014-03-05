@@ -1347,17 +1347,36 @@ void collect_dstats(int nblocks, struct dblock_t *dblocks, double *times) {
   int rank;
 
   MPI_Comm_rank(comm, &rank);
+    
+  fprintf(stderr, "collecting stats\n");
+
+  double max_times[MAX_TIMES];
+  MPI_Reduce( times, max_times, MAX_TIMES, MPI_DOUBLE, MPI_MAX, 0, comm);
+
+  // TODO: need to first compute over all blocks
+  const int MAX_QUANTS = 10;
+  int quants[MAX_QUANTS], min_quants[MAX_QUANTS], max_quants[MAX_QUANTS];
+  quants[0] = dblocks[0].num_orig_particles;
+  quants[1] = dblocks[0].num_particles;
+  quants[2] = dblocks[0].num_tets;
+  quants[3] = dblocks[0].num_rem_tet_verts;
+  MPI_Reduce( quants, min_quants, MAX_QUANTS, MPI_INT, MPI_MIN, 0, comm);
+  MPI_Reduce( quants, max_quants, MAX_QUANTS, MPI_INT, MPI_MAX, 0, comm);
 
   // --- print output --- 
 
   // global stats 
   if (rank == 0) {
     fprintf(stderr, "----------------- global stats ------------------\n");
-    fprintf(stderr, "local delaunay time = %.3lf s\n",
-	    times[LOCAL_TIME]);
-    fprintf(stderr, "particle exchange time = %.3lf s\n", times[EXCH_TIME]);
-    fprintf(stderr, "Voronoi / delaunay time = %.3lf s\n", times[CELL_TIME]);
-    fprintf(stderr, "output time = %.3lf s\n", times[OUT_TIME]);
+    fprintf(stderr, "local delaunay time     = %.3lf s\n", max_times[LOCAL_TIME]);
+    fprintf(stderr, "particle exchange time  = %.3lf s\n", max_times[EXCH_TIME]);
+    fprintf(stderr, "Voronoi / delaunay time = %.3lf s\n", max_times[CELL_TIME]);
+    fprintf(stderr, "output time             = %.3lf s\n", max_times[OUT_TIME]);
+    fprintf(stderr, "-------------------------------------------------\n");
+    fprintf(stderr, "original particles = [%d, %d]\n", min_quants[0], max_quants[0]);
+    fprintf(stderr, "with ghosts        = [%d, %d]\n", min_quants[1], max_quants[1]);
+    fprintf(stderr, "tets               = [%d, %d]\n", min_quants[2], max_quants[2]);
+    fprintf(stderr, "remote tet verts   = [%d, %d]\n", min_quants[3], max_quants[3]);
     fprintf(stderr, "-------------------------------------------------\n");
   }
 
