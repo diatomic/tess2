@@ -147,7 +147,7 @@ void aggregate_stats(int nblocks, struct vblock_t *vblocks,
 		     struct stats_t *loc_stats);
 void average(void *in, void *inout, int *len, MPI_Datatype *type);
 void histogram(void *in, void *inout, int *len, MPI_Datatype *type);
-void print_block(struct vblock_t *vblock, int gid);
+void print_block(struct dblock_t *dblock, int gid);
 void print_particles(float *particles, int num_particles, int gid);
 void prep_out(int nblocks, struct vblock_t *vblocks);
 void prep_d_out(int nblocks, struct dblock_t *dblocks, int **hdrs);

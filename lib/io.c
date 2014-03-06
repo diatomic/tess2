@@ -491,13 +491,16 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
     count[0] = *tot_blocks;
     err = ncmpi_get_vara_longlong_all(ncid, varids[29], start, count,
 				      (long long *) block_ofsts); ERR;
-    d->rem_tet_verts =
-      (struct remote_vert_t *)malloc(d->num_rem_tet_verts *
-				     sizeof(struct remote_vert_t));
+    if (d->num_rem_tet_verts)
+      d->rem_tet_verts =
+	(struct remote_vert_t *)malloc(d->num_rem_tet_verts *
+				       sizeof(struct remote_vert_t));
     count[0] = d->num_rem_tet_verts;
     start[0] = (count[0] ? block_ofsts[start_block_ofst + b] : 0);
     /* copy individual fields of struct into seaparate temp. arrays */
-    int *ids = (int *)malloc(d->num_rem_tet_verts * sizeof(int));
+    int *ids =  NULL;
+    if (d->num_rem_tet_verts)
+      ids = (int *)malloc(d->num_rem_tet_verts * sizeof(int));
     err = ncmpi_inq_varid(ncid, "rem_tet_vert_gids", &varids[30]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[30], start, count,
 				 ids); ERR;
@@ -508,14 +511,18 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
 				 ids); ERR;
     for (i = 0; i < d->num_rem_tet_verts; i++)
       d->rem_tet_verts[i].nid = ids[i];
-    free(ids);
-    unsigned char *dirs = (unsigned char *)malloc(d->num_rem_tet_verts);
+    if (d->num_rem_tet_verts)
+      free(ids);
+    unsigned char *dirs = NULL;
+    if (d->num_rem_tet_verts)
+      dirs = (unsigned char *)malloc(d->num_rem_tet_verts);
     err = ncmpi_inq_varid(ncid, "rem_tet_vert_dirs", &varids[32]); ERR;
     err = ncmpi_get_vara_uchar_all(ncid, varids[32], start, count,
 				   dirs); ERR;
     for (i = 0; i < d->num_rem_tet_verts; i++)
       d->rem_tet_verts[i].dir = dirs[i];
-    free(dirs);
+    if (d->num_rem_tet_verts)
+      free(dirs);
     
     /* vert_to_tet */
     start[0] = 0;

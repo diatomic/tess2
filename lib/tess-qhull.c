@@ -604,6 +604,7 @@ int gen_delaunay_output(facetT *facetlist, int **tet_verts) {
 
 }
 /*--------------------------------------------------------------------------*/
+#if 1
 /*
   generates delaunay output from qhull
 
@@ -619,7 +620,7 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
   int numfacets = 0;
   int t, v, n; /* index in tets, tet verts, tet neighbors */
 
-  /* count number of facets */
+  /* count number of tets (facets to qhull) */
   FORALLfacet_(facetlist) {
     if ((facet->visible && qh NEWfacets) || (qh_skipfacet(facet)))
       facet->visitid= 0;
@@ -657,19 +658,151 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
     /* for all neighbor tets */
     n = 0;
     FOREACHneighbor_(facet) {
-      if (neighbor->visitid)
+      if (neighbor->visitid) {
 	dblock->tets[t].tets[n++] = neighbor->visitid - 1;
+      }
       else
 	dblock->tets[t].tets[n++] = -1;
-      /* debug */
-/*       fprintf(stderr, "%d ", dblock->tets[t].tets[n - 1]); */
     }
+    assert(n == 4); /* sanity */
 
     t++;
 
   } /* for all tets */
 
   assert(numfacets == t); /* sanity */
+
+}
+/*--------------------------------------------------------------------------*/
+#else
+/* based on Steve's version of neighbor ids, same results as mine
+   DEPRECATED */
+/*
+  generates delaunay output from qhull
+
+  facetlist: qhull list of convex hull facets
+  tet_verts: pointer to array of tet vertex indices for this block 
+  (allocated by this function, user's responsibility to free)
+
+*/
+void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
+
+  facetT *facet, *neighbor, **neighborp;
+  ridgeT *ridge, **ridgep;
+  vertexT *vertex, **vertexp;
+  int numfacets = 0;
+  int t, v, n; /* index in tets, tet verts, tet neighbors */
+
+  /* count number of tets (facets to qhull) */
+  FORALLfacet_(facetlist) {
+    if ((facet->visible && qh NEWfacets) || (qh_skipfacet(facet)))
+      facet->visitid= 0;
+    else
+      facet->visitid= ++numfacets;
+  }
+  int *id_map = (int *)malloc(numfacets * sizeof(int));
+
+  dblock->num_tets = numfacets;
+  dblock->tets = (struct tet_t *)malloc(numfacets * sizeof(struct tet_t));
+
+  /* for all tets (facets to qhull) */
+  t = 0;
+  FORALLfacet_(facetlist) {
+
+    if (qh_skipfacet(facet) || (facet->visible && qh NEWfacets))
+      continue;
+
+    if (qh_setsize(facet->vertices) != 4) {
+      fprintf(stderr, "tet has %d vertices; skipping.\n",
+	      qh_setsize(facet->vertices));
+      continue;
+    }
+    id_map[t++] = facet->id;
+
+  }
+
+  /* for all tets (facets to qhull) */
+  t = 0;
+  FORALLfacet_(facetlist) {
+
+    if (qh_skipfacet(facet) || (facet->visible && qh NEWfacets))
+      continue;
+
+    if (qh_setsize(facet->vertices) != 4) {
+      fprintf(stderr, "tet has %d vertices; skipping.\n",
+	      qh_setsize(facet->vertices));
+      continue;
+    }
+
+    /* for all vertices */
+    v = 0;
+    if ((facet->toporient ^ qh_ORIENTclock)
+	|| (qh hull_dim > 2 && !facet->simplicial)) {
+      FOREACHvertex_(facet->vertices)
+	dblock->tets[t].verts[v++] = qh_pointid(vertex->point);
+    } else {
+      FOREACHvertexreverse12_(facet->vertices)
+	dblock->tets[t].verts[v++] = qh_pointid(vertex->point);
+    }
+
+    /* for all neighbor tets */
+    n = 0;
+    qh_makeridges(facet);
+    FOREACHridge_(facet->ridges) {
+      neighbor = otherfacet_(ridge, facet);
+
+      int neigh_id = bin_search(id_map, neighbor->id, numfacets);
+      if (neigh_id >= 0)
+	dblock->tets[t].tets[n++] = neigh_id;
+      else
+	dblock->tets[t].tets[n++] = -1;
+    }
+    assert(n == 4); /* sanity */
+
+/*     debug */
+/*         fprintf(stderr, "1: tet %d verts [%d %d %d %d] neigh_tets [%d %d %d %d]\n", */
+/*     	    t, dblock->tets[t].verts[0], dblock->tets[t].verts[1], */
+/*     	    dblock->tets[t].verts[2], dblock->tets[t].verts[3], */
+/*     	    dblock->tets[t].tets[0], dblock->tets[t].tets[1], */
+/*     	    dblock->tets[t].tets[2], dblock->tets[t].tets[3]); */
+
+    t++;
+
+  } /* for all tets */
+
+  free(id_map);
+  assert(numfacets == t); /* sanity */
+
+}
+/*--------------------------------------------------------------------------*/
+#endif
+/*--------------------------------------------------------------------------*/
+/* used with Steve's version of neighbor ids, DEPRECATED */
+/*
+  binary search
+  tbl: lookup table
+  key: search key
+  size: number of table elements
+
+  returns: index of key, -1 if not found
+*/
+int bin_search(int *tbl, int key, int size) {
+
+  int max = size - 1;
+  int min = 0;
+  int mid;
+
+  while (max >= min) {
+    mid = (min + max) / 2;
+    if (tbl[mid] < key )
+      min = mid + 1;
+    else if (tbl[mid] > key)
+      max = mid - 1;
+    else
+      return mid;
+  }
+
+  return -1; /* not found */
 
 }
 /*--------------------------------------------------------------------------*/

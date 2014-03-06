@@ -567,7 +567,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   ds = init_delaunay_data_structures(nblocks);
   create_dblocks(nblocks, dblocks, hdrs, particles, num_particles);
   
-  int dwell = 10;
+  int dwell = 0;
   get_mem(1, dwell);
 
 #ifdef TIMING
@@ -577,6 +577,9 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 
   // create local delaunay cells
   local_dcells(nblocks, dblocks, dim, ds);
+
+  // debug
+//   print_block(&dblocks[0], 0);
 
   #ifdef TIMING
   MPI_Barrier(comm);
@@ -675,7 +678,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   MPI_Barrier(comm);
   times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
   // MPI_Barrier(comm); 
-  times[VOL_TIME] = MPI_Wtime();
+  times[OUT_TIME] = MPI_Wtime();
 #endif
 
   get_mem(9, dwell);
@@ -2318,17 +2321,9 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
   // identify and queue convex hull particles
   for (int p = 0; p < dblock->num_orig_particles; ++p) {
 
-    // debug
-//     int rank;
-//     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-//     if (rank == 7)
-//       fprintf(stderr, "%p %p %p p = %d num_tets = %d "
-// 	      "num_orig_particles = %d\n", 
-// 	      dblock, dblock->tets, dblock->vert_to_tet, p, dblock->num_tets,
-// 	      dblock->num_orig_particles);
-
     // on convex hull = less than 4 neighbors
-    if (dblock->num_tets == 0 || !complete(p, dblock->tets, dblock->vert_to_tet[p])) {
+    if (dblock->num_tets == 0 || 
+	!complete(p, dblock->tets, dblock->vert_to_tet[p])) {
 
       // add to list of convex hull particles
       convex_hull_particles.push_back(p);
@@ -2360,6 +2355,7 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
   // for all tets
   for (int t = 0; t < dblock->num_tets; t++) {
+
     sent.num_gbs = 0;
     float center[3]; // circumcenter
     circumcenter(center, &dblock->tets[t], dblock->particles);
@@ -2378,10 +2374,9 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
 	int p = dblock->tets[t].verts[v];
 
-	// select neighbors we haven't sent to, yet
-	for (int i = 0; i < sent.num_gbs; ++i) {
+	// select neighbors we haven't sent to yet
+	for (int i = 0; i < sent.num_gbs; ++i)
 	  destinations[p].insert(sent.neigh_gbs[i]);
-	}
 
       } // all 4 verts
 
@@ -2412,8 +2407,8 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
       sent_particles.push_back(sent);
     }
   }
-}
 
+}
 // ---------------------------------------------------------------------------
 //
 //    Go through the original convex hull particles and enqueue any remaining
@@ -3089,15 +3084,22 @@ int gen_particles(int lid, float **particles, float jitter) {
 //   vblock: current voronoi block
 //   gid: global block id
 // 
-void print_block(struct vblock_t *vblock, int gid) {
+void print_block(struct dblock_t *dblock, int gid) {
 
-  int i;
-
-  fprintf(stderr, "block gid = %d, %d complete cells: ", 
-	  gid, vblock->num_complete_cells);
-  for (i = 0; i < vblock->num_complete_cells; i++)
-    fprintf(stderr, "%d ", vblock->complete_cells[i]);
-  fprintf(stderr, "\n");
+  fprintf(stderr, "block gid = %d has %d tets:\n", 
+	  gid, dblock->num_tets);
+  for (int i = 0; i < dblock->num_tets; i++) {
+    int sort_verts[4], sort_tets[4]; // sorted verts and tets
+    for (int j = 0; j < 4; j++) {
+      sort_verts[j] = dblock->tets[i].verts[j];
+      sort_tets[j] = dblock->tets[i].tets[j];
+    }
+    qsort(sort_verts, 4, sizeof(int), &compare);
+    qsort(sort_tets, 4, sizeof(int), &compare);
+    fprintf(stderr, "tet %d verts [%d %d %d %d] neigh_tets [%d %d %d %d]\n", 
+	    i, sort_verts[0], sort_verts[1], sort_verts[2], sort_verts[3],
+	    sort_tets[0], sort_tets[1], sort_tets[2], sort_tets[3]);
+  }
 
 }
 // --------------------------------------------------------------------------
