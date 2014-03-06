@@ -619,6 +619,7 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
   vertexT *vertex, **vertexp;
   int numfacets = 0;
   int t, v, n; /* index in tets, tet verts, tet neighbors */
+  int i, nbr;
 
   /* count number of tets (facets to qhull) */
   FORALLfacet_(facetlist) {
@@ -654,12 +655,32 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
       FOREACHvertexreverse12_(facet->vertices)
 	dblock->tets[t].verts[v++] = qh_pointid(vertex->point);
     }
+  }
+
+  FORALLfacet_(facetlist) {
+
+    if (qh_skipfacet(facet) || (facet->visible && qh NEWfacets))
+      continue;
+
+    if (qh_setsize(facet->vertices) != 4) {
+      fprintf(stderr, "tet has %d vertices; skipping.\n",
+	      qh_setsize(facet->vertices));
+      continue;
+    }
 
     /* for all neighbor tets */
     n = 0;
     FOREACHneighbor_(facet) {
       if (neighbor->visitid) {
-	dblock->tets[t].tets[n++] = neighbor->visitid - 1;
+	nbr = neighbor->visitid - 1;
+	dblock->tets[t].tets[n] = neighbor->visitid - 1;
+	if (nbr != -1)
+	{
+	  for (i = 0; i < 4; ++i)
+	    if (dblock->tets[nbr].verts[i] == dblock->tets[t].verts[n])
+	      fprintf(stderr, "Neighboring tet can't have a vertex it's opposite of: %d %d %d %d %d\n", t, nbr, i, n, dblock->tets[t].verts[n]);
+	}
+	++n;
       }
       else
 	dblock->tets[t].tets[n++] = -1;
