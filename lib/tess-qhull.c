@@ -655,8 +655,10 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
       FOREACHvertexreverse12_(facet->vertices)
 	dblock->tets[t].verts[v++] = qh_pointid(vertex->point);
     }
+    ++t;
   }
 
+  t = 0;
   FORALLfacet_(facetlist) {
 
     if (qh_skipfacet(facet) || (facet->visible && qh NEWfacets))
