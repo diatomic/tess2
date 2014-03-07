@@ -148,6 +148,11 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void* ds) {
     /* process delaunay output */
     if (!exitcode)
       gen_d_delaunay_output(qh facet_list, &dblocks[i]);
+
+    /* qhull does not order verts and neighbor tets such that the ith
+       neighbor is opposite the ith vertex; so need to reorder neighbors */
+    reorder_neighbors(&dblocks[i]);
+
     fill_vert_to_tet(&dblocks[i]);
 
     /* clean up qhull */
@@ -674,15 +679,16 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
     n = 0;
     FOREACHneighbor_(facet) {
       if (neighbor->visitid) {
-	nbr = neighbor->visitid - 1;
-	dblock->tets[t].tets[n] = neighbor->visitid - 1;
-	if (nbr != -1)
-	{
-	  for (i = 0; i < 4; ++i)
-	    if (dblock->tets[nbr].verts[i] == dblock->tets[t].verts[n])
-	      fprintf(stderr, "Neighboring tet can't have a vertex it's opposite of: %d %d %d %d %d\n", t, nbr, i, n, dblock->tets[t].verts[n]);
-	}
-	++n;
+	dblock->tets[t].tets[n++] = neighbor->visitid - 1;
+/* 	nbr = neighbor->visitid - 1; */
+/* 	dblock->tets[t].tets[n] = neighbor->visitid - 1; */
+/* 	if (nbr != -1) */
+/* 	{ */
+/* 	  for (i = 0; i < 4; ++i) */
+/* 	    if (dblock->tets[nbr].verts[i] == dblock->tets[t].verts[n]) */
+/* 	      fprintf(stderr, "Neighboring tet can't have a vertex it's opposite of: %d %d %d %d %d\n", t, nbr, i, n, dblock->tets[t].verts[n]); */
+/* 	} */
+/* 	++n; */
       }
       else
 	dblock->tets[t].tets[n++] = -1;
@@ -826,6 +832,77 @@ int bin_search(int *tbl, int key, int size) {
   }
 
   return -1; /* not found */
+
+}
+/*--------------------------------------------------------------------------*/
+/*
+
+reorders neighbors in dblock such that ith neighbor is opposite ith vertex
+
+*/
+void reorder_neighbors(struct dblock_t *dblock) {
+
+  int t, v, n, nv;
+  int nbr;
+  int done;
+  int tets[4];  /* newly ordered neighbors */
+
+  /* tets */
+  for (t = 0; t < dblock->num_tets; t++) {
+
+    /* verts */
+    for (v = 0; v < 4; v++) {
+
+      done = 0;
+
+      /* neighbor tets */
+      for (n = 0; n < 4; n++) {
+
+	nbr = dblock->tets[t].tets[n];
+	if (nbr == -2) /* done already */
+	  continue;
+
+	/* neighbor tet verts */
+	if (nbr > -1) {
+	  for (nv = 0; nv < 4; nv++) {
+	    if (dblock->tets[nbr].verts[nv] == dblock->tets[t].verts[v])
+	      break; /* nbr is the wrong neighbor */
+	  }
+	}
+
+	if (nbr > -1 && nv == 4) {/* nbr is the right neighbor */
+	  done = 1;
+	  break;
+	}
+
+      }
+
+      if (done) {
+	tets[v] = nbr;
+	dblock->tets[t].tets[n] = -2; /* mark this neighbor as done */
+      }
+      else
+	tets[v] = -1;
+
+    } /* verts */
+
+    /* copy reordered neighbors back to dblock */
+    for (n = 0; n < 4; n++)
+      dblock->tets[t].tets[n] = tets[n];
+
+    /* debug, sanity check */
+    for (v = 0; v < 4; ++v) {
+      int nbr = dblock->tets[t].tets[v]; /* opposite neighbor */
+      if (nbr > -1) {
+	for (nv = 0; nv < 4; nv++) { /* verts in opposite neighbor */
+	  if (dblock->tets[nbr].verts[nv] == dblock->tets[t].verts[v])
+	    fprintf(stderr, "Neighbor of tet %d can't have a vertex opposite "
+		    "to it\n", t);
+	}
+      }
+    }
+
+  } /* tets */
 
 }
 /*--------------------------------------------------------------------------*/
