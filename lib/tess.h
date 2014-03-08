@@ -19,6 +19,7 @@
 #include "delaunay.h"
 #include "voronoi.h"
 #include "swap.hpp"
+#include "utils.h"
 #include "diy.h"
 
 extern MPI_Comm comm; /* MPI communicator */
@@ -86,14 +87,8 @@ extern "C"
 void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 	       int *num_particles, int *num_orig_particles, 
 	       float **particles, int **gids, int **nids, 
-	       unsigned char **dirs, double *times, void* ds,
+	       unsigned char **dirs, void* ds,
 	       struct tet_t** tets, int* ntets);
-/* DEPRECATED */
-/* #ifdef __cplusplus */
-/* extern "C" */
-/* #endif */
-/* void all_dcells(int nblocks, struct dblock_t *dblocks, int dim, */
-/* 		double *times, void* ds); */
 #ifdef __cplusplus
 extern "C"
 #endif
@@ -153,22 +148,8 @@ void prep_out(int nblocks, struct vblock_t *vblocks);
 void prep_d_out(int nblocks, struct dblock_t *dblocks, int **hdrs);
 void save_headers(int nblocks, struct vblock_t *vblocks, int **hdrs);
 void transform_particle(char *p, unsigned char wrap_dir);
-/* DEPRECATED */
-/* void delaunay(int num_blocks, struct vblock_t *vblocks); */
 void neigh_cells(struct vblock_t *vblock, int cell, int face, int cur_vert);
 int compare(const void *a, const void *b);
-#ifdef __cplusplus
-extern "C"
-#endif
-void add_int(int val, int **vals, int *numvals, int *maxvals, int chunk_size);
-void add_float(float val, float **vals, int *numvals, int *maxvals, 
-	       int chunk_size);
-void add_pt(float *val, float **vals, int *numvals, int *maxvals, 
-	    int chunk_size);
-void add_empty_int(int **vals, int index, int *numitems, int *maxitems, 
-		  int chunk_size, int init_val);
-void add_sent(struct sent_t val, struct sent_t **vals, int *numvals, 
-	      int *maxvals, int chunk_size);
 int cell_bounds(struct vblock_t *vblock, int cell, int vert);
 void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles);
 void face_areas(int nblocks, struct vblock_t *vblocks);
@@ -192,6 +173,10 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
 			  int *num_mirror_particles, float **particles,
 			  int *num_particles, int *num_orig_particles,
 			  int **gids, int **nids, unsigned char **dirs);
+#ifdef __cplusplus
+extern "C"
+#endif
 void get_mem(int breakpoint, int dwell);
+void timing(double *times, int start, int stop);
 
 #endif

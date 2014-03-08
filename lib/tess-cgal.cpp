@@ -117,14 +117,13 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) {
 //   gids: global block ids of owners of received particles in each of my blocks
 //   nids: native particle ids of received particles in each of my blocks
 //   dirs: wrapping directions of received particles in each of my blocks
-//   times: timing
 //   ds: the delaunay data structures
 //
 void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 	       int *num_particles, int *num_orig_particles, 
 	       float **particles, int **gids, int **nids, 
-	       unsigned char **dirs, double *times,
-	       void* ds,tet_t** tets, int* ntets) {
+	       unsigned char **dirs,
+	       void* ds, tet_t** tets, int* ntets) {
 
   int num_recvd; // number of received particles in current block
   int i,j;

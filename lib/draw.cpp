@@ -1462,8 +1462,10 @@ void PrepRenderingData(int *gid2lid) {
   // voronoi cells
   PrepCellRendering(num_vis_cells);
 
+#ifdef TET
   // voronoi cell verts (for debugging)
   PrepCellVertRendering();
+#endif
 
   // delauany tets
   PrepTetRendering(num_loc_tets, num_rem_tets, gid2lid);

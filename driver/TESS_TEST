@@ -60,7 +60,7 @@ dsize="8 8 8"
 #dsize="128 128 128"
 #dsize="256 256 256"
 
-jitter=0.5
+jitter=2.0
 
 # volume range (-1.0: unused)
 minv=-1.0
@@ -90,7 +90,7 @@ args="$tb $dsize $jitter $minv $maxv $wrap $walls $outfile"
 
 if [ "$ARCH" = "MAC_OSX" ]; then
 
-mpiexec -l -n $num_procs $exe $args
+mpiexec -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 

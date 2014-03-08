@@ -22,6 +22,7 @@
 #include "mpi.h"
 #include "diy.h"
 #include "tess.h"
+#include "tess.hpp"
 #include "io.h"
 
 #include <stddef.h>
@@ -47,23 +48,6 @@ static double *times; // timing info
 static int wrap_neighbors; // whether wraparound neighbors are used 
 // CLP - if wrap_neighbors is 0 then check this condition. 
 static int walls_on;
-
-// c source files such as tess-qhull.c do not want to see
-// C++ arguments, so I hid these function prototypes here-TP
-void create_dblocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs,
-		    float **particles, int *num_particles);
-void reset_dblocks(int num_blocks, struct dblock_t* &dblocks);
-void fill_vert_to_tet(dblock_t* dblock);
-void incomplete_dcells_initial(struct dblock_t *tblock, int lid,
-			       vector <sent_t> &sent_particles,
-			       vector <int> &convex_hull_particles);
-void incomplete_dcells_final(struct dblock_t *dblock,
-			    int lid,
-			    vector <sent_t> &sent_particles,
-			    vector <int> &convex_hull_particles);
-void neighbor_d_is_complete(int nblocks, struct dblock_t *dblocks,
-			    struct remote_ic_t **rics,
-			    vector <struct sent_t> *sent_particles);
 
 // ------------------------------------------------------------------------
 //
@@ -185,6 +169,13 @@ void tess(float **particles, int *num_particles, char *out_file) {
 
 #else
 
+  // resample particles to test how sampling affects output distribution
+//   int i;
+//   for (i = 0; i < nblocks; i++) {
+//     sample_particles(particles[i], num_particles[i], 10);
+//     fprintf(stderr, "new num particles = %d\n", num_particles[i]);
+//   }
+
   voronoi_delaunay(nblocks, particles, num_particles, times, out_file);
 
 #endif
@@ -243,6 +234,12 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   for (i = 0; i < nblocks; i++)
     num_particles[i] = gen_particles(i, &particles[i], jitter);
 
+  // resample particles to test how sampling affects output distribution
+//   for (i = 0; i < nblocks; i++) {
+//     sample_particles(particles[i], num_particles[i], 100);
+//     fprintf(stderr, "new num particles = %d\n", num_particles[i]);
+//   }
+
   // save particles in a separate file for future reference 
   // write_particles(nblocks, particles, num_particles, "pts.out"); 
 
@@ -293,6 +290,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   // init timing 
   for (i = 0; i < MAX_TIMES; i++)
     times[i] = 0.0;
+  timing(times, TOT_TIME, -1);
 
   int **hdrs; // headers 
   struct vblock_t *vblocks; // voronoi blocks 
@@ -317,28 +315,19 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   if (!wrap_neighbors && walls_on)
     create_walls(&num_walls,&walls);
 
-  int dwell = 0;
+  // profile
+  int dwell = 10;
   get_mem(1, dwell);
-
-#ifdef TIMING
-  MPI_Barrier(comm);
-  times[LOCAL_TIME] = MPI_Wtime();
-#endif
+  timing(times, LOC1_TIME, -1);
 
   // create local voronoi cells
   std::vector<tet_t*>	tets(nblocks);
   std::vector<int>	ntets(nblocks);
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds, &tets[0], &ntets[0]);
   
-  #ifdef TIMING
-  MPI_Barrier(comm);
-  times[LOCAL_TIME] = MPI_Wtime() - times[LOCAL_TIME];
-  if (rank == 0)
-    fprintf(stderr, "-----------------------------------\n");
-  times[EXCH_TIME] = MPI_Wtime();
-#endif
-
+  // profile
   get_mem(2, dwell);
+  timing(times, INC1_TIME, LOC1_TIME);
 
   // keep track of which particles lie on the convex hull of the local points 
   int** convex_hull_particles	  = (int**) malloc(nblocks * sizeof(int*));
@@ -352,7 +341,9 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 			     &convex_hull_particles[i],
 			     &num_convex_hull_particles[i]);
 
+  // profile
   get_mem(3, dwell);
+  timing(times, NEIGH1_TIME, INC1_TIME);
 
   // cleanup local temporary blocks 
   destroy_blocks(nblocks, tblocks, NULL);
@@ -376,7 +367,9 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
 
+  // profile
   get_mem(5, dwell);
+  timing(times, LOC2_TIME, NEIGH1_TIME);
 
   // Second, decisive phase 
 
@@ -391,7 +384,9 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   // Recompute local cells
   local_cells(nblocks, tblocks, dim, num_particles, particles, ds, &tets[0], &ntets[0]);
 
+  // profile
   get_mem(6, dwell);
+  timing(times, INC2_TIME, LOC2_TIME);
 
   // CLP - Create  pointers to wall-mirror particles for each block 
   float** mirror_particles;
@@ -409,7 +404,9 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 			   num_convex_hull_particles[i], walls, num_walls, 
 			   &mirror_particles[i], &num_mirror_particles[i]);
 
+  // profile
   get_mem(7, dwell);
+  timing(times, NEIGH2_TIME, INC2_TIME);
 
   // cleanup local temporary blocks 
   destroy_blocks(nblocks, tblocks, NULL);
@@ -420,7 +417,9 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   neighbor_particles(nblocks, particles, num_particles, num_orig_particles,
 		     gids, nids, dirs);
     
+  // profile
   get_mem(9, dwell);
+  timing(times, LOC3_TIME, NEIGH2_TIME);
 
   // CLP - Function to add wall-mirror particles to particles 
   //   (see neighbor_particles()) 
@@ -444,14 +443,6 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   }
   free(num_mirror_particles);
 
-#ifdef TIMING
-  MPI_Barrier(comm);
-  times[EXCH_TIME] = MPI_Wtime() - times[EXCH_TIME];
-  if (rank == 0)
-    fprintf(stderr, "-----------------------------------\n");
-  times[CELL_TIME] = MPI_Wtime();
-#endif
-
   get_mem(10, dwell);
 
   // Clean-up tets; all_cells() will refill them
@@ -460,9 +451,11 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
   // create all final voronoi cells 
   all_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
-	    particles, gids, nids, dirs, times, ds, &tets[0], &ntets[0]);
+	    particles, gids, nids, dirs, ds, &tets[0], &ntets[0]);
 
+  // profile
   get_mem(11, dwell);
+  timing(times, OUT_TIME, LOC3_TIME);
 
   // cleanup 
   for (i = 0; i < nblocks; i++) {
@@ -473,28 +466,10 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   free(nids);
   clean_delaunay_data_structures(ds);
 
-#ifdef TIMING
-  // previously no barrier here; want min and max time;
-  //   changed to barrier and simple time now 
-  MPI_Barrier(comm);
-  times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
-  // MPI_Barrier(comm); 
-  times[VOL_TIME] = MPI_Wtime();
-#endif
-
   get_mem(12, dwell);
 
   // compute volume and surface area manually (not using convex hulls) 
   cell_vols(nblocks, vblocks, particles);
-
-#ifdef TIMING
-  // previously no barrier here; want min and max time;
-  //   changed to barrier and simple time now 
-  MPI_Barrier(comm);
-  times[VOL_TIME] = MPI_Wtime() - times[VOL_TIME];
-  // MPI_Barrier(comm); 
-  times[OUT_TIME] = MPI_Wtime();
-#endif
 
   // prepare for output 
   prep_out(nblocks, vblocks);
@@ -516,12 +491,9 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 #endif
   }
 
-#ifdef TIMING
-  MPI_Barrier(comm);
-  times[OUT_TIME] = MPI_Wtime() - times[OUT_TIME];
-#endif
- 
+  // profile
   get_mem(14, dwell);
+  timing(times, -1, OUT_TIME);
 
   // collect stats 
   collect_stats(nblocks, vblocks, times);
@@ -534,7 +506,9 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   for(int i = 0; i < nblocks; ++i)
     free(tets[i]);
 
+  // profile
   get_mem(15, dwell);
+  timing(times, -1, TOT_TIME);
 
 }
 // --------------------------------------------------------------------------
@@ -560,6 +534,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // init timing 
   for (int i = 0; i < MAX_TIMES; i++)
     times[i] = 0.0;
+  timing(times, TOT_TIME, -1);
 
   // initialize data structures
   int **hdrs; // headers 
@@ -567,29 +542,17 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   ds = init_delaunay_data_structures(nblocks);
   create_dblocks(nblocks, dblocks, hdrs, particles, num_particles);
   
-  int dwell = 0;
+  // profile
+  int dwell = 10;
   get_mem(1, dwell);
-
-#ifdef TIMING
-  MPI_Barrier(comm);
-  times[LOCAL_TIME] = MPI_Wtime();
-#endif
+  timing(times, LOC1_TIME, -1);
 
   // create local delaunay cells
   local_dcells(nblocks, dblocks, dim, ds);
 
-  // debug
-//   print_block(&dblocks[0], 0);
-
-  #ifdef TIMING
-  MPI_Barrier(comm);
-  times[LOCAL_TIME] = MPI_Wtime() - times[LOCAL_TIME];
-  if (rank == 0)
-    fprintf(stderr, "-----------------------------------\n");
-  times[EXCH_TIME] = MPI_Wtime();
-#endif
-
+  // profile
   get_mem(2, dwell);
+  timing(times, INC1_TIME, LOC1_TIME);
 
   // particles on the convex hull of the local points 
   vector <int> *convex_hull_particles  = new vector<int>[nblocks];
@@ -603,9 +566,11 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 			      convex_hull_particles[i]);
 
   // debug
-  fprintf(stderr, "3: num_particles[0] = %d\n", dblocks[0].num_particles);
+//   fprintf(stderr, "3: num_particles[0] = %d\n", dblocks[0].num_particles);
 
+  // profile
   get_mem(3, dwell);
+  timing(times, NEIGH1_TIME, INC1_TIME);
 
   // cleanup local temporary blocks 
   reset_dblocks(nblocks, dblocks);
@@ -614,9 +579,11 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   neighbor_d_particles(nblocks, dblocks);
 
   // debug
-  fprintf(stderr, "5: num_particles[0] = %d\n", dblocks[0].num_particles);
+//   fprintf(stderr, "5: num_particles[0] = %d\n", dblocks[0].num_particles);
 
+  // profile
   get_mem(4, dwell);
+  timing(times, LOC2_TIME, NEIGH1_TIME);
   
 #ifdef DEBUG
   int max_particles;
@@ -630,13 +597,17 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // Recompute local cells
   local_dcells(nblocks, dblocks, dim, ds);
 
+  // profile
   get_mem(5, dwell);
+  timing(times, INC2_TIME, LOC2_TIME);
 
   for (int i = 0; i < nblocks; i++)
     incomplete_dcells_final(&dblocks[i], i, sent_particles[i],
 			    convex_hull_particles[i]);
 
+  // profile
   get_mem(6, dwell);
+  timing(times, NEIGH2_TIME, INC2_TIME);
 
   // cleanup local temporary blocks 
   reset_dblocks(nblocks, dblocks);
@@ -644,25 +615,21 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // exchange particles with neighbors 
   neighbor_d_particles(nblocks, dblocks);
     
+  // profile
   get_mem(7, dwell);
+  timing(times, LOC3_TIME, NEIGH2_TIME);
   
   // cleanup convex hull particles
   for (int i = 0; i < nblocks; ++i)
     convex_hull_particles[i].clear();
   delete[] convex_hull_particles;
 
-#ifdef TIMING
-  MPI_Barrier(comm);
-  times[EXCH_TIME] = MPI_Wtime() - times[EXCH_TIME];
-  if (rank == 0)
-    fprintf(stderr, "-----------------------------------\n");
-  times[CELL_TIME] = MPI_Wtime();
-#endif
-
   // create all final cells 
   local_dcells(nblocks, dblocks, dim, ds);
 
+  // profile
   get_mem(8, dwell);
+  timing(times, OUT_TIME, LOC3_TIME);
 
   // cleanup delaunay data structure and sent particles
   clean_delaunay_data_structures(ds);
@@ -671,17 +638,6 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   for (int i = 0; i < nblocks; ++i)
     sent_particles[i].clear();
   delete[] sent_particles;
-
-#ifdef TIMING
-  // previously no barrier here; want min and max time;
-  //   changed to barrier and simple time now 
-  MPI_Barrier(comm);
-  times[CELL_TIME] = MPI_Wtime() - times[CELL_TIME];
-  // MPI_Barrier(comm); 
-  times[OUT_TIME] = MPI_Wtime();
-#endif
-
-  get_mem(9, dwell);
 
   // prepare for output 
   prep_d_out(nblocks, dblocks, hdrs);
@@ -698,10 +654,9 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 #endif
   }
 
-#ifdef TIMING
-  MPI_Barrier(comm);
-  times[OUT_TIME] = MPI_Wtime() - times[OUT_TIME];
-#endif
+  // profile
+  timing(times, -1, OUT_TIME);
+  timing(times, -1, TOT_TIME);
  
   // collect stats 
   collect_dstats(nblocks, dblocks, times);
@@ -709,7 +664,8 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // cleanup 
   destroy_dblocks(nblocks, dblocks, hdrs);
   
-  get_mem(10, dwell);
+  // profile
+  get_mem(9, dwell);
 
 }
 // --------------------------------------------------------------------------
@@ -1159,11 +1115,11 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 
   MPI_Comm_rank(comm, &rank);
 
-  // timing range 
-  stats.min_cell_time = times[CELL_TIME];
-  stats.max_cell_time = times[CELL_TIME];
-  stats.min_vol_time = times[VOL_TIME];
-  stats.max_vol_time = times[VOL_TIME];
+  // these are not used anymore, todo: cleanup
+  stats.min_cell_time = 0.0;
+  stats.max_cell_time = 0.0;
+  stats.min_vol_time = 0.0;
+  stats.max_vol_time = 0.0;
 
   // --- first pass: find average number of vertices per cell and 
   //   volume range --- 
@@ -1296,16 +1252,22 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
     stats.num_dense_bins;
   if (rank == 0) {
     fprintf(stderr, "----------------- global stats ------------------\n");
-    fprintf(stderr, "local voronoi / delaunay time = %.3lf s\n",
-	    times[LOCAL_TIME]);
-    fprintf(stderr, "particle exchange time = %.3lf s\n", times[EXCH_TIME]);
-    // fprintf(stderr, "[min, max] voronoi / delaunay time = [%.3lf, %.3lf] s\n", 
-    // 	    stats.min_cell_time, stats.max_cell_time); 
-    fprintf(stderr, "Voronoi / delaunay time = %.3lf s\n", times[CELL_TIME]);
-    // fprintf(stderr, "[min, max] cell volume / area time = [%.3lf, %.3lf] s\n", 
-    // 	    stats.min_vol_time, stats.max_vol_time); 
-    fprintf(stderr, "Cell volume / area time = %.3lf s\n", times[VOL_TIME]);
+    fprintf(stderr, "first local voronoi / delaunay time = %.3lf s\n",
+	    times[LOC1_TIME]);
+    fprintf(stderr, "first incomplete cell time = %.3lf s\n",
+	    times[INC1_TIME]);
+    fprintf(stderr, "first particle exchange time = %.3lf s\n", 
+	    times[NEIGH1_TIME]);
+    fprintf(stderr, "second local voronoi / delaunay time = %.3lf s\n",
+	    times[LOC2_TIME]);
+    fprintf(stderr, "second incomplete cell time = %.3lf s\n",
+	    times[INC2_TIME]);
+    fprintf(stderr, "second particle exchange time = %.3lf s\n", 
+	    times[NEIGH2_TIME]);
+    fprintf(stderr, "third local voronoi / delaunay time = %.3lf s\n",
+	    times[LOC3_TIME]);
     fprintf(stderr, "output time = %.3lf s\n", times[OUT_TIME]);
+    fprintf(stderr, "total time = %.3lf s\n", times[TOT_TIME]);
     fprintf(stderr, "-----\n");
     fprintf(stderr, "total tets found = %d\n", stats.tot_tets);
     fprintf(stderr, "total cells found = %d\n", stats.tot_cells);
@@ -1354,6 +1316,7 @@ void collect_stats(int nblocks, struct vblock_t *vblocks, double *times) {
 // 
 void collect_dstats(int nblocks, struct dblock_t *dblocks, double *times) {
 
+  nblocks = nblocks; // quite compiler warning
   int rank;
 
   MPI_Comm_rank(comm, &rank);
@@ -1376,10 +1339,24 @@ void collect_dstats(int nblocks, struct dblock_t *dblocks, double *times) {
   // global stats 
   if (rank == 0) {
     fprintf(stderr, "----------------- global stats ------------------\n");
-    fprintf(stderr, "local delaunay time     = %.3lf s\n", max_times[LOCAL_TIME]);
-    fprintf(stderr, "particle exchange time  = %.3lf s\n", max_times[EXCH_TIME]);
-    fprintf(stderr, "Voronoi / delaunay time = %.3lf s\n", max_times[CELL_TIME]);
-    fprintf(stderr, "output time             = %.3lf s\n", max_times[OUT_TIME]);
+    fprintf(stderr, "first local delaunay time     = %.3lf s\n",
+	    times[LOC1_TIME]);
+    fprintf(stderr, "first incomplete cell time    = %.3lf s\n",
+	    times[INC1_TIME]);
+    fprintf(stderr, "first particle exchange time  = %.3lf s\n", 
+	    times[NEIGH1_TIME]);
+    fprintf(stderr, "second local delaunay time    = %.3lf s\n",
+	    times[LOC2_TIME]);
+    fprintf(stderr, "second incomplete cell time   = %.3lf s\n",
+	    times[INC2_TIME]);
+    fprintf(stderr, "second particle exchange time = %.3lf s\n", 
+	    times[NEIGH2_TIME]);
+    fprintf(stderr, "third local delaunay time     = %.3lf s\n",
+	    times[LOC3_TIME]);
+    fprintf(stderr, "output time                   = %.3lf s\n", 
+	    times[OUT_TIME]);
+    fprintf(stderr, "total time                    = %.3lf s\n", 
+	    times[TOT_TIME]);
     fprintf(stderr, "-------------------------------------------------\n");
     fprintf(stderr, "original particles = [%d, %d]\n", min_quants[0], max_quants[0]);
     fprintf(stderr, "with ghosts        = [%d, %d]\n", min_quants[1], max_quants[1]);
@@ -3079,6 +3056,40 @@ int gen_particles(int lid, float **particles, float jitter) {
 }
 // --------------------------------------------------------------------------
 //
+//   randomly samples a set of partidles
+//
+//   particles: pointer to particles (input and output)
+//   num_particles: number of particles (input and output)
+//   sample_rate: 1 out of every sample_rate particles will be kept
+// 
+//   overwrites the old particles with the new but does not shrink memory
+//
+void sample_particles(float *particles, int &num_particles, int sample_rate) {
+
+  int old_num_particles = num_particles;
+  num_particles /= sample_rate;
+  float *new_particles = new float[3 * num_particles];
+
+  // sample particles
+  for (int i = 0; i < num_particles; i++) {
+    int rand_i = rand() / (float)RAND_MAX * old_num_particles;
+    new_particles[3 * i] = particles[3 * rand_i];
+    new_particles[3 * i + 1] = particles[3 * rand_i + 1];
+    new_particles[3 * i + 2] = particles[3 * rand_i + 2];
+  }
+
+  // copy samples back to original
+  for (int i = 0; i < num_particles; i++) {
+    particles[3 * i] = new_particles[3 * i];
+    particles[3 * i + 1] = new_particles[3 * i + 1];
+    particles[3 * i + 2] = new_particles[3 * i + 2];
+  }
+
+  delete[] new_particles;
+
+}
+// --------------------------------------------------------------------------
+//
 //   prints a block
 //
 //   vblock: current voronoi block
@@ -3179,202 +3190,6 @@ int compare(const void *a, const void *b) {
   if (*((int*)a) == *((int*)b))
     return 0;
   return 1;
-
-}
-// --------------------------------------------------------------------------
-//
-//   adds an int to a c-style vector of ints
-//
-//   val: value to be added
-//   vals: pointer to dynamic array of values
-//   numvals: pointer to number of values currently stored, updated by add_int
-//   maxvals: pointer to number of values currently allocated
-//   chunk_size: number of values to allocate at a time
-//
-// 
-void add_int(int val, int **vals, int *numvals, int *maxvals, int chunk_size) {
-
-  // first time 
-  if (*maxvals == 0) {
-    *vals = (int *)malloc(chunk_size * sizeof(int));
-    *numvals = 0;
-    *maxvals = chunk_size;
-  }
-
-  // grow memory 
-  else if (*numvals >= *maxvals) {
-    *vals = (int *)realloc(*vals, 
-			       (chunk_size + *maxvals) * sizeof(int));
-    *maxvals += chunk_size;
-  }
-
-  // add the element 
-  (*vals)[*numvals] = val;
-  (*numvals)++;
-
-}
-// --------------------------------------------------------------------------
-//
-//   adds a float to a c-style vector of floats
-//
-//   val: value to be added
-//   vals: pointer to dynamic array of values
-//   numvals: pointer to number of values currently stored, updated by add_int
-//   maxvals: pointer to number of values currently allocated
-//   chunk_size: number of values to allocate at a time
-//
-// 
-void add_float(float val, float **vals, int *numvals, int *maxvals, 
-	       int chunk_size) {
-
-  // first time 
-  if (*maxvals == 0) {
-    *vals = (float *)malloc(chunk_size * sizeof(float));
-    *numvals = 0;
-    *maxvals = chunk_size;
-  }
-
-  // grow memory 
-  else if (*numvals >= *maxvals) {
-    *vals = (float *)realloc(*vals, 
-			       (chunk_size + *maxvals) * sizeof(float));
-    *maxvals += chunk_size;
-  }
-
-  // add the element 
-  (*vals)[*numvals] = val;
-  (*numvals)++;
-
-}
-// --------------------------------------------------------------------------
-//
-//   adds a point (array of 3 floats) to a c-style vector of x,y,z,x,y,z points
-//
-//   val: value to be added
-//   vals: pointer to dynamic array of values
-//   numvals: pointer to number of points currently stored, updated by add_int
-//   maxvals: pointer to number of points currently allocated
-//   chunk_size: number of points to allocate at a time
-//
-// 
-void add_pt(float *val, float **vals, int *numvals, int *maxvals, 
-	    int chunk_size) {
-
-  // first time 
-  if (*maxvals == 0) {
-    *vals = (float *)malloc(chunk_size * 3 * sizeof(float));
-    *numvals = 0;
-    *maxvals = chunk_size;
-  }
-
-  // grow memory 
-  else if (*numvals >= *maxvals) {
-    *vals = (float *)realloc(*vals, 
-			       (chunk_size + *maxvals) * 3 * sizeof(float));
-    *maxvals += chunk_size;
-  }
-
-  // add the element 
-  (*vals)[3 * *numvals] = val[0];
-  (*vals)[3 * *numvals + 1] = val[1];
-  (*vals)[3 * *numvals + 2] = val[2];
-  (*numvals)++;
-
-}
-// --------------------------------------------------------------------------
-//
-//   adds a sent particle to a c-style vector of sent particles
-//
-//   val: sent particle to be added
-//   vals: pointer to dynamic array of sent particles
-//   numvals: pointer to number of values currently stored, updated by add_int
-//   maxvals: pointer to number of values currently allocated
-//   chunk_size: number of values to allocate at a time
-//
-// 
-void add_sent(struct sent_t val, struct sent_t **vals, int *numvals, 
-	      int *maxvals, int chunk_size) {
-
-  int i;
-
-  // first time 
-  if (*maxvals == 0) {
-    *vals = (struct sent_t *)malloc(chunk_size * sizeof(struct sent_t));
-    *numvals = 0;
-    *maxvals = chunk_size;
-  }
-
-  // grow memory 
-  else if (*numvals >= *maxvals) {
-    *vals = 
-      (struct sent_t *)realloc(*vals, 
-			       (chunk_size + *maxvals) * 
-			       sizeof(struct sent_t));
-    *maxvals += chunk_size;
-  }
-
-  // add the element 
-  (*vals)[*numvals].particle = val.particle;
-  (*vals)[*numvals].num_gbs = val.num_gbs;
-  for (i = 0; i < MAX_NEIGHBORS; i++) {
-    (*vals)[*numvals].neigh_gbs[i].gid = val.neigh_gbs[i].gid;
-    (*vals)[*numvals].neigh_gbs[i].neigh_dir = val.neigh_gbs[i].neigh_dir;
-  }
-  (*numvals)++;
-
-}
-// --------------------------------------------------------------------------
-//
-//   checks if an array of ints has been allocated large enough to access
-//   a given index. If not, grows the array and initializes the empty ints
-//
-//   vals: pointer to dynamic array of ints
-//   index: desired index to be accessed
-//   numitems: pointer to number of items currently stored, ie, 
-//     last subscript accessed + 1, updated by this function
-//   maxitems: pointer to number of items currently allocated
-//   chunk_size: minimum number of items to allocate at a time
-//   init_val: initalization value for newly allocated items
-//
-// 
-void add_empty_int(int **vals, int index, int *numitems, int *maxitems, 
-		   int chunk_size, int init_val) {
-
-  int i;
-  int alloc_chunk; // max of chunk_size and chunk needed to get to the index 
-
-  // first time 
-  if (*maxitems == 0) {
-
-    // allocate 
-    alloc_chunk = (index < chunk_size ? chunk_size : index + 1);
-    *vals = (int *)malloc(alloc_chunk * sizeof(int));
-    // init empty vals 
-    for (i = 0; i < alloc_chunk; i++)
-      (*vals)[i] = init_val;
-
-    *numitems = 0;
-    *maxitems = alloc_chunk;
-
-  }
-
-  // grow memory 
-  else if (index >= *maxitems) {
-
-    // realloc 
-    alloc_chunk = 
-      (index < *maxitems + chunk_size ? chunk_size : index + 1 - *maxitems);
-    *vals = (int *)realloc(*vals, (alloc_chunk + *maxitems) * sizeof(int));
-
-    // init empty buckets 
-    for (i = *maxitems; i < *maxitems + alloc_chunk; i++)
-      (*vals)[i] = init_val;
-
-    *maxitems += alloc_chunk;
-
-  }
-
-  (*numitems)++;
 
 }
 // --------------------------------------------------------------------------
@@ -3825,6 +3640,11 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
 // dwell: sleep time in seconds
 //
 void get_mem(int breakpoint, int dwell) {
+
+  // quite compiler warnings in case MEMOEY is not defined
+  breakpoint = breakpoint;
+  dwell = dwell;
+
 #ifdef MEMORY
   struct rusage r_usage;
   getrusage(RUSAGE_SELF, &r_usage);
@@ -3837,8 +3657,30 @@ void get_mem(int breakpoint, int dwell) {
 
   fprintf(stderr, "%d: max memory = %ld MB, current memory in dashboard\n", 
 	  breakpoint, r_usage.ru_maxrss / to_mb);
-  //sleep(dwell);
+//   sleep(dwell);
   fprintf(stderr, "%d: done\n", breakpoint);
 #endif
+}
+// ---------------------------------------------------------------------------
+//
+// starts / stops timing
+// (does a barrier)
+//
+// times: array of times
+// start: index of timer to start (-1 if not used)
+// stop: index of timer to stop (-1 if not used)
+//
+void timing(double *times, int start, int stop) {
+
+#ifdef TIMING
+
+  MPI_Barrier(comm);
+  if (start >= 0)
+    times[start] = MPI_Wtime();
+  if (stop >= 0)
+    times[stop] = MPI_Wtime() - times[stop];
+
+#endif
+
 }
 // ---------------------------------------------------------------------------

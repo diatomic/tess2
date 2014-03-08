@@ -58,7 +58,7 @@ static float proj_plane[3]; // normal to projection plane
 #define INPUT_TIME 0
 #define COMP_TIME 1
 #define OUTPUT_TIME 2
-#define TOT_TIME 3
+#define TOTAL_TIME 3
 
 // function prototypes
 void ParseArgs(int argc, char **argv, int *num_given_bounds,
@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
   // timing
   double times[DENSE_MAX_TIMES]; // timing
   MPI_Barrier(comm);
-  times[TOT_TIME] = MPI_Wtime();
+  times[TOTAL_TIME] = MPI_Wtime();
   times[INPUT_TIME] = MPI_Wtime();
 
   // read the tessellation
@@ -311,7 +311,7 @@ int main(int argc, char** argv) {
   delete[] items;
 
   MPI_Barrier(comm);
-  times[TOT_TIME] = MPI_Wtime() - times[TOT_TIME];
+  times[TOTAL_TIME] = MPI_Wtime() - times[TOTAL_TIME];
 
   SummaryStats(max_dense, tot_mass, check_mass, tot_cells,
 	       max_cell_grid_pts, times, comm);
@@ -1303,7 +1303,7 @@ void SummaryStats(float max_dense, float tot_mass,
 	    glo_max_dense, glo_tot_mass, glo_check_mass);
     fprintf(stderr, "Total number of cell interior evaluations = %.lld\n", 
 	    tot_interior_evals);
-    fprintf(stderr, "Total time = %.3lf s = \n", times[TOT_TIME]);
+    fprintf(stderr, "Total time = %.3lf s = \n", times[TOTAL_TIME]);
     fprintf(stderr, "%.3lf s input + %.3lf s density computation + "
 	    "%.3lf s output\n",
 	    times[INPUT_TIME], times[COMP_TIME], times[OUTPUT_TIME]);

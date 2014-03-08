@@ -76,7 +76,7 @@ args="$infile $outfile $minv $maxv $wrap $bf $sr"
 
 if [ "$ARCH" = "MAC_OSX" ]; then
 
-mpiexec -l -n $num_procs $exe $args
+mpiexec -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 

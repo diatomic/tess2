@@ -24,7 +24,6 @@ void clean_delaunay_data_structures(void* ds) {
   num_particles: number of particles in each block
   particles: particles in each block, particles[block_num][particle]
   where each particle is 3 values, px, py, pz
-  times: timing
   ds: the delaunay data structures; unused in qhull
 */
 void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
@@ -108,7 +107,6 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
   nblocks: number of blocks
   dblocks: pointer to array of dblocks
   dim: number of dimensions (eg. 3)
-  times: timing
   ds: the delaunay data structures; unused in qhull
 */
 void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void* ds) {
@@ -155,6 +153,12 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void* ds) {
 
     fill_vert_to_tet(&dblocks[i]);
 
+    /* mem check */
+#ifdef MEM
+    int dwell = 10;
+    get_mem(-1, dwell);
+#endif
+
     /* clean up qhull */
     qh_freeqhull(!qh_ALL);                 /* free long memory */
     qh_memfreeshort(&curlong, &totlong);  /* free short memory */
@@ -182,13 +186,12 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void* ds) {
   gids: global block ids of owners of received particles in each of my blocks
   nids: native particle ids of received particles in each of my blocks
   dirs: wrapping directions of received particles in each of my blocks
-  times: timing
   ds: the delaunay data structures; unused in qhull
 */
 void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
 		int *num_particles, int *num_orig_particles, 
 		float **particles, int **gids, int **nids, 
-		unsigned char **dirs, double *times, void* ds,
+		unsigned char **dirs, void* ds,
 		struct tet_t** tets, int* ntets) {
 
   boolT ismalloc = False;    /* True if qhull should free points in
@@ -201,7 +204,6 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
   int i, j;
 
   /* quiet compiler warnings about unused parameters */
-  times = times;
   ds = ds;
 
   dev_null = fopen("/dev/null", "w");
@@ -609,7 +611,6 @@ int gen_delaunay_output(facetT *facetlist, int **tet_verts) {
 
 }
 /*--------------------------------------------------------------------------*/
-#if 1
 /*
   generates delaunay output from qhull
 
@@ -624,7 +625,6 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
   vertexT *vertex, **vertexp;
   int numfacets = 0;
   int t, v, n; /* index in tets, tet verts, tet neighbors */
-  int i, nbr;
 
   /* count number of tets (facets to qhull) */
   FORALLfacet_(facetlist) {
@@ -637,7 +637,7 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
   dblock->num_tets = numfacets;
   dblock->tets = (struct tet_t *)malloc(numfacets * sizeof(struct tet_t));
 
-  /* for all tets (facets to qhull) */
+  /* for all tets, get vertices */
   t = 0;
   FORALLfacet_(facetlist) {
 
@@ -663,6 +663,7 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
     ++t;
   }
 
+  /* for all tets, get neighbors */
   t = 0;
   FORALLfacet_(facetlist) {
 
@@ -678,18 +679,8 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
     /* for all neighbor tets */
     n = 0;
     FOREACHneighbor_(facet) {
-      if (neighbor->visitid) {
+      if (neighbor->visitid)
 	dblock->tets[t].tets[n++] = neighbor->visitid - 1;
-/* 	nbr = neighbor->visitid - 1; */
-/* 	dblock->tets[t].tets[n] = neighbor->visitid - 1; */
-/* 	if (nbr != -1) */
-/* 	{ */
-/* 	  for (i = 0; i < 4; ++i) */
-/* 	    if (dblock->tets[nbr].verts[i] == dblock->tets[t].verts[n]) */
-/* 	      fprintf(stderr, "Neighboring tet can't have a vertex it's opposite of: %d %d %d %d %d\n", t, nbr, i, n, dblock->tets[t].verts[n]); */
-/* 	} */
-/* 	++n; */
-      }
       else
 	dblock->tets[t].tets[n++] = -1;
     }
@@ -703,148 +694,14 @@ void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
 
 }
 /*--------------------------------------------------------------------------*/
-#else
-/* based on Steve's version of neighbor ids, same results as mine
-   DEPRECATED */
 /*
-  generates delaunay output from qhull
-
-  facetlist: qhull list of convex hull facets
-  tet_verts: pointer to array of tet vertex indices for this block 
-  (allocated by this function, user's responsibility to free)
-
-*/
-void gen_d_delaunay_output(facetT *facetlist, struct dblock_t *dblock) {
-
-  facetT *facet, *neighbor, **neighborp;
-  ridgeT *ridge, **ridgep;
-  vertexT *vertex, **vertexp;
-  int numfacets = 0;
-  int t, v, n; /* index in tets, tet verts, tet neighbors */
-
-  /* count number of tets (facets to qhull) */
-  FORALLfacet_(facetlist) {
-    if ((facet->visible && qh NEWfacets) || (qh_skipfacet(facet)))
-      facet->visitid= 0;
-    else
-      facet->visitid= ++numfacets;
-  }
-  int *id_map = (int *)malloc(numfacets * sizeof(int));
-
-  dblock->num_tets = numfacets;
-  dblock->tets = (struct tet_t *)malloc(numfacets * sizeof(struct tet_t));
-
-  /* for all tets (facets to qhull) */
-  t = 0;
-  FORALLfacet_(facetlist) {
-
-    if (qh_skipfacet(facet) || (facet->visible && qh NEWfacets))
-      continue;
-
-    if (qh_setsize(facet->vertices) != 4) {
-      fprintf(stderr, "tet has %d vertices; skipping.\n",
-	      qh_setsize(facet->vertices));
-      continue;
-    }
-    id_map[t++] = facet->id;
-
-  }
-
-  /* for all tets (facets to qhull) */
-  t = 0;
-  FORALLfacet_(facetlist) {
-
-    if (qh_skipfacet(facet) || (facet->visible && qh NEWfacets))
-      continue;
-
-    if (qh_setsize(facet->vertices) != 4) {
-      fprintf(stderr, "tet has %d vertices; skipping.\n",
-	      qh_setsize(facet->vertices));
-      continue;
-    }
-
-    /* for all vertices */
-    v = 0;
-    if ((facet->toporient ^ qh_ORIENTclock)
-	|| (qh hull_dim > 2 && !facet->simplicial)) {
-      FOREACHvertex_(facet->vertices)
-	dblock->tets[t].verts[v++] = qh_pointid(vertex->point);
-    } else {
-      FOREACHvertexreverse12_(facet->vertices)
-	dblock->tets[t].verts[v++] = qh_pointid(vertex->point);
-    }
-
-    /* for all neighbor tets */
-    n = 0;
-    qh_makeridges(facet);
-    FOREACHridge_(facet->ridges) {
-      neighbor = otherfacet_(ridge, facet);
-
-      int neigh_id = bin_search(id_map, neighbor->id, numfacets);
-      if (neigh_id >= 0)
-	dblock->tets[t].tets[n++] = neigh_id;
-      else
-	dblock->tets[t].tets[n++] = -1;
-    }
-    assert(n == 4); /* sanity */
-
-/*     debug */
-/*         fprintf(stderr, "1: tet %d verts [%d %d %d %d] neigh_tets [%d %d %d %d]\n", */
-/*     	    t, dblock->tets[t].verts[0], dblock->tets[t].verts[1], */
-/*     	    dblock->tets[t].verts[2], dblock->tets[t].verts[3], */
-/*     	    dblock->tets[t].tets[0], dblock->tets[t].tets[1], */
-/*     	    dblock->tets[t].tets[2], dblock->tets[t].tets[3]); */
-
-    t++;
-
-  } /* for all tets */
-
-  free(id_map);
-  assert(numfacets == t); /* sanity */
-
-}
-/*--------------------------------------------------------------------------*/
-#endif
-/*--------------------------------------------------------------------------*/
-/* used with Steve's version of neighbor ids, DEPRECATED */
-/*
-  binary search
-  tbl: lookup table
-  key: search key
-  size: number of table elements
-
-  returns: index of key, -1 if not found
-*/
-int bin_search(int *tbl, int key, int size) {
-
-  int max = size - 1;
-  int min = 0;
-  int mid;
-
-  while (max >= min) {
-    mid = (min + max) / 2;
-    if (tbl[mid] < key )
-      min = mid + 1;
-    else if (tbl[mid] > key)
-      max = mid - 1;
-    else
-      return mid;
-  }
-
-  return -1; /* not found */
-
-}
-/*--------------------------------------------------------------------------*/
-/*
-
 reorders neighbors in dblock such that ith neighbor is opposite ith vertex
-
 */
 void reorder_neighbors(struct dblock_t *dblock) {
 
-  int t, v, n, nv;
-  int nbr;
-  int done;
+  int t, v, n, nv; /*indices into tets, verts, neighbors, neighbor verts */
+  int nbr; /* one neighbor tet */
+  int done; /* this neighbor is done */
   int tets[4];  /* newly ordered neighbors */
 
   /* tets */
@@ -890,7 +747,7 @@ void reorder_neighbors(struct dblock_t *dblock) {
     for (n = 0; n < 4; n++)
       dblock->tets[t].tets[n] = tets[n];
 
-    /* debug, sanity check */
+    /* sanity check */
     for (v = 0; v < 4; ++v) {
       int nbr = dblock->tets[t].tets[v]; /* opposite neighbor */
       if (nbr > -1) {
