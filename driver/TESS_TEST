@@ -28,7 +28,7 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-num_procs=1
+num_procs=8
 
 # procs per node
 ppn=8 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64

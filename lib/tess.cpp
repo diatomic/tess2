@@ -1357,6 +1357,11 @@ void collect_dstats(int nblocks, struct dblock_t *dblocks, double *times) {
 	    times[OUT_TIME]);
     fprintf(stderr, "total time                    = %.3lf s\n", 
 	    times[TOT_TIME]);
+    fprintf(stderr, "All times printed in one row:\n");
+    fprintf(stderr, "%.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
+	    times[LOC1_TIME], times[INC1_TIME], times[NEIGH1_TIME],
+	    times[LOC2_TIME], times[INC2_TIME], times[NEIGH2_TIME],
+	    times[LOC3_TIME], times[OUT_TIME], times[TOT_TIME]);
     fprintf(stderr, "-------------------------------------------------\n");
     fprintf(stderr, "original particles = [%d, %d]\n", min_quants[0], max_quants[0]);
     fprintf(stderr, "with ghosts        = [%d, %d]\n", min_quants[1], max_quants[1]);
