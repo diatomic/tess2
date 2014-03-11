@@ -2952,6 +2952,7 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
 
     else { // complete
 
+      num_gbs = 0;
       for (int j = 0; j < (int)nbrs.size(); ++j) {
 	int t = nbrs[j];
 	float center[3];
@@ -2966,10 +2967,10 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
 			     MAX_NEIGHBORS, center, rad);
 
 	// remove the neighbors we've already sent to
-	num_gbs = 0;
 	for (int l = 0; l < num_candidates; ++l) { // all candidates
 
-	  if (destinations[p].find(all_neigh_gbs[l]) == destinations[p].end()) {
+	  if (destinations[p].find(candidates[l]) == destinations[p].end()) {
+	    destinations[p].insert(candidates[l]);
 	    neigh_gbs[num_gbs].gid	  = candidates[l].gid;
 	    neigh_gbs[num_gbs].neigh_dir  = candidates[l].neigh_dir;
 	    num_gbs++;
