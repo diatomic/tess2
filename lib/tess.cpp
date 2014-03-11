@@ -558,7 +558,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   vector <int> *convex_hull_particles  = new vector<int>[nblocks];
 
   // information about particles sent to neighbors
-#if 1 // old version
+#if 0 // old version
   vector <sent_t> *sent_particles = new vector<sent_t>[nblocks];
 #else
   vector <set <gb_t> > *sent_particles = new vector<set <gb_t> >[nblocks];
@@ -2271,7 +2271,7 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 }
 // ---------------------------------------------------------------------------
 
-#if 1 // old version
+#if 0 // old version
 
 bool operator<(const gb_t& x, const gb_t& y) { return x.gid < y.gid || (x.gid == y.gid && x.neigh_dir < y.neigh_dir); }
 
@@ -2747,7 +2747,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 
 // ---------------------------------------------------------------------------
 
-#if 1 // old version
+#if 0 // old version
 
 //
 //    Go through the original convex hull particles and enqueue any remaining
