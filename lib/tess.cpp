@@ -558,7 +558,11 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   vector <int> *convex_hull_particles  = new vector<int>[nblocks];
 
   // information about particles sent to neighbors
+#if 1 // old version
   vector <sent_t> *sent_particles = new vector<sent_t>[nblocks];
+#else
+  vector <set <gb_t> > *sent_particles = new vector<set <gb_t> >[nblocks];
+#endif
 
   // determine which cells are incomplete or too close to neighbor 
   for (int i = 0; i < nblocks; i++)
@@ -605,6 +609,11 @@ void delaunay(int nblocks, float **particles, int *num_particles,
     incomplete_dcells_final(&dblocks[i], i, sent_particles[i],
 			    convex_hull_particles[i]);
 
+  // cleanup sent particles
+  for (int i = 0; i < nblocks; ++i)
+    sent_particles[i].clear();
+  delete[] sent_particles;
+
   // profile
   get_mem(6, dwell);
   timing(times, NEIGH2_TIME, INC2_TIME);
@@ -633,11 +642,6 @@ void delaunay(int nblocks, float **particles, int *num_particles,
 
   // cleanup delaunay data structure and sent particles
   clean_delaunay_data_structures(ds);
-
-  // cleanup sent particles
-  for (int i = 0; i < nblocks; ++i)
-    sent_particles[i].clear();
-  delete[] sent_particles;
 
   // prepare for output 
   prep_d_out(nblocks, dblocks, hdrs);
@@ -2267,6 +2271,8 @@ void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock,
 }
 // ---------------------------------------------------------------------------
 
+#if 1 // old version
+
 bool operator<(const gb_t& x, const gb_t& y) { return x.gid < y.gid || (x.gid == y.gid && x.neigh_dir < y.neigh_dir); }
 
 //   determines cells that are incomplete or too close to neighbor such that
@@ -2396,6 +2402,132 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
   }
 
 }
+// ---------------------------------------------------------------------------
+
+#else // new version w/o sent_particles
+
+bool operator<(const gb_t& x, const gb_t& y) { return x.gid < y.gid || (x.gid == y.gid && x.neigh_dir < y.neigh_dir); }
+
+//   determines cells that are incomplete or too close to neighbor such that
+//   they might change after neighbor exchange. The particles corresponding
+//   to sites of these cells are enqueued for exchange with neighors
+//
+//   tblock: one temporary voronoi block
+//   vblock: one voronoi block
+//   lid: local id of block
+//   destinations: neighbors to which particle has been sent (output)
+//   convex_hull_particles: pointer to convex hull particles to recheck later
+// 
+void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
+			       vector < set <gb_t> > &destinations,
+			       vector <int> &convex_hull_particles) {
+
+  struct bb_t bounds; // block bounds 
+  struct remote_particle_t rp; // particle being sent or received 
+  struct gb_t neigh_gbs[MAX_NEIGHBORS]; // blocks to whom particle was sent
+  struct gb_t all_neigh_gbs[MAX_NEIGHBORS]; // all neighbors in neighborhood
+
+  DIY_Block_bounds(0, lid, &bounds);
+
+  // get gids of all neighbors, in case a particle needs to be
+  //   sent to all neighbors
+  //   (enumerating all gids manually (not via DIY_Enqueue_Item_all)
+  //   to be consisent with enumerating particular neighbors) 
+  int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
+  DIY_Get_neighbors(0, lid, all_neigh_gbs);
+
+  destinations.resize(dblock->num_orig_particles);
+
+  // identify and queue convex hull particles
+  for (int p = 0; p < dblock->num_orig_particles; ++p) {
+
+    // on convex hull = less than 4 neighbors
+    if (dblock->num_tets == 0 || 
+	!complete(p, dblock->tets, dblock->vert_to_tet[p])) {
+
+      // add to list of convex hull particles
+      convex_hull_particles.push_back(p);
+
+      // incomplete cell goes to the closest neighbor 
+      unsigned char nearest_dir = 
+	nearest_neighbor(&(dblock->particles[3 * p]), &bounds);
+
+      // send the particle to the neighbor in direction nearest_dir
+      gb_t gb; // one global block
+      int i;
+      for (i = 0; i < num_all_neigh_gbs; i++) {
+	if (all_neigh_gbs[i].neigh_dir != 0x00 &&
+	    all_neigh_gbs[i].neigh_dir == nearest_dir) {
+	  gb.gid = all_neigh_gbs[i].gid;
+	  gb.neigh_dir = all_neigh_gbs[i].neigh_dir;
+	  break;
+	}
+      }
+      // save the desination so we don't duplicate later
+      if (i < num_all_neigh_gbs)
+	destinations[p].insert(gb);
+
+    } // incomplete
+
+  }
+
+  // for all tets
+  for (int t = 0; t < dblock->num_tets; t++) {
+
+    int num_gbs = 0;
+    float center[3]; // circumcenter
+    circumcenter(center, &dblock->tets[t], dblock->particles);
+
+    // radius is distance from circumcenter to any tet vertex
+    int p = dblock->tets[t].verts[0];
+    float rad = distance(center, &dblock->particles[3 * p]);
+    DIY_Add_gbs_all_near(0, lid, neigh_gbs, &num_gbs,
+			 MAX_NEIGHBORS, center, rad);
+
+    // there is at least one destination block
+    if (num_gbs) {
+
+      // send all 4 verts
+      for (int v = 0; v < 4; v++) {
+
+	int p = dblock->tets[t].verts[v];
+
+	// select neighbors we haven't sent to yet
+	for (int i = 0; i < num_gbs; ++i)
+	  destinations[p].insert(neigh_gbs[i]);
+
+      } // all 4 verts
+
+    } // at least one destination block
+
+  } // for all tets
+
+  // queue the actual particles
+  for (int p = 0; p < dblock->num_orig_particles; ++p) {
+    if (!destinations[p].empty()) {
+      std::vector<gb_t>	    gbs(destinations[p].begin(),
+				destinations[p].end());
+
+      rp.x = dblock->particles[3 * p];
+      rp.y = dblock->particles[3 * p + 1];
+      rp.z = dblock->particles[3 * p + 2];
+      rp.gid = DIY_Gid(0, lid);
+      rp.nid = p;
+      rp.dir = 0x00;
+
+      DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
+			   NULL, sizeof(struct remote_particle_t),
+			   &gbs[0], gbs.size(),
+			   &transform_particle);
+
+    } // desitinations not empty
+
+  } // for p
+
+}
+
+#endif
+
 // ---------------------------------------------------------------------------
 //
 //    Go through the original convex hull particles and enqueue any remaining
@@ -2614,6 +2746,9 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 }
 
 // ---------------------------------------------------------------------------
+
+#if 1 // old version
+
 //
 //    Go through the original convex hull particles and enqueue any remaining
 //    incomplete cells to all neighbors
@@ -2753,6 +2888,117 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
   } // for p
 }
 
+
+// --------------------------------------------------------------------------
+
+#else // new version w/ sent_particle
+
+//
+//    Go through the original convex hull particles and enqueue any remaining
+//    incomplete cells to all neighbors
+//
+//    dblock: one delaunay voronoi block
+//    lid: local id of block
+//    destinations: neighbors to which particles have already been sent
+//    convex_hull_particles: convex hull particles to check
+// 
+void incomplete_dcells_final(struct dblock_t *dblock, int lid,
+			     vector <set <gb_t> > &destinations,
+			     vector <int> &convex_hull_particles) {
+
+  struct bb_t bounds; // block bounds 
+  struct remote_particle_t rp; // particle being sent or received 
+  struct gb_t neigh_gbs[MAX_NEIGHBORS]; // blocks to whom particle was sent
+  struct gb_t all_neigh_gbs[MAX_NEIGHBORS]; // all neighbors in neighborhood
+  int num_gbs; // number of neighbors used
+
+  DIY_Block_bounds(0, lid, &bounds);
+
+  // get gids of all neighbors, in case a particle needs to be
+  //   sent to all neighbors
+  //   (enumerating all gids manually (not via DIY_Enqueue_Item_all)
+  //   to be consisent with enumerating particular neighbors) 
+  int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
+  DIY_Get_neighbors(0, lid, all_neigh_gbs);
+
+  // for all convex hull particles
+  for (int j = 0; j < (int)convex_hull_particles.size(); ++j) {
+
+    int p = convex_hull_particles[j];
+
+    std::vector<int> nbrs;
+    bool complete = neighbor_tets(nbrs, p, dblock->tets, 
+				  dblock->vert_to_tet[p]);
+
+    if (!complete) {
+
+      // local point still on the convex hull goes to everybody
+      // it hasn't gone to yet 
+
+      num_gbs = 0;
+      for (int l = 0; l < num_all_neigh_gbs; l++) { // all neighbors
+
+	if (all_neigh_gbs[l].neigh_dir != 0x00) { // skip self
+	  if (destinations[p].find(all_neigh_gbs[l]) == destinations[p].end()) {
+	    neigh_gbs[num_gbs].gid	  = all_neigh_gbs[l].gid;
+	    neigh_gbs[num_gbs].neigh_dir  = all_neigh_gbs[l].neigh_dir;
+	    num_gbs++;
+	  }
+	} // skip self
+
+      } // all neighbors
+    
+    } // !complete
+
+    else { // complete
+
+      for (int j = 0; j < (int)nbrs.size(); ++j) {
+	int t = nbrs[j];
+	float center[3];
+	circumcenter(center, &dblock->tets[t], dblock->particles);
+
+	// radius is distance from circumcenter to any tet vertex
+	int p0 = dblock->tets[t].verts[0];
+	float rad = distance(center, &dblock->particles[3 * p0]);
+	gb_t candidates[MAX_NEIGHBORS];
+	int num_candidates = 0;
+	DIY_Add_gbs_all_near(0, lid, candidates, &num_candidates,
+			     MAX_NEIGHBORS, center, rad);
+
+	// remove the neighbors we've already sent to
+	num_gbs = 0;
+	for (int l = 0; l < num_candidates; ++l) { // all candidates
+
+	  if (destinations[p].find(all_neigh_gbs[l]) == destinations[p].end()) {
+	    neigh_gbs[num_gbs].gid	  = candidates[l].gid;
+	    neigh_gbs[num_gbs].neigh_dir  = candidates[l].neigh_dir;
+	    num_gbs++;
+	  }
+
+	} // all candidates
+
+      } // for t in nbrs
+
+    } // complete 
+
+    if (num_gbs) {
+      rp.x = dblock->particles[3 * p];
+      rp.y = dblock->particles[3 * p + 1];
+      rp.z = dblock->particles[3 * p + 2];
+      rp.gid = DIY_Gid(0, lid);
+      rp.nid = p;
+      rp.dir = 0x00;
+      DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
+			   NULL, sizeof(struct remote_particle_t),
+			   neigh_gbs, num_gbs,
+			   &transform_particle);
+    }
+
+  } // for convex hull particles
+
+}
+
+#endif
 
 // --------------------------------------------------------------------------
 //
