@@ -2384,6 +2384,11 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 			   &gbs[0], gbs.size(),
 			   &transform_particle);
 
+      // Copy out the gbs
+      sent.num_gbs = gbs.size();
+      for (int i = 0; i < gbs.size(); ++i)
+	sent.neigh_gbs[i] = gbs[i];
+
       // save the details of the sent particle
       sent.particle = p;
       sent_particles.push_back(sent);
@@ -2659,6 +2664,9 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
 
     while (old_sent < last_sent && sent_particles[old_sent].particle != p)
       ++old_sent;
+
+    if (old_sent == last_sent)
+      break;
 
     std::vector<int> nbrs;
     bool complete = neighbor_tets(nbrs, p, dblock->tets, 
