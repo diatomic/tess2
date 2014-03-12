@@ -3901,11 +3901,12 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
 //
 void get_mem(int breakpoint, int dwell) {
 
-  // quite compiler warnings in case MEMOEY is not defined
+  // quite compiler warnings in case MEMORY is not defined
   breakpoint = breakpoint;
   dwell = dwell;
 
 #ifdef MEMORY
+
   struct rusage r_usage;
   getrusage(RUSAGE_SELF, &r_usage);
 
@@ -3915,10 +3916,16 @@ void get_mem(int breakpoint, int dwell) {
   const int to_mb = 1024;
 #endif
 
-  fprintf(stderr, "%d: max memory = %ld MB, current memory in dashboard\n", 
-	  breakpoint, r_usage.ru_maxrss / to_mb);
+  int64_t mem = r_usage.ru_maxrss / to_mb;
+  int64_t max_mem;
+  MPI_Reduce(&mem, &max_mem, 1, MPI_LONG_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank == 0)
+    fprintf(stderr, "%d: max memory = %lld MB\n", breakpoint, max_mem);
 //   sleep(dwell);
-  fprintf(stderr, "%d: done\n", breakpoint);
+//   fprintf(stderr, "%d: done\n", breakpoint);
+
 #endif
 }
 // ---------------------------------------------------------------------------
