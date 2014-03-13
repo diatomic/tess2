@@ -17,6 +17,10 @@ if			    (memory)
   add_definitions	    (-DMEMORY)
 endif			    (memory)
 
+if			    (bgq)
+  add_definitions	    (-DBGQ)
+endif			    (bgq)
+
 # Debugging
 if                          (debug)
     if                      (optimize)
