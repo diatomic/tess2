@@ -14,7 +14,7 @@
 // --------------------------------------------------------------------------
 
 // MEMORY PROFILING 
-// #define MEMORY 
+#define MEMORY 
 
 // using new tet data model (eventually default)
 #define TET
@@ -2447,29 +2447,29 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
     // on convex hull = less than 4 neighbors
     if (dblock->num_tets == 0 || 
-	!complete(p, dblock->tets, dblock->vert_to_tet[p])) {
+    	!complete(p, dblock->tets, dblock->vert_to_tet[p])) {
 
       // add to list of convex hull particles
       convex_hull_particles.push_back(p);
 
       // incomplete cell goes to the closest neighbor 
       unsigned char nearest_dir = 
-	nearest_neighbor(&(dblock->particles[3 * p]), &bounds);
+    	nearest_neighbor(&(dblock->particles[3 * p]), &bounds);
 
       // send the particle to the neighbor in direction nearest_dir
       gb_t gb; // one global block
       int i;
       for (i = 0; i < num_all_neigh_gbs; i++) {
-	if (all_neigh_gbs[i].neigh_dir != 0x00 &&
-	    all_neigh_gbs[i].neigh_dir == nearest_dir) {
-	  gb.gid = all_neigh_gbs[i].gid;
-	  gb.neigh_dir = all_neigh_gbs[i].neigh_dir;
-	  break;
-	}
+    	if (all_neigh_gbs[i].neigh_dir != 0x00 &&
+    	    all_neigh_gbs[i].neigh_dir == nearest_dir) {
+    	  gb.gid = all_neigh_gbs[i].gid;
+    	  gb.neigh_dir = all_neigh_gbs[i].neigh_dir;
+    	  break;
+    	}
       }
       // save the desination so we don't duplicate later
       if (i < num_all_neigh_gbs)
-	destinations[p].insert(gb);
+    	destinations[p].insert(gb);
 
     } // incomplete
 
@@ -2486,7 +2486,7 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
     int p = dblock->tets[t].verts[0];
     float rad = distance(center, &dblock->particles[3 * p]);
     DIY_Add_gbs_all_near(0, lid, neigh_gbs, &num_gbs,
-			 MAX_NEIGHBORS, center, rad);
+    			 MAX_NEIGHBORS, center, rad);
 
     // there is at least one destination block
     if (num_gbs) {
@@ -2494,11 +2494,11 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
       // send all 4 verts
       for (int v = 0; v < 4; v++) {
 
-	int p = dblock->tets[t].verts[v];
+    	int p = dblock->tets[t].verts[v];
 
-	// select neighbors we haven't sent to yet
-	for (int i = 0; i < num_gbs; ++i)
-	  destinations[p].insert(neigh_gbs[i]);
+    	// select neighbors we haven't sent to yet
+    	for (int i = 0; i < num_gbs; ++i)
+    	  destinations[p].insert(neigh_gbs[i]);
 
       } // all 4 verts
 
@@ -2932,7 +2932,7 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
 
     std::vector<int> nbrs;
     bool complete = neighbor_tets(nbrs, p, dblock->tets, 
-				  dblock->vert_to_tet[p]);
+    				  dblock->vert_to_tet[p]);
 
     if (!complete) {
 
@@ -2942,13 +2942,13 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
       num_gbs = 0;
       for (int l = 0; l < num_all_neigh_gbs; l++) { // all neighbors
 
-	if (all_neigh_gbs[l].neigh_dir != 0x00) { // skip self
-	  if (destinations[p].find(all_neigh_gbs[l]) == destinations[p].end()) {
-	    neigh_gbs[num_gbs].gid	  = all_neigh_gbs[l].gid;
-	    neigh_gbs[num_gbs].neigh_dir  = all_neigh_gbs[l].neigh_dir;
-	    num_gbs++;
-	  }
-	} // skip self
+    	if (all_neigh_gbs[l].neigh_dir != 0x00) { // skip self
+    	  if (destinations[p].find(all_neigh_gbs[l]) == destinations[p].end()) {
+    	    neigh_gbs[num_gbs].gid	  = all_neigh_gbs[l].gid;
+    	    neigh_gbs[num_gbs].neigh_dir  = all_neigh_gbs[l].neigh_dir;
+    	    num_gbs++;
+    	  }
+    	} // skip self
 
       } // all neighbors
     
@@ -2958,29 +2958,29 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
 
       num_gbs = 0;
       for (int j = 0; j < (int)nbrs.size(); ++j) {
-	int t = nbrs[j];
-	float center[3];
-	circumcenter(center, &dblock->tets[t], dblock->particles);
+    	int t = nbrs[j];
+    	float center[3];
+    	circumcenter(center, &dblock->tets[t], dblock->particles);
 
-	// radius is distance from circumcenter to any tet vertex
-	int p0 = dblock->tets[t].verts[0];
-	float rad = distance(center, &dblock->particles[3 * p0]);
-	gb_t candidates[MAX_NEIGHBORS];
-	int num_candidates = 0;
-	DIY_Add_gbs_all_near(0, lid, candidates, &num_candidates,
-			     MAX_NEIGHBORS, center, rad);
+    	// radius is distance from circumcenter to any tet vertex
+    	int p0 = dblock->tets[t].verts[0];
+    	float rad = distance(center, &dblock->particles[3 * p0]);
+    	gb_t candidates[MAX_NEIGHBORS];
+    	int num_candidates = 0;
+    	DIY_Add_gbs_all_near(0, lid, candidates, &num_candidates,
+    			     MAX_NEIGHBORS, center, rad);
 
-	// remove the neighbors we've already sent to
-	for (int l = 0; l < num_candidates; ++l) { // all candidates
+    	// remove the neighbors we've already sent to
+    	for (int l = 0; l < num_candidates; ++l) { // all candidates
 
-	  if (destinations[p].find(candidates[l]) == destinations[p].end()) {
-	    destinations[p].insert(candidates[l]);
-	    neigh_gbs[num_gbs].gid	  = candidates[l].gid;
-	    neigh_gbs[num_gbs].neigh_dir  = candidates[l].neigh_dir;
-	    num_gbs++;
-	  }
+    	  if (destinations[p].find(candidates[l]) == destinations[p].end()) {
+    	    destinations[p].insert(candidates[l]);
+    	    neigh_gbs[num_gbs].gid	  = candidates[l].gid;
+    	    neigh_gbs[num_gbs].neigh_dir  = candidates[l].neigh_dir;
+    	    num_gbs++;
+    	  }
 
-	} // all candidates
+    	} // all candidates
 
       } // for t in nbrs
 
@@ -2994,9 +2994,9 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
       rp.nid = p;
       rp.dir = 0x00;
       DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
-			   NULL, sizeof(struct remote_particle_t),
-			   neigh_gbs, num_gbs,
-			   &transform_particle);
+    			   NULL, sizeof(struct remote_particle_t),
+    			   neigh_gbs, num_gbs,
+    			   &transform_particle);
     }
 
   } // for convex hull particles
@@ -3909,7 +3909,41 @@ void get_mem(int breakpoint, int dwell) {
   breakpoint = breakpoint;
   dwell = dwell;
 
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
 #ifdef MEMORY
+
+#ifdef BGQ
+
+  uint64_t shared, persist, heapavail, stackavail,
+    stack, heap, heapmax, guard, mmap;
+	
+  // we're only interested in max heap size 
+  // (same as max resident size, high water mark)
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPMAX, &heapmax);
+
+  // some examples of other memory usage we could get if we wanted it
+  // note that stack and heap both count the total of both, use one or the other
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_SHARED, &shared);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_PERSIST, &persist);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPAVAIL, &heapavail);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACKAVAIL, &stackavail);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACK, &stack);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heap);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_GUARD, &guard);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_MMAP, &mmap);
+	
+  int to_mb = 1024 * 1024;
+  double heap_mem = double(heapmax) / to_mb;
+  double max_heap_mem;
+  MPI_Reduce(&heap_mem, &max_heap_mem, 1, MPI_DOUBLE, MPI_MAX, 0, 
+	     MPI_COMM_WORLD);
+  if (rank == 0)
+    fprintf(stderr, "%d: BGQ max memory = %.0lf MB\n", 
+	    breakpoint, max_heap_mem);
+
+#else
 
   struct rusage r_usage;
   getrusage(RUSAGE_SELF, &r_usage);
@@ -3920,49 +3954,14 @@ void get_mem(int breakpoint, int dwell) {
   const int to_mb = 1024;
 #endif
 
-  int64_t mem = r_usage.ru_maxrss / to_mb;
-  int64_t max_mem;
-  MPI_Reduce(&mem, &max_mem, 1, MPI_LONG_LONG, MPI_MAX, 0, MPI_COMM_WORLD);
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  float res = r_usage.ru_maxrss;
+  float mem = res / (float)to_mb;
+  float max_mem;
+  MPI_Reduce(&mem, &max_mem, 1, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
   if (rank == 0)
-    fprintf(stderr, "%d: max memory = %lld MB\n", breakpoint, max_mem);
+    fprintf(stderr, "%d: max memory = %0.1f MB\n", breakpoint, max_mem);
 //   sleep(dwell);
 //   fprintf(stderr, "%d: done\n", breakpoint);
-
-#ifdef BGQ
-
-  uint64_t shared, persist,
-    heapavail, stackavail,
-    stack, heap, heapmax, guard, mmap;
-	
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_SHARED, &shared);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_PERSIST, &persist);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPAVAIL, &heapavail);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACKAVAIL, &stackavail);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACK, &stack);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heap);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPMAX, &heapmax);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_GUARD, &guard);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_MMAP, &mmap);
-	
-  double heap_mem = double(heapmax) / (1024 * 1024);
-  double max_heap_mem;
-  MPI_Reduce(&heap_mem, &max_heap_mem, 1, MPI_DOUBLE, MPI_MAX, 0, 
-	     MPI_COMM_WORLD);
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (rank == 0)
-    fprintf(stderr, "%d: BGQ max memory = %.0lf MB\n", 
-	    breakpoint, max_heap_mem);
-
-//   printf("Allocated heap: %.2f MB, avail. heap: %.2f MB\n",
-// 	 double(heap)/(1024*1024), double(heapavail)/(1024*1024));
-//   printf("Allocated stack: %.2f MB, avail. stack: %.2f MB\n",
-// 	 double(stack)/(1024*1024), double(stackavail)/(1024*1024));
-//   printf("Memory: shared: %.2f MB, persist: %.2f MB, guard: %.2f MB, mmap: %.2f MB\n",
-// 	 double(shared)/(1024*1024), double(persist)/(1024*1024),
-// 	 double(guard)/(1024*1024), double(mmap)/(1024*1024));
 
 #endif // BGQ
 

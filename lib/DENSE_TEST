@@ -20,19 +20,19 @@
 # without permission
 #
 #----------------------------------------------------------------------------
-ARCH=MAC_OSX
+#ARCH=MAC_OSX
 #ARCH=LINUX
-#ARCH=BGQ
+ARCH=BGQ
 #ARCH=FUSION
 #ARCH=XT
 #ARCH=XE
 
 # number of procs
 # must be <= tb
-num_procs=16
+num_procs=4096
 
 # procs per node
-ppn=1 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
+ppn=2 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
 
 # number of BG/P nodes for vn mode
 num_nodes=$[$num_procs / $ppn]
@@ -44,7 +44,7 @@ fi
 exe=./dense
 
 # input file
-infile="../driver/vor.out.nc"
+infile="/projects/SSSPPg/tpeterka/128p4096b-vor.out.nc"
 #infile="vor.out-100K.nc"
 #infile="vor.out-100K-2b.nc"
 #infile="vor-99.out.nc"
@@ -66,6 +66,8 @@ infile="../driver/vor.out.nc"
 gsize="512 512 512"
 #gsize="1024 1024 1024"
 #gsize="2048 2048 2048"
+#gsize="4096 4096 4096"
+gsize="8192 8192 8192"
 
 #projection plane
 #project=!
@@ -120,7 +122,7 @@ fi
 
 if [ "$ARCH" = "BGQ" ]; then
 
-qsub -n $num_nodes --mode c$ppn -A SDAV -t 60 $exe $args
+qsub -n $num_nodes --mode c$ppn -A SSSPPg -t 60 $exe $args
 
 fi
 

@@ -17,9 +17,9 @@
 
 # 1. Set your architecture here
 
-ARCH = MAC_OSX
+#ARCH = MAC_OSX
 #ARCH = LINUX
-#ARCH = BGQ
+ARCH = BGQ
 
 # 2. Set your choice of computational geometry library here (QHULL or CGAL)
 
@@ -30,8 +30,8 @@ CONV = QHULL
 
 ifeq ($(ARCH), BGQ) # BG/Q version
 
-CC=/soft/compilers/wrappers/gcc/mpicc
-CXX=/soft/compilers/wrappers/gcc/mpicxx
+CC=/soft/compilers/wrappers/xl/mpicc
+CXX=/soft/compilers/wrappers/xl/mpicxx
 DIY_INC = -I$(HOME)/diy-gcc/include
 QHULL_INC =-I$(HOME)/software/qhull-2011.2/src/libqhull
 CGAL_INC =-I/$(HOME)/software/CGAL-4.3/include -I/soft/libraries/boost/current/cnk-gcc/current/include -I/usr/include
