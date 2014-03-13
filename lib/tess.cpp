@@ -37,6 +37,10 @@
 #include "tet.h"
 #include "tet-neighbors.h"
 
+#ifdef BGQ
+#include <spi/include/kernel/memory.h>
+#endif
+
 using namespace std;
 
 static int dim = 3; // everything 3D 
@@ -3926,7 +3930,44 @@ void get_mem(int breakpoint, int dwell) {
 //   sleep(dwell);
 //   fprintf(stderr, "%d: done\n", breakpoint);
 
-#endif
+#ifdef BGQ
+
+  uint64_t shared, persist,
+    heapavail, stackavail,
+    stack, heap, heapmax, guard, mmap;
+	
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_SHARED, &shared);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_PERSIST, &persist);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPAVAIL, &heapavail);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACKAVAIL, &stackavail);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACK, &stack);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heap);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPMAX, &heapmax);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_GUARD, &guard);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_MMAP, &mmap);
+	
+  double heap_mem = double(heapmax) / (1024 * 1024);
+  double max_heap_mem;
+  MPI_Reduce(&heap_mem, &max_heap_mem, 1, MPI_DOUBLE, MPI_MAX, 0, 
+	     MPI_COMM_WORLD);
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rank == 0)
+    fprintf(stderr, "%d: BGQ max memory = %.0lf MB\n", 
+	    breakpoint, max_heap_mem);
+
+//   printf("Allocated heap: %.2f MB, avail. heap: %.2f MB\n",
+// 	 double(heap)/(1024*1024), double(heapavail)/(1024*1024));
+//   printf("Allocated stack: %.2f MB, avail. stack: %.2f MB\n",
+// 	 double(stack)/(1024*1024), double(stackavail)/(1024*1024));
+//   printf("Memory: shared: %.2f MB, persist: %.2f MB, guard: %.2f MB, mmap: %.2f MB\n",
+// 	 double(shared)/(1024*1024), double(persist)/(1024*1024),
+// 	 double(guard)/(1024*1024), double(mmap)/(1024*1024));
+
+#endif // BGQ
+
+#endif // MEMORY
+
 }
 // ---------------------------------------------------------------------------
 //
