@@ -98,13 +98,15 @@ int main(int argc, char *argv[]) {
   assert(bf[0] > 0 && bf[1] > 0 && bf[2] > 0); // 0's not allowed
   assert(tot_blocks * bf[0] * bf[1] * bf[2] >= groupsize);
 
+  // debug
   int num_pts = num_particles[0];
   int max_pts;
   int min_pts;
+  // fprintf(stderr, "rank = %d num_pts = %d\n", rank, num_pts);
   MPI_Reduce(&num_pts, &max_pts, 1, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
   MPI_Reduce(&num_pts, &min_pts, 1, MPI_INT, MPI_MIN, 0, MPI_COMM_WORLD);
   if (rank == 0)
-    fprintf(stderr, "num pts before redistribution = [%d, $d]\n", min_pts,
+    fprintf(stderr, "num pts before redistribution = [%d, %d]\n", min_pts,
 	    max_pts);
 
   // redistribute particles
@@ -135,10 +137,10 @@ int main(int argc, char *argv[]) {
 	       data_mins, data_maxs, bf, old_block_dims);
 
   // initialize, run, cleanup tess
-  // tess_init(nblocks, gids, bb, neighbors, num_neighbors, data_mins, data_maxs, 
-  // 	    wrap, 0, minvol, maxvol, MPI_COMM_WORLD, times);
-  // tess(particles, num_particles, outfile);
-  // tess_finalize();
+  tess_init(nblocks, gids, bb, neighbors, num_neighbors, data_mins, data_maxs, 
+  	    wrap, 0, minvol, maxvol, MPI_COMM_WORLD, times);
+  tess(particles, num_particles, outfile);
+  tess_finalize();
 
   // cleanup
   for (int b = 0; b < nblocks; b++) {

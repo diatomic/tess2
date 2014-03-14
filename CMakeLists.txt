@@ -8,6 +8,7 @@ option                      (memory	    "Build tess with memory profiling"		    
 option			    (use_cgal	    "Use CGAL"					    OFF)
 option			    (draw	    "Build draw"				    ON)
 option			    (hacc_test	    "Build HACC test"				    OFF)
+option			    (bgq	    "Build on BG/Q"				    OFF)
 
 if			    (timing)
     add_definitions	    (-DTIMING)
