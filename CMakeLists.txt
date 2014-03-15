@@ -108,6 +108,17 @@ set			    (libraries
 			     ${CMAKE_THREAD_LIBS_INIT}
 			    )
 
+if                          (debug)
+    find_library            (LIBDW_LIBRARY NAMES dw)
+    if                      (LIBDW_LIBRARY)
+        set                 (DEBUG_SOURCES ${CMAKE_SOURCE_DIR}/lib/backward.cpp)
+        add_definitions     (-DBACKWARD_HAS_DW=1)
+        set                 (libraries ${libraries} ${LIBDW_LIBRARY})
+    else                    (LIBDW_LIBRARY)
+        message             (STATUS "LibDW not found; backward.cpp won't be used")
+    endif                   (LIBDW_LIBRARY)
+endif                       (debug)
+
 add_subdirectory	    (lib)
 add_subdirectory	    (driver)
 add_subdirectory	    (postprocessor)
