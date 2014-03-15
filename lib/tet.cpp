@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cmath>
+#include <cstdio>
 
 #include <set>
 #include <queue>
@@ -232,9 +233,13 @@ bool neighbor_edges(std::vector< std::pair<int, int> >& nbrs,
 bool neighbor_tets(std::vector<int>& nbrs,
 		   int	    v,
 		   tet_t*   tets,
+                   int      num_tets,
 		   int	    t
 		  )
 {
+  if (t < 0)
+      fprintf(stderr, "Warning in neighbor_tets(): cannot start with negative tet %d\n", t);
+
   bool finite = true;
   std::queue<int>   q;
   std::set<int>	    visited_tets;
@@ -245,6 +250,9 @@ bool neighbor_tets(std::vector<int>& nbrs,
   {
     int t = q.front();
     q.pop();
+
+    if (t >= num_tets)
+        fprintf(stderr, "Warning in neighbor_tets(): tet %d exceeds total %d tets\n", t, num_tets);
 
     // already visited, continue
     if (visited_tets.find(t) != visited_tets.end())
@@ -279,9 +287,13 @@ bool neighbor_tets(std::vector<int>& nbrs,
  */
 int complete(int	    v,
 	      tet_t*	    tets,
+              int           num_tets,
 	      int	    t
 	     )
 {
+  if (t < 0)
+      fprintf(stderr, "Warning in complete(): cannot start with a negative tet %d\n", t);
+
   std::queue<int>   q;
   std::set<int>	    visited_tets;
   q.push(t);
@@ -291,6 +303,9 @@ int complete(int	    v,
   {
     int t = q.front();
     q.pop();
+
+    if (t >= num_tets)
+        fprintf(stderr, "Warning in complete(): tet %d exceeds total %d tets\n", t, num_tets);
 
     // already visited, continue
     if (visited_tets.find(t) != visited_tets.end())

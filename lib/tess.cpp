@@ -680,6 +680,9 @@ void fill_vert_to_tet(dblock_t* dblock) {
   dblock->vert_to_tet = 
     (int*)realloc(dblock->vert_to_tet, sizeof(int) * dblock->num_particles);
 
+  for (int p = 0; p < dblock->num_particles; ++p)
+      dblock->vert_to_tet[p] = -1;
+
   for (int t = 0; t < dblock->num_tets; ++t) {
     for (int v = 0; v < 4; ++v) {
       int p = dblock->tets[t].verts[v];
@@ -2307,7 +2310,7 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
     // on convex hull = less than 4 neighbors
     if (dblock->num_tets == 0 || 
-    	!complete(p, dblock->tets, dblock->vert_to_tet[p])) {
+    	!complete(p, dblock->tets, dblock->num_tets, dblock->vert_to_tet[p])) {
 
       // add to list of convex hull particles
       convex_hull_particles.push_back(p);
@@ -2649,6 +2652,7 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
 
     std::vector<int> nbrs;
     bool complete = neighbor_tets(nbrs, p, dblock->tets, 
+                                  dblock->num_tets,
     				  dblock->vert_to_tet[p]);
 
     // debug

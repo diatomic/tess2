@@ -88,6 +88,15 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) {
   /* for all blocks */
   for (int i = 0; i < nblocks; i++) {
 
+    for (int j = 0; j < dblocks[i].num_particles - 1; ++j) {
+      int k = j + 1;
+      if (dblocks[i].particles[3*j]     == dblocks[i].particles[3*k] &&
+          dblocks[i].particles[3*j + 1] == dblocks[i].particles[3*k + 1] &&
+          dblocks[i].particles[3*j + 2] == dblocks[i].particles[3*k + 2]) {
+        fprintf(stderr, "Warning in local_dcells(): identical particles %d and %d\n", j, k);
+      }
+    }
+
     Delaunay3D& Dt = Dts[i];
     construct_delaunay(Dt, dblocks[i].num_particles, dblocks[i].particles);
 
@@ -98,6 +107,14 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) {
     gen_tets(Dt, dblocks[i].tets);
     
     fill_vert_to_tet(&dblocks[i]);
+
+    for (int p = 0; p < dblocks[i].num_particles; ++p)
+      if (dblocks[i].vert_to_tet[p] == -1) {
+        fprintf(stderr, "Vertex %d (%f %f %f) uninitialized in vert_to_tet\n", p,
+                        dblocks[i].particles[3*p],
+                        dblocks[i].particles[3*p + 1],
+                        dblocks[i].particles[3*p + 2]);
+      }
 
   }
 

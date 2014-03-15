@@ -11,6 +11,7 @@ bool neighbor_edges(std::vector< std::pair<int, int> >& nbrs,
 bool neighbor_tets(std::vector<int>& nbrs,
 		   int	    v,
 		   tet_t*  tets,
+                   int      num_tets,
 		   int	    t
 		  );
 
@@ -20,6 +21,7 @@ extern "C"
 #endif
 int complete(int	    v,
 	      tet_t*	    tets,
+              int           num_tets,
 	      int	    t
 	     );
 
