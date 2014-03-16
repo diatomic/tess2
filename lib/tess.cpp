@@ -2307,6 +2307,12 @@ void incomplete_dcells_initial(struct dblock_t *dblock, int lid,
 
   // identify and queue convex hull particles
   for (int p = 0; p < dblock->num_orig_particles; ++p) {
+    
+    if (dblock->vert_to_tet[p] == -1)
+    {
+      fprintf(stderr, "Particle %d is not in the triangulation. Perhaps it's a duplicate? Aborting.\n", p);
+      assert(false);
+    }
 
     // on convex hull = less than 4 neighbors
     if (dblock->num_tets == 0 || 
@@ -2649,6 +2655,12 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
   for (int j = 0; j < (int)convex_hull_particles.size(); ++j) {
 
     int p = convex_hull_particles[j];
+
+    if (dblock->vert_to_tet[p] == -1)
+    {
+      fprintf(stderr, "Particle %d is not in the triangulation. Perhaps it's a duplicate? Aborting.\n", p);
+      assert(false);
+    }
 
     std::vector<int> nbrs;
     bool complete = neighbor_tets(nbrs, p, dblock->tets, 
