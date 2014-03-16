@@ -2656,9 +2656,9 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
 
     int p = convex_hull_particles[j];
 
-    if (dblock->vert_to_tet[p] == -1)
-    {
-      fprintf(stderr, "Particle %d is not in the triangulation. Perhaps it's a duplicate? Aborting.\n", p);
+    if (dblock->vert_to_tet[p] == -1) {
+      fprintf(stderr, "Particle %d is not in the triangulation. "
+	      "Perhaps it's a duplicate? Aborting.\n", p);
       assert(false);
     }
 

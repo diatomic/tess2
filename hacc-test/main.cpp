@@ -16,6 +16,7 @@
 #include <assert.h>
 #include "tess.h"
 #include <vector>
+#include <set>
 #include <stdio.h>
 #include "GenericIODefinitions.hpp"
 #include "GenericIOReader.h"
@@ -272,34 +273,54 @@ void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
 
     // padsize CRC for floats
     int floatpadsize = gio::CRCSize / sizeof(float);
+    int idpadsize = gio::CRCSize / sizeof(int64_t);
 
     // allocate application arrays to store variables plus CRCs
     float* x = new float[num_particles[b] + floatpadsize]; 
     float* y = new float[num_particles[b] + floatpadsize]; 
     float* z = new float[num_particles[b] + floatpadsize];
+    int64_t *id = new int64_t[num_particles[b] + idpadsize];
 
     // clear variables and then register application arrays with the reader
     reader->AddVariable("x", x, gio::GenericIOBase::ValueHasExtraSpace); 
     reader->AddVariable("y", y, gio::GenericIOBase::ValueHasExtraSpace); 
     reader->AddVariable("z", z, gio::GenericIOBase::ValueHasExtraSpace);
+    reader->AddVariable("id", id, gio::GenericIOBase::ValueHasExtraSpace);
 
     // read the particles
     // note the reader wants gid, not lid
     reader->ReadBlock(gids[b]);
 
-    // package particles
+    // unique_ids is used to weed out duplicate particles, which sometimes
+    // can happen in hacc
+    set <int64_t> unique_ids;
+
+    // package particles, sampling as specified and filtering out duplicates
     num_particles[b] /= sample_rate;
     particles[b] = (float *)malloc(num_particles[b] * 3 * sizeof(float));
+    int nu = 0; // number of unique points
     for (int i = 0; i < num_particles[b]; i++) {
-      particles[b][3 * i]     = x[i * sample_rate];
-      particles[b][3 * i + 1] = y[i * sample_rate];
-      particles[b][3 * i + 2] = z[i * sample_rate];
+      if (unique_ids.find(id[i * sample_rate]) == unique_ids.end()) {
+	particles[b][3 * nu]     = x[i * sample_rate];
+	particles[b][3 * nu + 1] = y[i * sample_rate];
+	particles[b][3 * nu + 2] = z[i * sample_rate];
+	unique_ids.insert(id[i * sample_rate]);
+	nu++;
+      }
     }
+
+    // debug
+    if (nu < num_particles[b])
+      fprintf(stderr, "%d duplicate particles found and removed in rank %d\n",
+	      num_particles[b] - nu, rank);
+
+    num_particles[b] = nu;
 
     // cleanup temporary points
     delete[] x;
     delete[] y;
     delete[] z;
+    delete[] id;
 
   }
 

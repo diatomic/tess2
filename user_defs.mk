@@ -17,9 +17,9 @@
 
 # 1. Set your architecture here
 
-#ARCH = MAC_OSX
+ARCH = MAC_OSX
 #ARCH = LINUX
-ARCH = BGQ
+#ARCH = BGQ
 
 # 2. Set your choice of computational geometry library here (QHULL or CGAL)
 
