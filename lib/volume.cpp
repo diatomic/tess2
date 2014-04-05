@@ -37,8 +37,8 @@ float volume(int v, int* verts_to_tets, tet_t* tets, int num_tets, float* partic
 
       float ab[3], ac[3];
       for (int j = 0; j < 3; ++j) {
-	ab[i] = circumcenters[3*b + i] - circumcenters[3*a + i];
-	ac[i] = circumcenters[3*c + i] - circumcenters[3*a + i];
+	ab[j] = circumcenters[3*b + j] - circumcenters[3*a + j];
+	ac[j] = circumcenters[3*c + j] - circumcenters[3*a + j];
       }
       float cp[3];
       cross(cp, ab, ac);
