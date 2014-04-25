@@ -45,8 +45,8 @@ fi
 exe=./post-voronoi
 
 # total number of blocks in the domain
-#tb=$[$num_procs * 1]
-tb=128
+tb=$[$num_procs * 1]
+#tb=128
 
 # inout file
 infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"

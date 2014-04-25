@@ -17,15 +17,30 @@
 #include <stddef.h>
 #include <vector>
 #include "voronoi.h"
+#include "delaunay.h"
 #include <math.h>
 #include "mpi.h"
 #include "diy.h"
 #include "io.h"
+#include "tet.h"
+#include "tet-neighbors.h"
+
+// using new tet data model (eventually default)
+#define TET
 
 using namespace std;
 
+#ifdef TET
+
+// voronoi blocks
+dblock_t **dblocks;
+
+#else
+
 // voronoi blocks
 vblock_t **vblocks;
+
+#endif
 
 // grid point
 struct grid_pt_t {
@@ -69,17 +84,38 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 		  float **density);
 void IterateCellsCIC(int block, int *block_min_idx, int *block_num_idx, 
 		     float **density);
+
+// new TET data model version
+void CellBounds(dblock_t *dblock, int cell, float *cell_min, float *cell_max, 
+		vector<float> &normals, vector <vector <float> > &face_verts);
+int CellGridPts(float *cell_mins, float *cell_maxs, 
+		grid_pt_t* &grid_pts, int * &border, int& alloc_grid_pts,
+		vector<float> &normals, vector <vector <float> > &face_verts);
+int CellInteriorGridPts(int *cell_grid_pts, 
+			int *cell_min_grid_idx, float *cell_min_grid_pos, 
+			grid_pt_t *grid_pts, int *border,
+			vector<float> &normals, 
+			vector <vector <float> > &face_verts);
+bool PtInCell(float *pt, vector<float> &normals, 
+	      vector <vector <float> > &face_verts);
+// end of new TET data model version
+
+// old VORONOI data model version
 void CellBounds(vblock_t *vblock, int c_cell, float *cell_min, float *cell_max, 
-		float *centroid, vector<float> &normals);
-void ComputeNormal(vblock_t *vblock, int face, float *normal);
-bool PtInCell(float *pt, vblock_t *vblock, int cell, float *normals);
-void Global2LocalIdx(int *global_idx, int *local_idx, int *block_min_idx);
+		vector<float> &normals);
 int CellGridPts(vblock_t *vblock, int cell, float *cell_mins, float *cell_maxs, 
 		grid_pt_t* &grid_pts, int * &border, int& alloc_grid_pts,
 		float *normals);
 int CellInteriorGridPts(vblock_t *vblock, int cell, int *cell_grid_pts, 
 			int *cell_min_grid_idx, float *cell_min_grid_pos, 
 			grid_pt_t *grid_pts, int *border, float *normals);
+bool PtInCell(float *pt, vblock_t *vblock, int cell, float *normals);
+// end of old VORONOI data model version
+
+void Normal(float *verts, float *normal);
+// DEPRECATED
+void NewellNormal(vblock_t *vblock, int face, float *normal);
+void Global2LocalIdx(int *global_idx, int *local_idx, int *block_min_idx);
 void GridStepParams(int num_given_bounds, 
 		    float *given_mins, float *given_maxs);
 void ItemDtype(DIY_Datatype *dtype);
@@ -91,7 +127,7 @@ void idx2phys(int *grid_idx, float *pos);
 void phys2idx(float *pos, int *grid_idx);
 void DataBounds(int nblocks, MPI_Comm comm);
 void SummaryStats(float max_dense, float tot_mass,
-		  float check_mass, int tot_cells, int max_cell_grid_pts,
+		  float check_mass, int max_cell_grid_pts,
 		  double *times, MPI_Comm comm);
 void DistributeScalarCIC(float *pt, float scalar,
 			 vector <int> &grid_idxs, vector <float> &grid_scalars);
@@ -106,7 +142,6 @@ int main(int argc, char** argv) {
   int rank, groupsize; // MPI usual
   int did; // domain id
   MPI_Comm comm = MPI_COMM_WORLD; // MPI communicator
-  int tot_cells; // total number of cells in this process
 
   // grid given bounds
   int num_given_bounds; // number of given bounds
@@ -149,14 +184,29 @@ int main(int argc, char** argv) {
   gb_t **diy_neighs; // neighbors in diy global block format
 
   // read tessellation
+#ifdef TET
+
+  pnetcdf_d_read(&nblocks, &tot_blocks, &dblocks, argv[1], MPI_COMM_WORLD,
+	       &gids, &num_neighbors, &neighbors, &neigh_procs);
+
+#else
+
   pnetcdf_read(&nblocks, &tot_blocks, &vblocks, argv[1], MPI_COMM_WORLD,
 	       &gids, &num_neighbors, &neighbors, &neigh_procs);
+
+#endif
+
   int wrap = 0; // todo: make wrap an input program argument
   bb_t bounds[nblocks]; // block bounds
   for (int i = 0; i < nblocks; i++) {
     for (int j = 0; j < dim; j++) {
+#ifdef TET
+      bounds[i].min[j] = dblocks[i]->mins[j];
+      bounds[i].max[j] = dblocks[i]->maxs[j];
+#else
       bounds[i].min[j] = vblocks[i]->mins[j];
       bounds[i].max[j] = vblocks[i]->maxs[j];
+#endif
     }
   }
   int maxblocks; // max blocks in any process
@@ -201,6 +251,7 @@ int main(int argc, char** argv) {
   // allocate density field
   float *density[nblocks];
   for (int block = 0; block < nblocks; block++) {
+
     BlockGridParams(block, block_min_idx, block_max_idx, block_num_idx);
     int npts; // total number of points in the block
     if (project)
@@ -211,20 +262,6 @@ int main(int argc, char** argv) {
 
     // init density
     memset(density[block], 0 , npts * sizeof(float));
-
-    // debug
-//     float min_pos[3], max_pos[3];
-//     idx2phys(block_min_idx, min_pos);
-//     idx2phys(block_max_idx, max_pos);
-//     fprintf(stderr, "The grid in gid %d extends from [%d %d %d] "
-// 	    "(%.3f %.3f %.3f) to "
-// 	    "[%d %d %d] (%.3f %.3f %.3f) and is [%d %d %d] in size.\n",
-// 	    DIY_Gid(did,block), 
-// 	    block_min_idx[0], block_min_idx[1], block_min_idx[2],
-// 	    min_pos[0], min_pos[1], min_pos[2],
-// 	    block_max_idx[0], block_max_idx[1], block_max_idx[2],
-// 	    max_pos[0], max_pos[1], max_pos[2],
-// 	    block_num_idx[0], block_num_idx[1], block_num_idx[2]);
 
   }
 
@@ -247,8 +284,6 @@ int main(int argc, char** argv) {
 
     // for comarison, CIC
 //     IterateCellsCIC(block, block_min_idx, block_num_idx, density);
-
-    tot_cells += vblocks[block]->num_complete_cells;
 
   }
 
@@ -313,7 +348,7 @@ int main(int argc, char** argv) {
   MPI_Barrier(comm);
   times[TOTAL_TIME] = MPI_Wtime() - times[TOTAL_TIME];
 
-  SummaryStats(max_dense, tot_mass, check_mass, tot_cells,
+  SummaryStats(max_dense, tot_mass, check_mass,
 	       max_cell_grid_pts, times, comm);
 
   DIY_Finalize();
@@ -334,16 +369,12 @@ int main(int argc, char** argv) {
 void IterateCells(int block, int *block_min_idx, int *block_num_idx, 
 		  float **density) {
 
-  float cell_min[3], cell_max[3], cell_centroid[3]; // cell bounds
+  float cell_min[3], cell_max[3]; // cell bounds
   float grid_pos[3]; // physical position of grid point
   int alloc_grid_pts = 0; // number of grid points allocated
   grid_pt_t *grid_pts = NULL; // grid points covered by the cell
   int *border = NULL; // cell border, min and max x index for each y, z index
   int num_grid_pts; // number of grid points    
-
-  // debug
-//   fprintf(stderr, "gid %d has %d complete cells\n", DIY_Gid(0, block),
-// 	  vblocks[block]->num_complete_cells);
 
   // divisor for volume (3d density) or area (2d density)
   // assumes projection is to x-y plane
@@ -351,30 +382,49 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 	       grid_step_size[0] * grid_step_size[1] * grid_step_size[2]);
 
   // cells
+
+#ifdef TET
+
+  for (int cell = 0; cell < dblocks[block]->num_orig_particles; cell++) {
+
+    // skip inccomplete cells
+    if (!complete(cell, dblocks[block]->tets, dblocks[block]->num_tets,
+		  dblocks[block]->vert_to_tet[cell]))
+      continue;
+
+    vector <float> normals; // cell normals
+    vector <vector <float> > face_verts; // vertex positions in each face
+
+    // cell bounds
+    CellBounds(dblocks[block], cell, cell_min, cell_max, normals, face_verts);
+
+    // grid points covered by this cell
+    num_grid_pts = CellGridPts(cell_min, cell_max, grid_pts, border, 
+			       alloc_grid_pts, normals, face_verts);
+
+    if (!num_grid_pts) // cell outside of global data bounds
+      continue;
+
+    // debug
+    check_mass++;
+
+#else
+
   for (int cell = 0; cell < vblocks[block]->num_complete_cells; cell++) {
 
     vector <float> normals; // cell normals
 
     // cell bounds
-    CellBounds(vblocks[block], cell, cell_min, cell_max,
-	       cell_centroid, normals);
-
-    // debug
-//     if (cell_min[0] < data_mins[0] || cell_min[1] < data_mins[1] || 
-// 	cell_min[2] < data_mins[2] ||
-// 	cell_max[0] > data_maxs[0] || cell_max[1] > data_maxs[1] || 
-// 	cell_max[2] > data_maxs[2])
-//       fprintf(stderr, "1: block = %d cell = %d cell_mins = [%.1f %.1f %.1f] "
-// 	      "cell_maxs = [%.1f %.1f %.1f]\n", block, cell,
-// 	      cell_min[0], cell_min[1], cell_min[2],
-// 	      cell_max[0], cell_max[1], cell_max[2]);
+    CellBounds(vblocks[block], cell, cell_min, cell_max, normals);
 
     // debug
     check_mass++;
 
     // grid points covered by this cell
     num_grid_pts = CellGridPts(vblocks[block], cell, cell_min, cell_max, 
-			       grid_pts,  border, alloc_grid_pts, &normals[0]);
+			       grid_pts, border, alloc_grid_pts, &normals[0]);
+
+#endif
 
     // debug
     if (num_grid_pts > max_cell_grid_pts)
@@ -386,6 +436,23 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
       idx2phys(grid_pts[i].idx, grid_pos);
 
       // assign density to grid points in the block
+
+#ifdef TET
+
+      if (grid_pos[0] >= dblocks[block]->mins[0] &&
+	  (grid_pos[0] < dblocks[block]->maxs[0]  ||
+	   fabs(grid_pos[0] - data_maxs[0]) < eps) &&
+
+	  grid_pos[1] >= dblocks[block]->mins[1] &&
+	  (grid_pos[1] < dblocks[block]->maxs[1]  ||
+	   fabs(grid_pos[1] - data_maxs[1]) < eps) &&
+
+	  grid_pos[2] >= dblocks[block]->mins[2] &&
+	  (grid_pos[2] < dblocks[block]->maxs[2]  ||
+	   fabs(grid_pos[2] - data_maxs[2]) < eps) ) {
+
+#else
+
       if (grid_pos[0] >= vblocks[block]->mins[0] &&
 	  (grid_pos[0] < vblocks[block]->maxs[0]  ||
 	   fabs(grid_pos[0] - data_maxs[0]) < eps) &&
@@ -398,6 +465,7 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 	  (grid_pos[2] < vblocks[block]->maxs[2]  ||
 	   fabs(grid_pos[2] - data_maxs[2]) < eps) ) {
 
+#endif
 	// assign the density to the local block density array
 	int block_grid_idx[3]; // local block idx of grid point
 	Global2LocalIdx(grid_pts[i].idx, block_grid_idx, block_min_idx);
@@ -426,85 +494,6 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
     free(border);
 
 }
-//--------------------------------------------------------------------------
-// // DEPRECATED
-// //
-// // allocates a new block and creates DIY datatype for it
-// //
-// // did: domain id
-// // lid: local block number
-// // hdr: block header
-// // dtype: pointer to datatype
-// //
-// // side effects: commits datatype, DIY will cleanup
-// //
-// // returns: address of new block
-// //
-// void *CreateReadType(int did, int lid, int *hdr, DIY_Datatype *dtype) {
-
-//   did = did; // quiet compiler warning
-//   lid = lid; 
-
-//   // allocate space
-
-//   struct vblock_t *v = new vblock_t;
-
-//   v->num_verts = hdr[NUM_VERTS];
-//   v->tot_num_cell_verts = hdr[TOT_NUM_CELL_VERTS];
-//   v->num_complete_cells = hdr[NUM_COMPLETE_CELLS];
-//   v->tot_num_cell_faces = hdr[TOT_NUM_CELL_FACES];
-//   v->tot_num_face_verts = hdr[TOT_NUM_FACE_VERTS];
-//   v->num_orig_particles = hdr[NUM_ORIG_PARTICLES];
-
-//   if (v->num_verts > 0)
-//     v->save_verts = new float[3 * v->num_verts];
-//   if (v->num_orig_particles > 0) {
-//     v->num_cell_verts = new int[v->num_orig_particles];
-//     v->sites = new float[3 * v->num_orig_particles];
-//   }
-//   if (v->tot_num_cell_verts > 0)
-//     v->cells = new int[v->tot_num_cell_verts];
-//   if (v->num_complete_cells > 0) {
-//     v->complete_cells = new int[v->num_complete_cells];
-//     v->areas = new float[v->num_complete_cells];
-//     v->vols = new float[v->num_complete_cells];
-//     v->num_cell_faces = new int[v->num_complete_cells];
-//   }
-//   if (v->tot_num_cell_faces > 0)
-//     v->num_face_verts = new int[v->tot_num_cell_faces];
-//   if (v->tot_num_face_verts > 0)
-//     v->face_verts = new int[v->tot_num_face_verts];
-
-//   struct map_block_t map[] = {
-
-//     { DIY_FLOAT,  OFST, 3, 
-//       offsetof(struct vblock_t, mins)                 },
-//     { DIY_FLOAT, ADDR, v->num_verts * 3, 
-//       DIY_Addr(v->save_verts)                         },
-//     { DIY_FLOAT, ADDR, v->num_orig_particles * 3,
-//       DIY_Addr(v->sites)                              },
-//     { DIY_INT,    ADDR, v->num_complete_cells, 
-//       DIY_Addr(v->complete_cells)                     },
-//     { DIY_FLOAT, ADDR, v->num_complete_cells, 
-//       DIY_Addr(v->areas)                              },
-//     { DIY_FLOAT, ADDR, v->num_complete_cells, 
-//       DIY_Addr(v->vols)                               },
-//     { DIY_INT,    ADDR, v->num_complete_cells, 
-//       DIY_Addr(v->num_cell_faces)                     },
-//     { DIY_INT,    ADDR, v->tot_num_cell_faces, 
-//       DIY_Addr(v->num_face_verts)                     },
-//     { DIY_INT,    ADDR, v->tot_num_face_verts, 
-//       DIY_Addr(v->face_verts)                         },
-//     { DIY_FLOAT,  OFST, 3, 
-//       offsetof(struct vblock_t, maxs)                 },
-
-//   };
-
-//   DIY_Create_struct_datatype(DIY_Addr(v), 10, map, dtype);
-
-//   return v;
-
-// }
 //--------------------------------------------------------------------------
 //
 // parse args
@@ -589,6 +578,66 @@ void BlockGridParams(int lid, int *block_min_idx, int *block_max_idx,
 
   float pos[3]; // temporary position (x,y,z)
 
+#ifdef TET
+
+  // global grid index of block minimum grid point
+  phys2idx(dblocks[lid]->mins, block_min_idx);
+  idx2phys(block_min_idx, pos);
+  if (pos[0] < dblocks[lid]->mins[0])
+    block_min_idx[0]++;
+  if (pos[1] < dblocks[lid]->mins[1])
+    block_min_idx[1]++;
+  if (pos[2] < dblocks[lid]->mins[2])
+    block_min_idx[2]++;
+  idx2phys(block_min_idx, pos); // double check adjusted position
+  assert(pos[0] >= dblocks[lid]->mins[0] && pos[1] >= dblocks[lid]->mins[1] &&
+	 pos[2] >= dblocks[lid]->mins[2]);
+
+  // global grid index of block maximum grid point
+  phys2idx(dblocks[lid]->maxs, block_max_idx);
+  idx2phys(block_max_idx, pos);
+  if (pos[0] + grid_step_size[0] <= dblocks[lid]->maxs[0])
+    block_max_idx[0]++;
+  if (pos[1] + grid_step_size[1] <= dblocks[lid]->maxs[1])
+    block_max_idx[1]++;
+  if (pos[2] + grid_step_size[2] <= dblocks[lid]->maxs[2])
+    block_max_idx[2]++;
+  idx2phys(block_max_idx, pos); // double check adjusted position
+  assert(pos[0] <= dblocks[lid]->maxs[0] && pos[1] <= dblocks[lid]->maxs[1] &&
+	 pos[2] <= dblocks[lid]->maxs[2]);
+
+  // eliminate duplication at the maximum block border
+  if (fabs(data_mins[0] + block_max_idx[0] * grid_step_size[0] -
+	   dblocks[lid]->maxs[0]) < eps && 
+      fabs(dblocks[lid]->maxs[0] - data_maxs[0]) > grid_step_size[0])
+    block_max_idx[0]--;
+  if (fabs(data_mins[1] + block_max_idx[1] * grid_step_size[1] -
+      dblocks[lid]->maxs[1]) < eps &&
+      fabs(dblocks[lid]->maxs[1] - data_maxs[1]) > grid_step_size[1])
+    block_max_idx[1]--;
+  if (fabs(data_mins[2] + block_max_idx[2] * grid_step_size[2] -
+      dblocks[lid]->maxs[2]) < eps &&
+      fabs(dblocks[lid]->maxs[2] - data_maxs[2]) > grid_step_size[2])
+    block_max_idx[2]--;
+
+  // possibly extend minimum end of blacks at the minimum end of the domain
+  if (fabs(dblocks[lid]->mins[0] - data_mins[0]) < grid_step_size[0])
+    block_min_idx[0] = 0;
+  if (fabs(dblocks[lid]->mins[1] - data_mins[1]) < grid_step_size[1])
+    block_min_idx[1] = 0;
+  if (fabs(dblocks[lid]->mins[2] - data_mins[2]) < grid_step_size[2])
+    block_min_idx[2] = 0;
+
+  // possibly extend maximum end of blacks at the maximum end of the domain
+  if (fabs(dblocks[lid]->maxs[0] - data_maxs[0]) < grid_step_size[0])
+    block_max_idx[0] = glo_num_idx[0] - 1;
+  if (fabs(dblocks[lid]->maxs[1] - data_maxs[1]) < grid_step_size[1])
+    block_max_idx[1] = glo_num_idx[1] - 1;
+  if (fabs(dblocks[lid]->maxs[2] - data_maxs[2]) < grid_step_size[2])
+    block_max_idx[2] = glo_num_idx[2] - 1;
+
+#else
+
   // global grid index of block minimum grid point
   phys2idx(vblocks[lid]->mins, block_min_idx);
   idx2phys(block_min_idx, pos);
@@ -645,6 +694,8 @@ void BlockGridParams(int lid, int *block_min_idx, int *block_max_idx,
   if (fabs(vblocks[lid]->maxs[2] - data_maxs[2]) < grid_step_size[2])
     block_max_idx[2] = glo_num_idx[2] - 1;
 
+#endif
+
   // compute number of grid points in local block
   block_num_idx[0] = block_max_idx[0] - block_min_idx[0] + 1;
   block_num_idx[1] = block_max_idx[1] - block_min_idx[1] + 1;
@@ -652,24 +703,19 @@ void BlockGridParams(int lid, int *block_min_idx, int *block_max_idx,
 
 }
 //--------------------------------------------------------------------------
+// OLD VORONOI DATA MODEL VERSION
 //
-// get cell bounds
+// get cell bounds and computes normals for all cell faces
 //
 // vblock: one voronoi block
 // c_cell: current cell counter
 // cell_min, cell_max: cell bounds (output)
-// centroid: centroid, mean of all vertices (output)
 // normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...) (output)
 //
 void CellBounds(vblock_t *vblock, int c_cell, float *cell_min, float *cell_max, 
-		float *centroid, vector<float> &normals) {
+		vector<float> &normals) {
 
   float n[3]; // face normal
-
-  centroid[0] = 0.0;
-  centroid[1] = 0.0;
-  centroid[2] = 0.0;
-  int tot_verts = 0;
 
   int cell = vblock->complete_cells[c_cell];
   int num_faces; // number of faces in the current cell
@@ -701,7 +747,7 @@ void CellBounds(vblock_t *vblock, int c_cell, float *cell_min, float *cell_max,
     num_verts = vblock->faces[face].num_verts;
 
     // normal
-    ComputeNormal(vblock, face, n);
+    NewellNormal(vblock, face, n);
     // check sign of dot product of normal with vector from site 
     // to first face vertex to see if normal has correct direction
     // want outward normal
@@ -719,10 +765,6 @@ void CellBounds(vblock_t *vblock, int c_cell, float *cell_min, float *cell_max,
     normals.push_back(n[1]);
     normals.push_back(n[2]);
 
-    // debug
-//     fprintf(stderr, "1: c_cell %d cell %d k %d face %d normal [%.3f %.3f %.3f]\n",
-// 	    c_cell, cell, k, face, n[0], n[1], n[2]);
-
     for (int l = 0; l < num_verts; l++) { // vertices
 
       int v = vblock->faces[face].verts[l];
@@ -732,29 +774,110 @@ void CellBounds(vblock_t *vblock, int c_cell, float *cell_min, float *cell_max,
 	cell_min[0] = vblock->save_verts[3 * v];
       if (k == 0 && l == 0 || vblock->save_verts[3 * v] > cell_max[0])
 	cell_max[0] = vblock->save_verts[3 * v];
-      centroid[0] += vblock->save_verts[3 * v];
 
       if (k == 0 && l == 0 || vblock->save_verts[3 * v + 1] < cell_min[1])
 	cell_min[1] = vblock->save_verts[3 * v + 1];
       if (k == 0 && l == 0 || vblock->save_verts[3 * v + 1] > cell_max[1])
 	cell_max[1] = vblock->save_verts[3 * v + 1];
-      centroid[1] += vblock->save_verts[3 * v + 1];
 
       if (k == 0 && l == 0 || vblock->save_verts[3 * v + 2] < cell_min[2])
 	cell_min[2] = vblock->save_verts[3 * v + 2];
       if (k == 0 && l == 0 || vblock->save_verts[3 * v + 2] > cell_max[2])
 	cell_max[2] = vblock->save_verts[3 * v + 2];
-      centroid[2] += vblock->save_verts[3 * v + 2];
-
-      tot_verts++;
 
     } // vertices
 
   } // faces
 
-  centroid[0] /= tot_verts;
-  centroid[1] /= tot_verts;
-  centroid[2] /= tot_verts;
+} 
+//--------------------------------------------------------------------------
+// NEW TET DATA MODEL VERSION
+//
+// get cell bounds, face vertices, and normals for all cell faces
+//
+// dblock: one delaunay block
+// cell: current cell counter
+// cell_min, cell_max: cell bounds (output)
+// normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...) (output)
+// face_verts: vertex positions for each face (output)
+//
+void CellBounds(dblock_t *dblock, int cell, float *cell_min, float *cell_max, 
+		vector<float> &normals, 
+		vector <vector <float> > &face_verts) {
+
+  float n[3]; // face normal
+
+  // a tet containing the cell site
+  int t = dblock->vert_to_tet[cell];
+
+  // neighbor edges is a vector of (vertex u, tet of vertex u) pairs 
+  // that neighbor vertex v
+  vector< pair<int, int> > nbrs;
+  bool finite = neighbor_edges(nbrs, cell, dblock->tets, t);
+
+  // infinte cells should have been filtered by the caller
+  assert(finite);
+
+  // grow vectors to correct size, num_faces = nbrs.size()
+  normals.reserve(3 * (int)nbrs.size());
+  face_verts.resize((int)nbrs.size());
+
+  // get cell bounds
+  for (int k = 0; k < (int)nbrs.size(); k++) { // faces
+
+    // get edge link
+    int u  = nbrs[k].first;
+    int ut = nbrs[k].second;
+    std::vector<int> edge_link;
+    fill_edge_link(edge_link, cell, u, ut, dblock->tets);
+
+    for (int l = 0; l < (int)edge_link.size(); l++) { // vertices
+
+      face_verts[k].reserve(3 * (int)edge_link.size());
+
+      float vv[3]; // voronoi vertex position
+      circumcenter(vv, &(dblock->tets[edge_link[l]]), dblock->particles);
+      face_verts[k].push_back(vv[0]);
+      face_verts[k].push_back(vv[1]);
+      face_verts[k].push_back(vv[2]);
+
+      // extrema for entire cell
+      if (k == 0 && l == 0 || vv[0] < cell_min[0])
+	cell_min[0] = vv[0];
+      if (k == 0 && l == 0 || vv[0] > cell_max[0])
+	cell_max[0] = vv[0];
+
+      if (k == 0 && l == 0 || vv[1] < cell_min[1])
+	cell_min[1] = vv[1];
+      if (k == 0 && l == 0 || vv[1] > cell_max[1])
+	cell_max[1] = vv[1];
+
+      if (k == 0 && l == 0 || vv[2] < cell_min[2])
+	cell_min[2] = vv[2];
+      if (k == 0 && l == 0 || vv[2] > cell_max[2])
+	cell_max[2] = vv[2];
+
+    } // vertices
+
+    // normal
+    Normal(&(face_verts[k][0]), n);
+    // check sign of dot product of normal with vector from site 
+    // to first face vertex to see if normal has correct direction
+    // want outward normal
+    float v[3];
+    v[0] = face_verts[k][0] - dblock->particles[3 * cell];
+    v[1] = face_verts[k][1] - dblock->particles[3 * cell + 1];
+    v[2] = face_verts[k][2] - dblock->particles[3 * cell + 2];
+    if (v[0] * n[0] + v[1] * n[1] + v[2] * n[2] < 0.0) {
+      n[0] *= -1.0;
+      n[1] *= -1.0;
+      n[2] *= -1.0;
+    }
+    normals.push_back(n[0]);
+    normals.push_back(n[1]);
+    normals.push_back(n[2]);
+
+  } // faces
 
 } 
 //--------------------------------------------------------------------------
@@ -977,6 +1100,7 @@ void phys2idx(float *pos, int *grid_idx) {
 
 }
 //-----------------------------------------------------------------------
+// DEPRECATED, used in old data model
 //
 // compute normal of a face using Newell's method
 //
@@ -987,7 +1111,7 @@ void phys2idx(float *pos, int *grid_idx) {
 // face: face id
 // normal: (output) normal, allocated by caller
 //
-void ComputeNormal(vblock_t *vblock, int face, float *normal) {
+void NewellNormal(vblock_t *vblock, int face, float *normal) {
 
   int v; // index of vertex
   float cur[3], next[3]; // current and next vertex
@@ -1026,6 +1150,38 @@ void ComputeNormal(vblock_t *vblock, int face, float *normal) {
 
 }
 //--------------------------------------------------------------------------
+//
+// compute normal of a face using cross product
+//
+// verts: 3 vertices in order around a face
+// normal: (output) the normal of (verts[0] - verts[1] ) x (verts[2] - verts[1])
+//
+void Normal(float *verts, float *normal) {
+
+  float v0[3], v1[3];
+
+  v0[0] = verts[0] - verts[3];
+  v0[1] = verts[1] - verts[4];
+  v0[2] = verts[2] - verts[5];
+
+  v1[0] = verts[6] - verts[3];
+  v1[1] = verts[7] - verts[4];
+  v1[2] = verts[8] - verts[5];
+
+  normal[0] = v0[1] * v1[2] - v0[2] * v1[1];
+  normal[1] = v0[2] * v1[0] - v0[0] * v1[2];
+  normal[2] = v0[0] * v1[1] - v0[1] * v1[0];
+
+  float mag = sqrt(normal[0] * normal[0] + normal[1] * normal[1] +
+		   normal[2] * normal[2]);
+  // normalize
+  normal[0] /= mag;
+  normal[1] /= mag;
+  normal[2] /= mag;
+
+}
+//--------------------------------------------------------------------------
+// OLD VERSION VORONOI DATA MODEL
 //
 // whether a point lies inside a cell
 //
@@ -1087,6 +1243,49 @@ bool PtInCell(float *pt, vblock_t *vblock, int c_cell, float *normals) {
 
 }
 //--------------------------------------------------------------------------
+// NEW VERSION TET DATA MODEL
+//
+// whether a point lies inside a cell
+//
+// pt: point
+// normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
+// face_verts: vertex positions for each face
+//
+// returns whether point is in cell (true) or not (false)
+//
+ bool PtInCell(float *pt, vector<float> &normals,
+	       vector <vector <float> > &face_verts) {
+
+   int sign; // sign of distance (1 or -1)
+   int old_sign = 0; // previous sign, 0 = uninitialized
+   float dist = 0.0; // signed distance from point to plane
+
+   for (int k = 0; k < (int)face_verts.size(); k++) { // faces
+
+     // compute distance from point to face
+     dist = 0.0;
+
+     float *n = &(normals[3 * k]); // current normal
+     dist = n[0] * (pt[0] - face_verts[k][0]) + 
+       n[1] * (pt[1] - face_verts[k][1]) + 
+       n[2] * (pt[2] - face_verts[k][2]);
+
+     // check sign of distance only if non-zero
+     if (fabs(dist) > eps) {
+       sign = (dist >= 0.0 ? 1 : -1);
+       if (old_sign == 0)
+	 old_sign = sign;
+       if (old_sign != sign)
+	 return false;
+     }
+
+   } // faces
+
+   return true;
+
+ }
+//--------------------------------------------------------------------------
+// OLD VORONOI DATA MODEL
 //
 // grid points covered by one cell
 //
@@ -1148,13 +1347,105 @@ int CellGridPts(vblock_t *vblock, int cell, float *cell_mins,
     border = (int *)realloc(border, npts * sizeof(grid_pt_t));
     alloc_grid_pts = npts;
   }
+  memset(grid_pts, 0 , npts * sizeof(grid_pt_t));
 
   num_grid_pts = CellInteriorGridPts(vblock, cell, cell_grid_pts, 
 				     cell_min_grid_idx, cell_min_grid_pos, 
 				     grid_pts, border, normals);
 
-  // debug
-//   fprintf(stderr, "2: cell = %d num_grid_pts = %d\n", cell, num_grid_pts);
+  // if no grid points covered by cell, pick a single grid point near to the
+  // cell centroid
+  if (!num_grid_pts) {
+
+    center[0] = (cell_mins[0] + cell_maxs[0]) / 2.0f;
+    center[1] = (cell_mins[1] + cell_maxs[1]) / 2.0f;
+    center[2] = (cell_mins[2] + cell_maxs[2]) / 2.0f;
+    phys2idx(center, grid_pts[num_grid_pts].idx);
+
+    // deposit mass onto one grid point, density will be computed from this later
+    grid_pts[num_grid_pts].mass = mass;
+    num_grid_pts = 1;
+
+  }
+
+  return num_grid_pts;
+
+}
+//--------------------------------------------------------------------------
+// NEW TET DATA MODEL
+//
+// grid points covered by one cell
+//
+//  if the cell covers at least one grid point, then actual number of grid 
+//    points will be returned and the cell mass will be distributed evenly  
+//    over that nubmer of points
+//  if the cell does not cover any grid points, then the nearest grid point
+//     will be returned and the mass of the cell will be deposited there
+//
+// todo: see if it is more accurate to deposit over a minimum of 8 grid points
+//
+// cell_mins: minimum cell vertex (x,y,z)
+// cell_maxs: maximum cell vertex (x,y,z)
+// grid_pts: (output) grid points covered by this cell, allocated by this
+//   function, caller's responsibility to free
+// border: cell border, min and max x index for each y and z index
+// alloc_grid_pts: number of grid points currently allocated, this function
+//   will realloc to the new size if needed, otherwise will leave old size
+// normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
+// face_verts: vertex positions for each face
+//
+// returns: number of grid points covered by this cell
+// 0 indicates cell is outside of global data bounds (skip it)
+//
+int CellGridPts(float *cell_mins, 
+		float *cell_maxs,  grid_pt_t* &grid_pts, int* &border, 
+		int &alloc_grid_pts, vector<float> &normals,
+		vector <vector <float> > &face_verts) {
+
+  float center[3]; // cell center
+  int num_grid_pts; // number of grid points covered by this cell
+
+  // filter out cells that are outside of global data bounds
+  if (cell_mins[0] < data_mins[0] || cell_maxs[0] > data_maxs[0] ||
+      cell_mins[1] < data_mins[1] || cell_maxs[1] > data_maxs[1] ||
+      cell_mins[2] < data_mins[2] || cell_maxs[2] > data_maxs[2])
+    return 0;
+
+  // global grid index of cell minimum grid point
+  int cell_min_grid_idx[3];
+  phys2idx(cell_mins, cell_min_grid_idx);
+
+  // global grid index of cell maximum grid point
+  int cell_max_grid_idx[3];
+  phys2idx(cell_maxs, cell_max_grid_idx);
+
+  // cell minimum grid point physical position
+  float cell_min_grid_pos[3];
+  idx2phys(cell_min_grid_idx, cell_min_grid_pos);
+
+  // number of grid points covered by cell bounding box
+  int cell_grid_pts[3];
+  cell_grid_pts[0] = cell_max_grid_idx[0] - cell_min_grid_idx[0] + 1;
+  cell_grid_pts[1] = cell_max_grid_idx[1] - cell_min_grid_idx[1] + 1;
+  cell_grid_pts[2] = cell_max_grid_idx[2] - cell_min_grid_idx[2] + 1;
+
+  // grid_pts and border memory allocation
+  int npts = cell_grid_pts[0] * cell_grid_pts[1] * cell_grid_pts[2];
+
+  if (!alloc_grid_pts) {
+    grid_pts = (grid_pt_t *)malloc(npts * sizeof(grid_pt_t));
+    border = (int *)malloc(npts * 2 * sizeof(int)); // more than large enough
+    alloc_grid_pts = npts;
+  }  else if (npts > alloc_grid_pts) {
+    grid_pts = (grid_pt_t *)realloc(grid_pts, npts * sizeof(grid_pt_t));
+    border = (int *)realloc(border, npts * sizeof(grid_pt_t));
+    alloc_grid_pts = npts;
+  }
+  memset(grid_pts, 0 , npts * sizeof(grid_pt_t));
+
+  num_grid_pts = CellInteriorGridPts(cell_grid_pts, 
+				     cell_min_grid_idx, cell_min_grid_pos, 
+				     grid_pts, border, normals, face_verts);
 
   // if no grid points covered by cell, pick a single grid point near to the
   // cell centroid
@@ -1248,13 +1539,12 @@ void DataBounds(int nblocks, MPI_Comm comm) {
 // max_dense: local maximum density
 // tot_mass: local total mass
 // check_mass: local ground truth total mass
-// tot_cells: local total number of cells
 // max_cell_grid_pts: maximum number of grid points covered by a cell
 // times: timing info
 // comm: MPI cmmunicator
 //
 void SummaryStats(float max_dense, float tot_mass,
-		  float check_mass, int tot_cells, int max_cell_grid_pts,
+		  float check_mass, int max_cell_grid_pts,
 		  double *times, MPI_Comm comm) {
 
   int rank;
@@ -1263,14 +1553,12 @@ void SummaryStats(float max_dense, float tot_mass,
   float glo_max_dense = 0; // global max density
   float glo_tot_mass = 0; // global total mass
   float glo_check_mass = 0; // global reference total mass
-  int glo_tot_cells = 0; // global number of cells
   int glo_max_cell_grid_pts = 0; // global maximum number of grid points
                              // covered by a cell
 
   MPI_Reduce(&max_dense, &glo_max_dense, 1, MPI_FLOAT, MPI_MAX, 0, comm);
   MPI_Reduce(&tot_mass, &glo_tot_mass, 1, MPI_FLOAT, MPI_SUM, 0, comm);
   MPI_Reduce(&check_mass, &glo_check_mass, 1, MPI_FLOAT, MPI_SUM, 0, comm);
-  MPI_Reduce(&tot_cells, &glo_tot_cells, 1, MPI_INT, MPI_SUM, 0, comm);
   MPI_Reduce(&max_cell_grid_pts, &glo_max_cell_grid_pts, 1, MPI_INT, 
 	     MPI_MAX, 0, comm);
 
@@ -1288,7 +1576,6 @@ void SummaryStats(float max_dense, float tot_mass,
 
   if (rank == 0) {
     fprintf(stderr, "--------------Summary--------------\n");
-    fprintf(stderr, "Total number of voronoi cells = %d\n", glo_tot_cells);
     fprintf(stderr, "Global 3D grid size = %d x %d x %d\n",
 	    glo_num_idx[0], glo_num_idx[1], glo_num_idx[2]);
     fprintf(stderr, "Physical grid extends from min [%.4e %.4e %.4e]\n"
@@ -1314,6 +1601,7 @@ void SummaryStats(float max_dense, float tot_mass,
 //--------------------------------------------------------------------------
 #if 0
 // DEPRECATED naive O(n^3) version
+// OLD VORONOI DATA MODEL VERSION
 //
 // finds interior grid points in cell and sets density at them
 //
@@ -1376,11 +1664,83 @@ int CellInteriorGridPts(vblock_t *vblock, int cell, int *cell_grid_pts,
   return num_grid_pts;
 
 }
+//--------------------------------------------------------------------------
+// DEPRECATED naive O(n^3) version
+// NEW TET DATA MODEL VERSION
+//
+// finds interior grid points in cell and sets density at them
+//
+// cell_grid_pts: number of grid points covered by cell bounding box
+// cell_min_grid_idx: cell minimum grid point global index
+// cell_min_grid_pos: cell minimum grid point physical position
+// grid_pts: (output) grid points covered by this cell, allocated by caller
+// border: cell border, min and max x index for each y and z index
+// normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
+// face_verts: vertex positions for each face
+//
+// returns: number of interior grid points
+//
+int CellInteriorGridPts(int *cell_grid_pts, 
+			int *cell_min_grid_idx, float *cell_min_grid_pos, 
+			grid_pt_t *grid_pts, int *border,
+			vector<float> &normals, 
+			vector <vector <float> > &face_verts) {
+
+  int num_grid_pts = 0; // current number of grid points interior to cell
+  int tot_num_grid_pts = 0; // total number of grid points interior to cell
+  float grid_pos[3]; // physical position of current grid point
+
+  // find the interior of the cell
+  for (int zi = 0; zi < cell_grid_pts[2]; zi++) { // z
+    for (int yi = 0; yi < cell_grid_pts[1]; yi++) { // y
+      for (int xi = 0; xi < cell_grid_pts[0]; xi++) { // x
+	grid_pos[0] = cell_min_grid_pos[0] + xi * grid_step_size[0];
+	grid_pos[1] = cell_min_grid_pos[1] + yi * grid_step_size[1];
+	grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
+	tot_interior_evals++;
+	if (PtInCell(grid_pos, normals, face_verts)) {
+	  grid_pts[num_grid_pts].idx[0] = cell_min_grid_idx[0] + xi;
+	  grid_pts[num_grid_pts].idx[1] = cell_min_grid_idx[1] + yi;
+	  grid_pts[num_grid_pts].idx[2] = cell_min_grid_idx[2] + zi;
+	  grid_pts[num_grid_pts].mass = mass;
+	  tot_num_grid_pts++;
+	}
+	else
+	  grid_pts[num_grid_pts].mass = 0.0f;
+	num_grid_pts++;
+
+      }
+    }
+  }
+
+  // divide the mass at each grid point by the total number of grid points
+  num_grid_pts = 0;
+  for (int zi = 0; zi < cell_grid_pts[2]; zi++) { // z
+    for (int yi = 0; yi < cell_grid_pts[1]; yi++) { // y
+      for (int xi = 0; xi < cell_grid_pts[0]; xi++) { // x
+
+	if (grid_pts[num_grid_pts].mass)
+	  grid_pts[num_grid_pts].mass = mass / (float)tot_num_grid_pts;
+	num_grid_pts++;
+
+      }
+    }
+  }
+
+  return num_grid_pts;
+
+}
+//--------------------------------------------------------------------------
+
 #endif
+
 //--------------------------------------------------------------------------
 #if 0
+
 // DEPRECATED version
 // improved over naive version by limiting x scan
+//
+// OLD VORONOI DATA MODEL VERSION
 //
 // finds interior grid points in cell and sets density at them
 //
@@ -1542,9 +1902,182 @@ int CellInteriorGridPts(vblock_t *vblock, int cell, int *cell_grid_pts,
   return num_grid_pts;
 
 }
-#endif
 //--------------------------------------------------------------------------
+// DEPRECATED version
+// improved over naive version by limiting x scan
+//
+// NEW TET DATA MODEL VERSION
+//
+// finds interior grid points in cell and sets density at them
+//
+// cell_grid_pts: number of grid points covered by cell bounding box
+// cell_min_grid_idx: cell minimum grid point global index
+// cell_min_grid_pos: cell minimum grid point physical position
+// grid_pts: (output) grid points covered by this cell, allocated by caller
+// border: cell border, min and max x index for each y and z index
+// normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
+// face_verts: vertex positions for each face
+//
+// returns: number of interior grid points
+//
+int CellInteriorGridPts(int *cell_grid_pts, 
+			int *cell_min_grid_idx, float *cell_min_grid_pos, 
+			grid_pt_t *grid_pts, int *border,
+			vector<float> &normals, 
+			vector <vector <float> > &face_verts) {
+
+  int num_grid_pts = 0; // current number of grid points interior to cell
+  int tot_num_grid_pts = 0; // total number of grid points interior to cell
+  float grid_pos[3]; // physical position of current grid point
+  int old_x_left = cell_grid_pts[0] / 2; // old x index stepping left
+  int old_x_right = cell_grid_pts[0] / 2; // old x index stepping right
+  bool x_in_left, x_in_right; // pt inside cell while stepping leftk right
+  int min_xi, max_xi; // min, max x index of border crossing
+
+  // find the interior of the cell
+
+  for (int zi = 0; zi < cell_grid_pts[2]; zi++) { // z
+    for (int yi = 0; yi < cell_grid_pts[1]; yi++) { // y
+
+      // init the stepping
+      grid_pos[0] = cell_min_grid_pos[0] + old_x_left * grid_step_size[0];
+      grid_pos[1] = cell_min_grid_pos[1] + yi * grid_step_size[1];
+      grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
+      tot_interior_evals++;
+      if (PtInCell(grid_pos, normals, face_verts)) {
+	x_in_left = true;
+	x_in_right = true;
+      }
+      else {
+	x_in_left = false;
+	x_in_right = false;
+      }
+      min_xi = cell_grid_pts[0] - 1;
+      max_xi = 0;
+
+      // x step left
+      for (int xi = old_x_left; xi >= 0 && xi < cell_grid_pts[0];) {
+
+	grid_pos[0] = cell_min_grid_pos[0] + xi * grid_step_size[0];
+	grid_pos[1] = cell_min_grid_pos[1] + yi * grid_step_size[1];
+	grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
+
+	tot_interior_evals++;
+	if (PtInCell(grid_pos, normals, face_verts)) {
+	  if (x_in_left) { // remains interior, keep stepping
+	    if (xi < min_xi)
+	      min_xi = xi;
+	    if (xi > max_xi)
+	      max_xi = xi;
+	    xi--;
+	  }
+	  else { // edge crossing from interior to exterior
+	    if (xi < min_xi)
+	      min_xi = xi;
+	    if (xi > max_xi)
+	      max_xi = xi;
+	    old_x_left = xi;
+	    break;
+	  }
+	} // pt is inside the cell
+
+	// pt is outside the cell
+	else {
+	  if (!x_in_left) // remains exterior, keep stepping
+	    xi++;
+	  else { // edge crossing from exterior to interior
+	    old_x_left = xi;
+	    break;
+	  }
+	} // pt is outside the cell
+
+      } // x step left
+
+      // x step right
+      for (int xi = old_x_right; xi >= 0 && xi < cell_grid_pts[0];) {
+
+	grid_pos[0] = cell_min_grid_pos[0] + xi * grid_step_size[0];
+	grid_pos[1] = cell_min_grid_pos[1] + yi * grid_step_size[1];
+	grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
+
+	tot_interior_evals++;
+	if (PtInCell(grid_pos, normals, face_verts)) {
+	  if (x_in_right) {// remains interior, keep stepping
+	    if (xi < min_xi) 
+	      min_xi = xi;
+	    if (xi > max_xi)
+	      max_xi = xi;
+	    xi++;
+	  } 
+	  else { // edge crossing from interior to exterior
+	    if (xi < min_xi)
+	      min_xi = xi;
+	    if (xi > max_xi)
+	      max_xi = xi;
+	    old_x_right = xi;
+	    break;
+	  }
+	} // pt is inside the cell
+
+	// pt is outside the cell
+	else {
+	  if (!x_in_right) // remains exterior, keep stepping
+	    xi--;
+	  else { // edge crossing from exterior to interior
+	    old_x_right = xi;
+	    break;
+	  }
+	} // pt is outside the cell
+
+      } // x step right
+
+      border[2 * (zi * cell_grid_pts[1] + yi)]     = min_xi;
+      border[2 * (zi * cell_grid_pts[1] + yi) + 1] = max_xi;
+      // if min_xi > max_xi, then no points were found
+      if (min_xi <= max_xi)
+	tot_num_grid_pts += (max_xi - min_xi + 1);
+
+    } // y
+
+  } // z
+
+  // deposit the density in the interior of the cell
+  for (int zi = 0; zi < cell_grid_pts[2]; zi++) { // z
+    for (int yi = 0; yi < cell_grid_pts[1]; yi++) { // y
+
+      min_xi = border[2 * (zi * cell_grid_pts[1] + yi)];
+      max_xi = border[2 * (zi * cell_grid_pts[1] + yi) + 1];
+
+      for (int xi = min_xi; xi <= max_xi; xi++) { // x
+
+	grid_pts[num_grid_pts].idx[0] = cell_min_grid_idx[0] + xi;
+	grid_pts[num_grid_pts].idx[1] = cell_min_grid_idx[1] + yi;
+	grid_pts[num_grid_pts].idx[2] = cell_min_grid_idx[2] + zi;
+	// deposit mass onto grid points, density to be computed later
+	grid_pts[num_grid_pts].mass = mass / (float)tot_num_grid_pts;
+	num_grid_pts++;
+
+      }
+    }
+  }
+  // debug
+//   fprintf(stderr, "cell = %d tot_num_grid_pts = %d num_grid_pts = %d\n",
+// 	  cell, tot_num_grid_pts, num_grid_pts);
+
+  // cleanup
+  assert(tot_num_grid_pts == num_grid_pts); // sanity
+  return num_grid_pts;
+
+}
+//--------------------------------------------------------------------------
+
+#endif
+
+//--------------------------------------------------------------------------
+
 #if 1
+
+// OLD VORONOI DATA MODEL VERSION
 //
 // finds interior grid points in cell and sets density at them
 // current version further improved by limiting y scan
@@ -1777,7 +2310,245 @@ int CellInteriorGridPts(vblock_t *vblock, int cell, int *cell_grid_pts,
   return num_grid_pts;
 
 }
+//--------------------------------------------------------------------------
+// NEW TET DATA MODEL VERSION
+//
+// finds interior grid points in cell and sets density at them
+// current version further improved by limiting y scan
+//
+// cell_grid_pts: number of grid points covered by cell bounding box
+// cell_min_grid_idx: cell minimum grid point global index
+// cell_min_grid_pos: cell minimum grid point physical position
+// grid_pts: (output) grid points covered by this cell, allocated by caller
+// border: cell border, min and max x index for each y and z index
+// normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...)
+// face_verts: vertex positions for each face
+//
+// returns: number of interior grid points
+//
+int CellInteriorGridPts(int *cell_grid_pts, 
+			int *cell_min_grid_idx, float *cell_min_grid_pos, 
+			grid_pt_t *grid_pts, int *border,
+			vector<float> &normals, 
+			vector <vector <float> > &face_verts) {
+
+  int num_grid_pts = 0; // current number of grid points interior to cell
+  int tot_num_grid_pts = 0; // total number of grid points interior to cell
+  float grid_pos[3]; // physical position of current grid point
+  int x_left = cell_grid_pts[0] / 2; // x index stepping left
+  int x_right = cell_grid_pts[0] / 2; // x index stepping right
+  int y_start = 0; // y index start
+  bool x_in_left, x_in_right; // pt inside cell while stepping left, right
+  int min_xi, max_xi; // min, max x index of border crossing
+  bool border_found = false; // found border intersection at current z
+  bool z_step_done = false; // this z step is done
+  int xi, yi, zi; // indices for x, y, z
+  int yj; // second, temporary index in y
+  int first_x; // x index of border crossing at first y line in each z
+
+  int y_steps = 0; // see how many y_steps we ended up making
+
+  // find the border points of the cell
+
+  // z step
+  for (zi = 0; zi < cell_grid_pts[2]; zi++) {
+
+    grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
+    border_found = false; // init
+    z_step_done = false;
+
+    // initialize (with min > max) unused y-scan lines
+    for (yj = 0; yj < y_start; yj++) { // prior to start
+      border[2 * (zi * cell_grid_pts[1] + yj)]     = 1; // min
+      border[2 * (zi * cell_grid_pts[1] + yj) + 1] = 0; // max
+    }
+
+    // y step
+    // even though the upper loop bound is the full number of grid points,
+    // early termination will occur deep in the body of the loop when the
+    // number of x-intersections becomes 0
+    for (yi = y_start; yi < cell_grid_pts[1]; yi++) {
+
+      // debug
+      y_steps++;
+
+      grid_pos[1] = cell_min_grid_pos[1] + yi * grid_step_size[1];
+
+      // init the x stepping
+      grid_pos[0] = cell_min_grid_pos[0] + x_left * grid_step_size[0];
+      grid_pos[1] = cell_min_grid_pos[1] + yi * grid_step_size[1];
+      grid_pos[2] = cell_min_grid_pos[2] + zi * grid_step_size[2];
+      tot_interior_evals++;
+      if (PtInCell(grid_pos, normals, face_verts)) {
+	x_in_left = true;
+	x_in_right = true;
+      }
+      else {
+	x_in_left = false;
+	x_in_right = false;
+      }
+      min_xi = cell_grid_pts[0] - 1;
+      max_xi = 0;
+
+      // x step left
+      for (xi = x_left; xi >= 0 && xi < cell_grid_pts[0];) {
+
+	grid_pos[0] = cell_min_grid_pos[0] + xi * grid_step_size[0];
+
+	tot_interior_evals++;
+	if (PtInCell(grid_pos, normals, face_verts)) {
+	  if (x_in_left) { // remains interior, keep stepping
+	    if (xi < min_xi)
+	      min_xi = xi;
+	    if (xi > max_xi)
+	      max_xi = xi;
+	    xi--;
+	  }
+	  else { // edge crossing from interior to exterior
+	    if (xi < min_xi)
+	      min_xi = xi;
+	    if (xi > max_xi)
+	      max_xi = xi;
+	    x_left = xi;
+	    break;
+	  }
+	} // pt is inside the cell
+
+	// pt is outside the cell
+	else {
+	  if (!x_in_left) // remains exterior, keep stepping
+	    xi++;
+	  else { // edge crossing from exterior to interior
+	    x_left = xi;
+	    break;
+	  }
+	} // pt is outside the cell
+
+      } // x step left
+
+      // x step right
+      for (xi = x_right; xi >= 0 && xi < cell_grid_pts[0];) {
+
+	grid_pos[0] = cell_min_grid_pos[0] + xi * grid_step_size[0];
+
+	tot_interior_evals++;
+	if (PtInCell(grid_pos, normals, face_verts)) {
+	  if (x_in_right) {// remains interior, keep stepping
+	    if (xi < min_xi) 
+	      min_xi = xi;
+	    if (xi > max_xi)
+	      max_xi = xi;
+	    xi++;
+	  } 
+	  else { // edge crossing from interior to exterior
+	    if (xi < min_xi)
+	      min_xi = xi;
+	    if (xi > max_xi)
+	      max_xi = xi;
+	    x_right = xi;
+	    break;
+	  }
+	} // pt is inside the cell
+
+	// pt is outside the cell
+	else {
+	  if (!x_in_right) // remains exterior, keep stepping
+	    xi--;
+	  else { // edge crossing from exterior to interior
+	    x_right = xi;
+	    break;
+	  }
+	} // pt is outside the cell
+
+      } // x step right
+
+      border[2 * (zi * cell_grid_pts[1] + yi)]     = min_xi;
+      border[2 * (zi * cell_grid_pts[1] + yi) + 1] = max_xi;
+
+      // min_xi > max_xi is the signal that no points were found
+
+      // intersection found in this y-scan line
+      if (min_xi <= max_xi) {
+	tot_num_grid_pts += (max_xi - min_xi + 1);
+	if (yi == y_start)
+	  first_x = (min_xi + max_xi) / 2;
+      }
+
+      // note the first y line with an intersection in this z step
+      int first_y; // y line with first border points
+      first_y = y_start; // initial values change nothing unless reset below
+      if (min_xi <= max_xi && !border_found) {
+	first_y = yi;
+	border_found = true;
+      }
+
+      if (min_xi > max_xi && border_found)
+	z_step_done = true;
+
+      // when this z step is done and if there are more z steps to do, 
+      // check if y_start needs to be loosened for next z step
+      if ((yi == cell_grid_pts[1] - 1 || z_step_done)
+	  && zi + 1 < cell_grid_pts[2]) {
+
+	grid_pos[2] = cell_min_grid_pos[2] + (zi + 1) * grid_step_size[2];
+	grid_pos[0] = cell_min_grid_pos[0] + first_x * grid_step_size[0];
+
+	for (yj = first_y; yj > 0; yj--) {
+	  grid_pos[1] = cell_min_grid_pos[1] + yj * grid_step_size[1];
+	  tot_interior_evals++;
+	  if (!PtInCell(grid_pos, normals, face_verts))
+	    break;
+	}
+	y_start = yj;
+
+      } // loosen y start
+
+      // terminate the yi loop (this z step) early if it is done
+      // also initialize the borders of unused y-scan lines skipped at the end
+      if (z_step_done) {
+	for (yj = yi + 1; yj < cell_grid_pts[1]; yj++) { // after end
+	  border[2 * (zi * cell_grid_pts[1] + yj)]     = 1; // min
+	  border[2 * (zi * cell_grid_pts[1] + yj) + 1] = 0; // max
+	}
+
+	break; // y step
+
+      }
+
+    } // y step
+
+  } // z step
+
+  // deposit the mass in the interior of the cell
+  num_grid_pts = 0;
+  for (zi = 0; zi < cell_grid_pts[2]; zi++) { // z
+    for (yi = 0; yi < cell_grid_pts[1]; yi++) { // y
+
+      min_xi = border[2 * (zi * cell_grid_pts[1] + yi)];
+      max_xi = border[2 * (zi * cell_grid_pts[1] + yi) + 1];
+
+      for (xi = min_xi; xi <= max_xi; xi++) { // x
+
+	grid_pts[num_grid_pts].idx[0] = cell_min_grid_idx[0] + xi;
+	grid_pts[num_grid_pts].idx[1] = cell_min_grid_idx[1] + yi;
+	grid_pts[num_grid_pts].idx[2] = cell_min_grid_idx[2] + zi;
+	// deposit mass onto grid points, density to be computed later
+	grid_pts[num_grid_pts].mass = mass / (float)tot_num_grid_pts;
+	num_grid_pts++;
+
+      }
+    }
+  }
+
+  // cleanup
+  assert(tot_num_grid_pts == num_grid_pts); // sanity
+  return num_grid_pts;
+
+}
+//--------------------------------------------------------------------------
+
 #endif
+
 //--------------------------------------------------------------------------
 //
 // computes grid step parameters
@@ -1856,17 +2627,21 @@ void IterateCellsCIC(int block, int *block_min_idx, int *block_num_idx,
 
   float grid_pos[3]; // physical position of grid point
 
-  // debug
-  fprintf(stderr, "gid %d has %d cell sites (particles)\n", DIY_Gid(0, block),
-	  vblocks[block]->num_orig_particles);
-
   // divisor for volume (3d density) or area (2d density)
   // assumes projection is to x-y plane
   float div = (project ? grid_step_size[0] * grid_step_size[1] :
 	       grid_step_size[0] * grid_step_size[1] * grid_step_size[2]);
 
   // cells
+#ifdef TET
+
+  for (int cell = 0; cell < dblocks[block]->num_orig_particles; cell++) {
+
+#else
+
   for (int cell = 0; cell < vblocks[block]->num_orig_particles; cell++) {
+
+#endif
 
     // debug
     check_mass++;
@@ -1874,7 +2649,17 @@ void IterateCellsCIC(int block, int *block_min_idx, int *block_num_idx,
     // distribute mass at cell site to neighboring grid points
     vector<int> grid_idxs; // grid idxs that get a fraction of the mass
     vector<float> grid_masses; // mass given to each grid_idx
+
+#ifdef TET
+
+    float *pt = &(dblocks[block]->particles[3 * cell]); // x,y,z of particle
+
+#else
+
     float *pt = &(vblocks[block]->sites[3 * cell]); // x,y,z of particle
+
+#endif
+
     DistributeScalarCIC(pt, mass, grid_idxs, grid_masses);
 
     assert((int)grid_idxs.size() / 3 == 8); // sanity
@@ -1885,6 +2670,23 @@ void IterateCellsCIC(int block, int *block_min_idx, int *block_num_idx,
       idx2phys(&(grid_idxs[3 * i]), grid_pos);
 
       // assign density to grid points in the block
+
+#ifdef TET
+
+      if (grid_pos[0] >= dblocks[block]->mins[0] &&
+	  (grid_pos[0] < dblocks[block]->maxs[0]  ||
+	   fabs(grid_pos[0] - data_maxs[0]) < eps) &&
+
+	  grid_pos[1] >= dblocks[block]->mins[1] &&
+	  (grid_pos[1] < dblocks[block]->maxs[1]  ||
+	   fabs(grid_pos[1] - data_maxs[1]) < eps) &&
+
+	  grid_pos[2] >= dblocks[block]->mins[2] &&
+	  (grid_pos[2] < dblocks[block]->maxs[2]  ||
+	   fabs(grid_pos[2] - data_maxs[2]) < eps) ) {
+
+#else
+
       if (grid_pos[0] >= vblocks[block]->mins[0] &&
 	  (grid_pos[0] < vblocks[block]->maxs[0]  ||
 	   fabs(grid_pos[0] - data_maxs[0]) < eps) &&
@@ -1896,6 +2698,8 @@ void IterateCellsCIC(int block, int *block_min_idx, int *block_num_idx,
 	  grid_pos[2] >= vblocks[block]->mins[2] &&
 	  (grid_pos[2] < vblocks[block]->maxs[2]  ||
 	   fabs(grid_pos[2] - data_maxs[2]) < eps) ) {
+
+#endif
 
 	// assign the density to the local block density array
 	int block_grid_idx[3]; // local block idx of grid point

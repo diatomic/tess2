@@ -14,7 +14,7 @@
 // --------------------------------------------------------------------------
 
 // MEMORY PROFILING 
-#define MEMORY 
+// #define MEMORY 
 
 // using new tet data model (eventually default)
 #define TET
@@ -2644,13 +2644,6 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
   int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
   DIY_Get_neighbors(0, lid, all_neigh_gbs);
 
-  // debug
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Barrier(MPI_COMM_WORLD);
-  if (rank == 0)
-    fprintf(stderr, "1: complete = neighbor_tets\n");
-
   // for all convex hull particles
   for (int j = 0; j < (int)convex_hull_particles.size(); ++j) {
 
@@ -2666,9 +2659,6 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
     bool complete = neighbor_tets(nbrs, p, dblock->tets, 
                                   dblock->num_tets,
     				  dblock->vert_to_tet[p]);
-
-    // debug
-    // bool complete = false;
 
     if (!complete) {
 
@@ -2736,11 +2726,6 @@ void incomplete_dcells_final(struct dblock_t *dblock, int lid,
     }
 
   } // for convex hull particles
-
-  // debug
-  MPI_Barrier(MPI_COMM_WORLD);
-  if (rank == 0)
-    fprintf(stderr, "2:\n");
 
 }
 // --------------------------------------------------------------------------

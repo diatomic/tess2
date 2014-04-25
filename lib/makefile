@@ -88,7 +88,7 @@ dump: $(DUMP_OBJS)
 	$(CXX) -o dump $(DUMP_OBJS)
 
 dense: $(DENSE_OBJS) 
-	mpicxx -o dense $(DENSE_OBJS) $(DIY_LIB) $(PNETCDF_LIB)
+	mpicxx -o dense $(DENSE_OBJS) $(LIBS)
 
 clean:
 	rm -f *.o 

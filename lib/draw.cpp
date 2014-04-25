@@ -76,8 +76,8 @@ vec2d aspect; // scaling due to window aspect ratio
 // near clip plane
 float near = 0.1;
 
-// data overall extent scaling factor fro clipping cells
-float ds = 1.2;
+// data overall extent scaling factor for clipping cells
+float ds = 1.0;
 
 // window size
 // vec2d win_size = {1024, 512};
