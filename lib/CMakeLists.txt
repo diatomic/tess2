@@ -16,4 +16,4 @@ add_executable		(dump dump.cpp ser_io.cpp swap.cpp)
 target_link_libraries	(dump ${libraries})
 
 add_executable		(dense dense.cpp io.c)
-target_link_libraries	(dense ${libraries})
+target_link_libraries	(dense tess ${libraries})
