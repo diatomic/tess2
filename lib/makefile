@@ -52,10 +52,9 @@ endif
 
 ###########
 
-TESS_OBJS = tess.o io.o swap.o tet.o utils.o $(TESS_CONV_OBJ)
+TESS_OBJS = tess.o io.o swap.o tet.o utils.o dense.o $(TESS_CONV_OBJ)
 DRAW_OBJS = draw.o ser_io.o swap.o io.o
 DUMP_OBJS = dump.o ser_io.o swap.o
-DENSE_OBJS = dense.o io.o
 
 .SUFFIXES: .c .cpp
 
@@ -68,12 +67,12 @@ DENSE_OBJS = dense.o io.o
 default: all
 
 ifeq ($(ARCH), BGP)
-all: libtess.a dump dense
+all: libtess.a dump
 else
 ifeq ($(ARCH), BGQ)
-all: libtess.a dump dense
+all: libtess.a dump
 else
-all: libtess.a draw dump dense
+all: libtess.a draw dump
 endif
 endif
 
@@ -86,9 +85,6 @@ draw: $(DRAW_OBJS)
 
 dump: $(DUMP_OBJS) 
 	$(CXX) -o dump $(DUMP_OBJS)
-
-dense: $(DENSE_OBJS) 
-	mpicxx -o dense $(DENSE_OBJS) $(LIBS)
 
 clean:
 	rm -f *.o 
