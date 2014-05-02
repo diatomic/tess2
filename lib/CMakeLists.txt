@@ -1,9 +1,9 @@
 if			(use_cgal)
     add_library		(tess tess.cpp tess-cgal.cpp io.c swap.cpp
-    tet.cpp utils.c)
+    tet.cpp utils.c dense.cpp)
 else			(use_cgal)
     add_library		(tess tess.cpp tess-qhull.c io.c swap.cpp
-    tet.cpp utils.c)
+    tet.cpp utils.c dense.cpp)
 endif			(use_cgal)
 
 if			(draw)
@@ -15,5 +15,3 @@ endif			(draw)
 add_executable		(dump dump.cpp ser_io.cpp swap.cpp)
 target_link_libraries	(dump ${libraries})
 
-add_executable		(dense dense.cpp io.c)
-target_link_libraries	(dense tess ${libraries})
