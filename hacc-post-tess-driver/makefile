@@ -71,10 +71,10 @@ OBJS = main.o
 
 default: all
 
-all: hacc-voronoi
+all: hacc-delaunay
 
-hacc-voronoi: $(OBJS)
-	$(CXX) -o hacc-voronoi $(OBJS) $(LIBS)
+hacc-delaunay: $(OBJS)
+	$(CXX) -o hacc-delaunay $(OBJS) $(LIBS)
 
 clean:
 	rm -f *.o 

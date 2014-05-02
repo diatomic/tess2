@@ -61,10 +61,10 @@ OBJS = main.o
 
 default: all
 
-all: post-voronoi
+all: post-delaunay
 
-post-voronoi: $(OBJS) ../lib/libtess.a
-	$(CXX) -o post-voronoi $(OBJS) $(LIBS)
+post-delaunay: $(OBJS) ../lib/libtess.a
+	$(CXX) -o post-delaunay $(OBJS) $(LIBS)
 
 clean:
 	rm -f *.o 

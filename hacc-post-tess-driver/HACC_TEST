@@ -40,7 +40,7 @@ if [ $num_nodes -lt 1 ]; then
 fi
 
 # executable
-exe=./hacc-voronoi
+exe=./hacc-delaunay
 
 # inout file
 #infile="m000.mpicosmo.499"

@@ -42,7 +42,7 @@ if [ $num_nodes -lt 1 ]; then
 fi
 
 # executable
-exe=./post-voronoi
+exe=./post-delaunay
 
 # total number of blocks in the domain
 tb=$[$num_procs * 1]
