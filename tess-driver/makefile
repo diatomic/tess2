@@ -60,10 +60,10 @@ OBJS = main.o
 
 default: all
 
-all: voronoi
+all: delaunay
 
-voronoi: $(OBJS) ../lib/libtess.a
-	$(CXX) -o voronoi $(OBJS) $(LIBS)
+delaunay: $(OBJS) ../lib/libtess.a
+	$(CXX) -o delaunay $(OBJS) $(LIBS)
 
 clean:
 	rm -f *.o 

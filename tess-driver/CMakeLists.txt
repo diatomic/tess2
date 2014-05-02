@@ -1,3 +1,3 @@
-add_executable          (voronoi main.cpp)
-target_link_libraries   (voronoi tess ${libraries})
+add_executable          (delaunay main.cpp)
+target_link_libraries   (delaunay tess ${libraries})
 

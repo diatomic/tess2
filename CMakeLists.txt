@@ -120,7 +120,7 @@ if                          (debug)
 endif                       (debug)
 
 add_subdirectory	    (lib)
-add_subdirectory	    (driver)
+add_subdirectory	    (tess-driver)
 add_subdirectory	    (dense-driver)
 add_subdirectory	    (postprocessor)
 add_subdirectory	    (pread-voronoi)
