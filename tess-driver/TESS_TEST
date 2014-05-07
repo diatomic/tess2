@@ -40,7 +40,7 @@ if [ $num_nodes -lt 1 ]; then
 fi
 
 # executable
-exe=./delaunay
+exe=${HOME}/tess/tess-driver/delaunay
 
 # total number of blocks in the domain
 tb=$[$num_procs * 1]
@@ -90,7 +90,7 @@ args="$tb $dsize $jitter $minv $maxv $wrap $walls $outfile"
 
 if [ "$ARCH" = "MAC_OSX" ]; then
 
-mpiexec -n $num_procs $exe $args
+mpiexec -l -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 
