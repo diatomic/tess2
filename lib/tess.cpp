@@ -284,7 +284,6 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 
   int *num_orig_particles; // number of original particles, before any
 			   // neighbor exchange 
-  int dim = 3; // 3D 
   int rank; // MPI rank 
   int i;
   void* ds; // persistent delaunay data structures
@@ -314,7 +313,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   //   using data_mins and data_maxs
   //   Currently assuimg walls on all sides, but format can easily be 
   //   modified to be ANY set of walls 
-  struct wall_t *walls;
+  struct wall_t *walls = NULL;
   int num_walls = 0;
   if (!wrap_neighbors && walls_on)
     create_walls(&num_walls,&walls);
@@ -327,7 +326,8 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   // create local voronoi cells
   std::vector<tet_t*>	tets(nblocks);
   std::vector<int>	ntets(nblocks);
-  local_cells(nblocks, tblocks, dim, num_particles, particles, ds, &tets[0], &ntets[0]);
+  local_cells(nblocks, tblocks, num_particles, particles, ds, &tets[0], 
+	      &ntets[0]);
   
   // profile
   get_mem(2, dwell);
@@ -386,7 +386,8 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
     free(tets[i]);
 
   // Recompute local cells
-  local_cells(nblocks, tblocks, dim, num_particles, particles, ds, &tets[0], &ntets[0]);
+  local_cells(nblocks, tblocks, num_particles, particles, ds, &tets[0], 
+	      &ntets[0]);
 
   // profile
   get_mem(6, dwell);
@@ -454,7 +455,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
     free(tets[i]);
 
   // create all final voronoi cells 
-  all_cells(nblocks, vblocks, dim, num_particles, num_orig_particles,
+  all_cells(nblocks, vblocks, num_particles, num_orig_particles,
 	    particles, gids, nids, dirs, ds, &tets[0], &ntets[0]);
 
   // profile
@@ -529,7 +530,6 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 void delaunay(int nblocks, float **particles, int *num_particles, 
 	      double *times, char *out_file) {
 
-  int dim = 3; // 3D 
   int rank; // MPI rank 
   void* ds; // persistent delaunay data structures
 
@@ -552,7 +552,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   timing(times, LOC1_TIME, -1);
 
   // create local delaunay cells
-  local_dcells(nblocks, dblocks, dim, ds);
+  local_dcells(nblocks, dblocks, ds);
 
   // profile
   get_mem(2, dwell);
@@ -595,10 +595,10 @@ void delaunay(int nblocks, float **particles, int *num_particles,
     fprintf(stderr, "phase 1: max_particles = %d\n", max_particles);
 #endif
 
-  // Second, decisive phase 
+  // second, decisive phase 
 
-  // Recompute local cells
-  local_dcells(nblocks, dblocks, dim, ds);
+  // recompute local cells
+  local_dcells(nblocks, dblocks, ds);
 
   // profile
   get_mem(5, dwell);
@@ -633,7 +633,7 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   delete[] convex_hull_particles;
 
   // create all final cells 
-  local_dcells(nblocks, dblocks, dim, ds);
+  local_dcells(nblocks, dblocks, ds);
 
   // profile
   get_mem(8, dwell);
@@ -2821,7 +2821,7 @@ void complete_cells(struct vblock_t *vblock, int lid) {
   int vid, vid1; // vertex id 
   int j, k, n, m;
   double d2_min = 0.0; // dia^2 of circumscribing sphere of volume min_vol 
-  int start_n; // index into cells at start of new cell 
+  int start_n = 0; // index into cells at start of new cell 
   int too_small; // whether cell volume is definitely below threshold 
 
   // allocate memory based on number of cells and average number of
@@ -3220,26 +3220,26 @@ int compare(const void *a, const void *b) {
 
   } // vertices 
 
+  // DEPRECATED
   // check that site of cell is in the interior of the bounds (sanity) 
-  if (vblock->sites[3 * cell] < cell_min[0] ||
-      vblock->sites[3 * cell] > cell_max[0] ||
-      vblock->sites[3 * cell + 1] < cell_min[1] ||
-      vblock->sites[3 * cell + 1] > cell_max[1] ||
-      vblock->sites[3 * cell + 2] < cell_min[2] ||
-      vblock->sites[3 * cell + 2] > cell_max[2]) {
-    fprintf(stderr, "warning: the site for cell %d "
-	    "[%.3f %.3f %.3f] is not "
-	    "inside the cell bounds min [%.3f %.3f %.3f] "
-	    "max [%.3f %.3f %.3f]; skipping this cell\n",
-	    cell, vblock->sites[3 * cell], vblock->sites[3 * cell + 1], 
-	    vblock->sites[3 * cell + 2],
-	    cell_min[0], cell_min[1], cell_min[2],
-	    cell_max[0], cell_max[1], cell_max[2]);
+//   if (vblock->sites[3 * cell] < cell_min[0] ||
+//       vblock->sites[3 * cell] > cell_max[0] ||
+//       vblock->sites[3 * cell + 1] < cell_min[1] ||
+//       vblock->sites[3 * cell + 1] > cell_max[1] ||
+//       vblock->sites[3 * cell + 2] < cell_min[2] ||
+//       vblock->sites[3 * cell + 2] > cell_max[2]) {
+//     fprintf(stderr, "warning: the site for cell %d "
+// 	    "[%.3f %.3f %.3f] is not "
+// 	    "inside the cell bounds min [%.3f %.3f %.3f] "
+// 	    "max [%.3f %.3f %.3f]; skipping this cell\n",
+// 	    cell, vblock->sites[3 * cell], vblock->sites[3 * cell + 1], 
+// 	    vblock->sites[3 * cell + 2],
+// 	    cell_min[0], cell_min[1], cell_min[2],
+// 	    cell_max[0], cell_max[1], cell_max[2]);
 
-    return 0;
-  }
+//     return 0;
+//   }
 
-  else
     return 1;
 
 } 

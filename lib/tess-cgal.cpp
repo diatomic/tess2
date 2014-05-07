@@ -24,14 +24,13 @@ void clean_delaunay_data_structures(void* ds)
 //
 //   nblocks: number of blocks
 //   tblocks: pointer to array of temporary vblocks
-//   dim: number of dimensions (eg. 3)
 //   num_particles: number of particles in each block
 //   particles: particles in each block, particles[block_num][particle]
 //   where each particle is 3 values, px, py, pz
 //   times: timing
 //   ds: the delaunay data structures
 //
-void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
+void local_cells(int nblocks, struct vblock_t *tblocks,
 		 int *num_particles, float **particles, void* ds,
 		 tet_t** tets, int* ntets) {
 
@@ -40,7 +39,7 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
   unsigned total = 0;
   Delaunay3D* Dts = (Delaunay3D*) ds;
 
-  /* for all blocks */
+  // for all blocks 
   for (i = 0; i < nblocks; i++) {
     Delaunay3D& Dt = Dts[i];
     construct_delaunay(Dt, num_particles[i], particles[i]);
@@ -52,14 +51,14 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
     tets[i]  = (tet_t*) malloc(sizeof(tet_t)*ntets[i]);
     gen_tets(Dt, tets[i]);
 
-    /* allocate number of verts for original particles */
+    // allocate number of verts for original particles
     tblocks[i].num_cell_verts = (int *)malloc(sizeof(int) * num_particles[i]);
     memset(tblocks[i].num_cell_verts, 0, sizeof(int) * num_particles[i]);
 
-    /* process voronoi output */
+    // process voronoi output
     gen_voronoi_output(Dt, &tblocks[i], num_particles[i]);
 
-    /* allocate cell sites for original particles */
+    // allocate cell sites for original particles
     tblocks[i].num_orig_particles = num_particles[i];
     tblocks[i].sites =
       (float *)malloc(3 * sizeof(float) * tblocks[i].num_orig_particles);
@@ -68,24 +67,24 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
       tblocks[i].sites[3 * j + 1] = particles[i][3 * j + 1];
       tblocks[i].sites[3 * j + 2] = particles[i][3 * j + 2];
     }
-  } /* for all blocks */
+  } // for all blocks
 
   //std::cout << "Total particles in local_cells(): " << total << std::endl;
 }
-/*--------------------------------------------------------------------------*/
-/*
-  creates local delaunay cells
-
-  nblocks: number of blocks
-  dblocks: pointer to array of dblocks
-  dim: number of dimensions (eg. 3)
-  ds: the delaunay data structures
-*/
-void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) {
+//--------------------------------------------------------------------------
+//
+//  creates local delaunay cells
+//
+//  nblocks: number of blocks
+//  dblocks: pointer to array of dblocks
+//  dim: number of dimensions (eg. 3)
+//  ds: the delaunay data structures
+//
+void local_dcells(int nblocks, struct dblock_t *dblocks, void *ds) {
 
   Delaunay3D* Dts = (Delaunay3D*) ds;
 
-  /* for all blocks */
+  // for all blocks
   for (int i = 0; i < nblocks; i++) {
 
     // Explicit check for adjacent duplicates (debug only)
@@ -127,7 +126,6 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) {
 //
 //   nblocks: number of blocks
 //   vblocks: pointer to array of vblocks
-//   dim: number of dimensions (eg. 3)
 //   num_particles: number of particles in each block
 //   num_orig_particles: number of original particles in each block, before any
 //   neighbor exchange
@@ -138,7 +136,7 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds) {
 //   dirs: wrapping directions of received particles in each of my blocks
 //   ds: the delaunay data structures
 //
-void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
+void all_cells(int nblocks, struct vblock_t *vblocks,
 	       int *num_particles, int *num_orig_particles, 
 	       float **particles, int **gids, int **nids, 
 	       unsigned char **dirs,
@@ -249,11 +247,11 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
   vblock->num_verts = Dt.number_of_finite_cells() + 1;
   int temp_num_cells = Dt.number_of_vertices();
 
-  /* vertices */
-  std::map<Cell_handle, int> tet_indices;	// TODO: perhaps, replace with something better
+  // vertices 
+  std::map<Cell_handle, int> tet_indices; // TODO: perhaps, replace with something better
   vblock->verts = (double *)malloc(sizeof(double) * 3 * vblock->num_verts);
   vblock->verts[0] = vblock->verts[1] = vblock->verts[2] = std::numeric_limits<double>::infinity();
-  i = 1; /* already did the infinity vertex, index 0 */
+  i = 1; // already did the infinity vertex, index 0
   for(Cell_iterator cit = Dt.finite_cells_begin(); cit != Dt.finite_cells_end(); ++cit)
   {
       Point center = cit->circumcenter(Dt.geom_traits());
@@ -264,26 +262,24 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
       i++;
   }
 
-  /*
-     order Vertex_iterators in the order of original particles
-     (CGAL switches the order of the points via a spatial sort)
-  */
+  // order Vertex_iterators in the order of original particles
+  // (CGAL switches the order of the points via a spatial sort)
   std::vector< std::pair<unsigned, Vertex_handle> > vertices;
   for(Vertex_iterator vit = Dt.finite_vertices_begin(); vit != Dt.finite_vertices_end(); ++vit)
       vertices.push_back(std::make_pair(vit->info(), vit));
   std::sort(vertices.begin(), vertices.end());
 
-  /* number of vertices in each cell; size is number of particles; 
-     if a cell is skipped, the number of vertices will be 0 */
+  // number of vertices in each cell; size is number of particles; 
+  // if a cell is skipped, the number of vertices will be 0
   int cell = 0; /* index of cell being processed */
   for(unsigned k = 0; k < vertices.size(); ++k)
   {
     Vertex_handle v = vertices[k].second;
-    std::vector<Cell_handle> cell_vertices;	    // Delaunay cells are Voronoi vertices
+    std::vector<Cell_handle> cell_vertices; // Delaunay cells are Voronoi vertices
     Dt.incident_cells(v, std::back_inserter(cell_vertices));
 
     int num_infinite = 0;
-    for (j = 0; j < cell_vertices.size(); ++j)
+    for (j = 0; j < (int)cell_vertices.size(); ++j)
       if (Dt.is_infinite(cell_vertices[j]))
 	++num_infinite;
     vblock->num_cell_verts[cell] = cell_vertices.size();
@@ -293,23 +289,23 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
     ++cell;
   }
 
-  /* allocate the cell vertices */
+  // allocate the cell vertices
   vblock->tot_num_cell_verts = 0;
-/*   for (i = 0; i < temp_num_cells; i++) */
+
   for (i = 0; i < num_particles; i++)
     vblock->tot_num_cell_verts += vblock->num_cell_verts[i];
   vblock->cells = (int *)malloc(sizeof(int) * vblock->tot_num_cell_verts);
 
-  /* cell vertices */
+  // cell vertices
   i = 0;
   for(unsigned k = 0; k < vertices.size(); ++k)
   {
     Vertex_handle v = vertices[k].second;
-    std::vector<Cell_handle> cell_vertices;	    // Delaunay cells are Voronoi vertices
+    std::vector<Cell_handle> cell_vertices; // Delaunay cells are Voronoi vertices
     Dt.incident_cells(v, std::back_inserter(cell_vertices));
 
     bool seen_infinite = false;
-    for (j = 0; j < cell_vertices.size(); ++j)
+    for (j = 0; j < (int)cell_vertices.size(); ++j)
     {
       if (Dt.is_infinite(cell_vertices[j]))
       {
@@ -323,7 +319,7 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
     }
   }
 
-  /* voronoi faces */
+  // voronoi faces
   int tot_faces = Dt.number_of_finite_edges();
   vblock->faces = (struct vface_t*)malloc(tot_faces * sizeof(struct vface_t));
   memset(vblock->faces, 0, tot_faces * sizeof(struct vface_t));
@@ -361,7 +357,7 @@ int gen_voronoi_output(Delaunay3D &Dt, struct vblock_t *vblock,
   }
 
   vblock->num_faces = num_faces;
-  assert(vblock->num_faces == tot_faces); /* sanity */
+  assert(vblock->num_faces == tot_faces); // sanity
 
   return temp_num_cells;
 
@@ -415,7 +411,7 @@ void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
   }
   Dt.insert(points.begin(), points.end());
 #else
-  for (unsigned j = n; j < num_particles; j++)
+  for (unsigned j = n; j < (unsigned)num_particles; j++)
   {
     Point p(particles[3*j],
 	    particles[3*j+1],

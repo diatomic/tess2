@@ -1153,7 +1153,7 @@ int CellInteriorGridPts(int *cell_grid_pts,
   bool z_step_done = false; // this z step is done
   int xi, yi, zi; // indices for x, y, z
   int yj; // second, temporary index in y
-  int first_x; // x index of border crossing at first y line in each z
+  int first_x = 0; // x index of border crossing at first y line in each z
 
   int y_steps = 0; // see how many y_steps we ended up making
 

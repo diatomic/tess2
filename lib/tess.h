@@ -84,7 +84,7 @@ void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock,
 #ifdef __cplusplus
 extern "C"
 #endif
-void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
+void all_cells(int nblocks, struct vblock_t *vblocks,
 	       int *num_particles, int *num_orig_particles, 
 	       float **particles, int **gids, int **nids, 
 	       unsigned char **dirs, void* ds,
@@ -101,13 +101,13 @@ void reset_blocks(int num_blocks, struct vblock_t *vblocks);
 #ifdef __cplusplus
 extern "C"
 #endif
-void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
+void local_cells(int nblocks, struct vblock_t *tblocks,
 		 int *num_particles, float **particles, void* ds,
 		 struct tet_t** tets, int* ntets);
 #ifdef __cplusplus
 extern "C"
 #endif
-void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void *ds);
+void local_dcells(int nblocks, struct dblock_t *dblocks, void *ds);
 
 #ifdef __cplusplus
 extern "C"
