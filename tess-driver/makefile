@@ -66,4 +66,4 @@ delaunay: $(OBJS) ../lib/libtess.a
 	$(CXX) -o delaunay $(OBJS) $(LIBS)
 
 clean:
-	rm -f *.o 
+	rm -f *.o delaunay

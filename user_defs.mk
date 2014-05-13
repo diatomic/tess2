@@ -17,9 +17,9 @@
 
 # 1. Set your architecture here
 
-ARCH = MAC_OSX
+#ARCH = MAC_OSX
 #ARCH = LINUX
-#ARCH = BGQ
+ARCH = BGQ
 
 # 2. Set your choice of computational geometry library here (QHULL or CGAL)
 
@@ -30,15 +30,27 @@ CONV = CGAL
 
 ifeq ($(ARCH), BGQ) # BG/Q version
 
+ifeq ($(CONV), QHULL)
 CC=/soft/compilers/wrappers/xl/mpicc
 CXX=/soft/compilers/wrappers/xl/mpicxx
+else
+CC=/soft/compilers/wrappers/gcc/mpicc
+CXX=/soft/compilers/wrappers/gcc/mpicxx
+endif
+
 DIY_INC = -I$(HOME)/diy-gcc/include
 QHULL_INC =-I$(HOME)/software/qhull-2011.2/src/libqhull
 CGAL_INC =-I/$(HOME)/software/CGAL-4.3/include -I/soft/libraries/boost/current/cnk-gcc/current/include -I/usr/include
 PNETCDF_INC = -I$(HOME)/software/parallel-netcdf-1.3.0-gcc/include
 DIY_LIB = $(HOME)/diy-gcc/lib/libdiy.a
 QHULL_LIB = -L$(HOME)/software/qhull-2011.2/lib -lqhullstatic
-CGAL_LIB = -L$(HOME)/software/CGAL-4.3-install/lib -L$(HOME)/software/gmp-5.1.3/lib -lgmp -dynamic -lCGAL -L/soft/libraries/boost/current/cnk-gcc/current/lib -lboost_system-mt -lboost_thread-mt
+CGAL_LIB = -dynamic \
+	/home/tpeterka/software/gmp-5.1.3/lib/libgmp.a \
+	/home/tpeterka/software/CGAL-4.3-install/lib/libCGAL.a \
+	/soft/libraries/boost/current/cnk-gcc/current/lib/libboost_thread-mt.a \
+	/soft/libraries/boost/current/cnk-gcc/current/lib/libboost_system-mt.a \
+	-lmpich-gcc -lopa-gcc -lmpl-gcc -lpami-gcc -Wl,-Bstatic -lSPI \
+	-lSPI_cnk -Wl,-Bdynamic -lrt -lpthread -lstdc++ -lmpichcxx-gcc
 PNETCDF_LIB = -L$(HOME)/software/parallel-netcdf-1.3.0-gcc/lib -lpnetcdf
 
 else
@@ -77,10 +89,15 @@ endif
 
 ifeq ($(CONV), CGAL) # cgal version
 
-#CGAL_CCFLAGS=-frounding-math -DCGAL_DISABLE_ROUNDING_MATH_CHECK \
-	     -DTESS_CGAL_ALLOW_SPATIAL_SOR # should be based on compiler check
+ifeq ($(ARCH), BGQ)
 CGAL_CCFLAGS=-frounding-math -DCGAL_USE_MPFR -DCGAL_USE_GMP \
-	     -DTESS_CGAL_ALLOW_SPATIAL_SOR -pipe -Os -arch x86_64 -fno-strict-aliasing -O3
+	-DTESS_CGAL_ALLOW_SPATIAL_SORT -DNDEBUG -O3
+else
+CGAL_CCFLAGS=-frounding-math -DCGAL_USE_MPFR -DCGAL_USE_GMP \
+	-DTESS_CGAL_ALLOW_SPATIAL_SORT -pipe -Os -arch x86_64 \
+	-fno-strict-aliasing -O3
+endif
+
 DELAUNAY_INC=${CGAL_INC}
 DELAUNAY_LIB=${CGAL_LIB}
 DELAUNAY_CCFLAGS=${CGAL_CCFLAGS}

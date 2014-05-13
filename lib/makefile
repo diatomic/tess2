@@ -87,4 +87,4 @@ dump: $(DUMP_OBJS)
 	$(CXX) -o dump $(DUMP_OBJS)
 
 clean:
-	rm -f *.o 
+	rm -f *.o *.a

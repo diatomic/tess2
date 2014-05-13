@@ -20,13 +20,12 @@ void clean_delaunay_data_structures(void* ds) {
 
   nblocks: number of blocks
   tblocks: pointer to array of temporary vblocks
-  dim: number of dimensions (eg. 3)
   num_particles: number of particles in each block
   particles: particles in each block, particles[block_num][particle]
   where each particle is 3 values, px, py, pz
   ds: the delaunay data structures; unused in qhull
 */
-void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
+void local_cells(int nblocks, struct vblock_t *tblocks,
 		 int *num_particles, float **particles, void* ds,
 		 struct tet_t** tets, int* ntets) {
 
@@ -37,6 +36,7 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
   int curlong, totlong;     /* memory remaining after qh_memfreeshort */
   FILE *dev_null; /* file descriptor for writing to /dev/null */
   int i, j;
+  int dim = 3; /* 3d */
 
   ds = ds; /* quiet compiler warning about unused parameter */
 
@@ -106,10 +106,9 @@ void local_cells(int nblocks, struct vblock_t *tblocks, int dim,
 
   nblocks: number of blocks
   dblocks: pointer to array of dblocks
-  dim: number of dimensions (eg. 3)
   ds: the delaunay data structures; unused in qhull
 */
-void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void* ds) {
+void local_dcells(int nblocks, struct dblock_t *dblocks, void* ds) {
 
   boolT ismalloc = False;    /* True if qhull should free points in
 				qh_freeqhull() or reallocation */
@@ -118,6 +117,7 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void* ds) {
   int curlong, totlong;     /* memory remaining after qh_memfreeshort */
   FILE *dev_null; /* file descriptor for writing to /dev/null */
   int i, j;
+  int dim = 3; /* 3d */
 
   ds = ds; /* quiet compiler warning about unused parameter */
 
@@ -177,7 +177,6 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void* ds) {
 
   nblocks: number of blocks
   vblocks: pointer to array of vblocks
-  dim: number of dimensions (eg. 3)
   num_particles: number of particles in each block
   num_orig_particles: number of original particles in each block, before any
   neighbor exchange
@@ -188,7 +187,7 @@ void local_dcells(int nblocks, struct dblock_t *dblocks, int dim, void* ds) {
   dirs: wrapping directions of received particles in each of my blocks
   ds: the delaunay data structures; unused in qhull
 */
-void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
+void all_cells(int nblocks, struct vblock_t *vblocks,
 		int *num_particles, int *num_orig_particles, 
 		float **particles, int **gids, int **nids, 
 		unsigned char **dirs, void* ds,
@@ -202,6 +201,7 @@ void all_cells(int nblocks, struct vblock_t *vblocks, int dim,
   FILE *dev_null; /* file descriptor for writing to /dev/null */
   int num_recvd; /* number of received particles in current block */
   int i, j;
+  int dim = 3; /* 3d */
 
   /* quiet compiler warnings about unused parameters */
   ds = ds;

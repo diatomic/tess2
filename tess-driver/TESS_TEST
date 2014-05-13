@@ -20,9 +20,9 @@
 # without permission
 #
 #----------------------------------------------------------------------------
-ARCH=MAC_OSX
+#ARCH=MAC_OSX
 #ARCH=LINUX
-#ARCH=BGQ
+ARCH=BGQ
 #ARCH=FUSION
 #ARCH=XT
 #ARCH=XE
