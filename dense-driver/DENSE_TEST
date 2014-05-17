@@ -29,7 +29,7 @@ ARCH=MAC_OSX
 
 # number of procs
 # must be <= tb
-num_procs=4
+num_procs=1
 
 # procs per node
 ppn=2 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
@@ -46,12 +46,13 @@ exe=./dense
 # input file
 #infile="/projects/SSSPPg/tpeterka/128p4096b-vor.out.nc"
 #infile="../driver/vor.out.nc"
-infile="../driver/del.out.nc"
+infile="../tess-driver/del.out.nc"
 #infile="vor.out-100K-2b.nc"
 #infile="vor-99.out.nc"
 #infile="7445077095.out.nc"
-#infile="${HOME}/tess/postprocessor/6606356352.out.nc"
-#infile="${HOME}/tess/postprocessor/7445077095.out.nc"
+#infile="${HOME}/tess/post-tess-driver/6606356352.out.nc"
+#infile="${HOME}/tess/post-tess-driver/7445077095.out.nc"
+#infile="${HOME}/tess/post-tess-driver/nfw-1e5.out.nc"
 #infile="cnfw_2e5.out.nc"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/voronoi-results/nfw.out.nc"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/cic-results/cnfw_2e5.out.nc"
@@ -64,9 +65,9 @@ outfile="dense.raw"
 #gsize="32 32 32"
 #gsize="64 64 64"
 #gsize="128 128 128"
-gsize="256 256 256"
+#gsize="256 256 256"
 #gsize="512 512 512"
-#gsize="1024 1024 1024"
+gsize="1024 1024 1024"
 #gsize="2048 2048 2048"
 #gsize="4096 4096 4096"
 #gsize="8192 8192 8192"

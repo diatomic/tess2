@@ -49,16 +49,16 @@ tb=$[$num_procs * 1]
 #tb=128
 
 # inout file
-infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"
+#infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/7445077095.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/halos/input-data/6606356352.dat"
-#infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/input-data/nfw_particles_1e5.dat"
+infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/input-data/nfw_particles_1e4.dat"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/input-data/cnfw_particles_2e5.dat"
 #infile="./pts.out"
 
 # output file, "!" to disable output
-outfile="7445077095.out"
+#outfile="7445077095.out"
 #outfile="6606356352.out"
-#outfile="nfw.out"
+outfile="nfw.out"
 #outfile="mchalo00.out"
 #outfile="nor_ex.out"
 #outfile="cnfw_2e5.out"

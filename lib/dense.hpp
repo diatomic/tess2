@@ -33,7 +33,7 @@ using namespace std;
 // grid point
 struct grid_pt_t {
   int idx[3]; // global grid point index
-  float mass; // mass
+  double mass; // mass
 };
 
 // timing
@@ -59,6 +59,11 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 		  float *grid_phys_mins, float *grid_step_size, 
 		  dblock_t **dblocks, float *data_mins, float *data_maxs, 
 		  float eps, float mass);
+void IterateCellsOMP(int block, int *block_min_idx, int *block_num_idx, 
+		     float **density, bool project, float *proj_plane,
+		     float *grid_phys_mins, float *grid_step_size, 
+		     dblock_t **dblocks, float *data_mins, float *data_maxs, 
+		     float eps, float mass);
 void IterateCellsCic(int block, int *block_min_idx, int *block_num_idx, 
 		     float **density, bool project, float *proj_plane,
 		     float *grid_phys_mins, float *grid_step_size, 
