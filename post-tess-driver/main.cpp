@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
   char outfile[256]; // output file name
   float mins[3], maxs[3]; // data global extents
   float minvol, maxvol; // volume range, -1.0 = unused
-  double times[MAX_TIMES]; // timing
+  double times[TESS_MAX_TIMES]; // timing
   float **particles; // particles[block_num][particle] 
 		     //  where each particle is 3 values, px, py, pz
   int *num_particles; // number of particles in each block

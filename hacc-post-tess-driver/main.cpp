@@ -56,7 +56,7 @@ int main(int argc, char *argv[]) {
   char infile[256]; // input file name
   char outfile[256]; // output file name
   float minvol, maxvol; // volume range, -1.0 = unused
-  double times[MAX_TIMES]; // timing
+  double times[TESS_MAX_TIMES]; // timing
   int nblocks; // my local number of blocks
   int num_threads = 1; // number of threads diy can use
   int dim = 3; // 3d always
