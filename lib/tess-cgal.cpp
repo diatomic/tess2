@@ -402,7 +402,7 @@ void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles)
 
 #ifdef TESS_CGAL_ALLOW_SPATIAL_SORT
   std::vector< std::pair<Point,unsigned> > points; points.reserve(num_particles);
-  for (unsigned j = n; j < num_particles; j++)
+  for (unsigned j = n; j < (unsigned)num_particles; j++)
   {
     Point p(particles[3*j],
 	    particles[3*j+1],

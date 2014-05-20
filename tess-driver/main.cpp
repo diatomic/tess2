@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
   int dsize[3]; // domain grid size
   float jitter; // max amount to randomly displace particles
   float minvol, maxvol; // volume range, -1.0 = unused
-  double times[MAX_TIMES]; // timing
+  double times[TESS_MAX_TIMES]; // timing
   int wrap; // wraparound neighbors flag
   int walls; // apply walls to simulation (wrap must be off)
   char outfile[256]; // output file name

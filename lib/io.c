@@ -329,7 +329,7 @@ void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks,
   side effects: allocates dblocks, gids, num_neighbors, neighbors, neigh_procs
 
 */
-void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks, 
+void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks, 
 		  char *in_file, MPI_Comm comm, int **gids, int **num_neighbors,
 		  int ***neighbors, int ***neigh_procs) {
 
@@ -380,7 +380,7 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
 
   /* block offsets */
   int64_t *block_ofsts = (int64_t*)malloc(*tot_blocks * sizeof(int64_t));
-  *dblocks = (struct dblock_t**)malloc(*nblocks * sizeof(struct dblock_t*));
+  *dblocks = (struct dblock_t*)malloc(*nblocks * sizeof(struct dblock_t));
 
   /* read all blocks */
   *gids = (int *)malloc(*nblocks * sizeof(int));
@@ -392,7 +392,7 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
   int b;
   for (b = 0; b < *nblocks; b++) {
 
-    struct dblock_t* d = (struct dblock_t*)malloc(sizeof(struct dblock_t));
+    struct dblock_t *d = &((*dblocks)[b]);
 
     /* quantities */
     start[0] = start_block_ofst + b;
@@ -427,7 +427,8 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
     count[0] = *tot_blocks;
     err = ncmpi_get_vara_longlong_all(ncid, varids[9], start, count, 
 				      (long long *)block_ofsts); ERR;
-    d->particles = (float *)malloc(d->num_particles * 3 * sizeof(float));
+    d->particles = 
+      (float *)malloc(d->num_particles * 3 * sizeof(float));
     start[0] = block_ofsts[start_block_ofst + b];
     start[1] = 0;
     count[0] = d->num_particles;
@@ -475,7 +476,8 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
     count[0] = *tot_blocks;
     err = ncmpi_get_vara_longlong_all(ncid, varids[26], start, count, 
 				      (long long *) block_ofsts); ERR;
-    d->tets = (struct tet_t*)malloc(d->num_tets * sizeof(struct tet_t));
+    d->tets = 
+      (struct tet_t*)malloc(d->num_tets * sizeof(struct tet_t));
     /* 2x because I converted array of structs to array of ints */
     count[0] = 2 * d->num_tets;
     count[1] = (count[0] ? 4 : 0);
@@ -529,15 +531,13 @@ void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t ***dblocks,
     count[0] = *tot_blocks;
     err = ncmpi_get_vara_longlong_all(ncid, varids[9], start, count, 
 				      (long long *)block_ofsts); ERR;
-    d->vert_to_tet = (int *)malloc(d->num_particles * sizeof(int));
+    d->vert_to_tet = 
+      (int *)malloc(d->num_particles * sizeof(int));
     start[0] = block_ofsts[start_block_ofst + b];
     count[0] = d->num_particles;
     err = ncmpi_inq_varid(ncid, "vert_to_tet", &varids[33]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[33], start, count, 
 				   d->vert_to_tet); ERR;
-
-    /* save the block */
-    (*dblocks)[b] = d;
 
   } /* for all blocks */
 
@@ -1025,7 +1025,7 @@ void pnetcdf_write(int nblocks, struct vblock_t *vblocks,
   side effects: allocates vblocks, gids, num_neighbors, neighbors, neigh_procs
 
 */
-void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks, 
+void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t **vblocks, 
 		  char *in_file, MPI_Comm comm, int **gids, int **num_neighbors,
 		  int ***neighbors, int ***neigh_procs) {
 
@@ -1080,7 +1080,7 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
 
   /* block offsets */
   int64_t *block_ofsts = (int64_t*)malloc(*tot_blocks * sizeof(int64_t));
-  *vblocks = (struct vblock_t**)malloc(*nblocks * sizeof(struct vblock_t*));
+  *vblocks = (struct vblock_t*)malloc(*nblocks * sizeof(struct vblock_t));
 
   /* read all blocks */
   *gids = (int *)malloc(*nblocks * sizeof(int));
@@ -1092,7 +1092,7 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
   int b;
   for (b = 0; b < *nblocks; b++) {
 
-    struct vblock_t* v = (struct vblock_t*)malloc(sizeof(struct vblock_t));
+    struct vblock_t *v = &((*vblocks)[b]);
 
     /* quantities */
     start[0] = start_block_ofst + b;
@@ -1293,9 +1293,6 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t ***vblocks,
     err = ncmpi_inq_varid(ncid, "cell_faces", &varids[39]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[39], start, count, 
 				 v->cell_faces); ERR;
-
-    /* save the block */
-    (*vblocks)[b] = v;
 
   } /* for all blocks */
 

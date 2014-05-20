@@ -30,7 +30,6 @@ static int64_t tot_interior_evals = 0; // tot nmbr cell interior evaluations
 //
 // density: density field for each local block (output)
 // nblocks: number of local blocks
-// times: timing (output)
 // comm: MPI communicator
 // num_given_bounds: number of given physical bounds of grid
 // given_mins, given_maxs: given physical bounds of grid (x,y,z)
@@ -38,17 +37,17 @@ static int64_t tot_interior_evals = 0; // tot nmbr cell interior evaluations
 // proj_plane: normal to projection plane (x,y,z)
 // mass: mass of one particle
 // data_mins, data_maxs: global data physicsl extents (x,y,z) (output)
-// dblocks: pointers to local delaunay blocks
+// dblocks: local delaunay blocks
 // grid_phys_mins, grid_phys_maxs: global grid physical extents (x,y,z) (output)
 // grid_step_size: physical size of grid space (x,y,z) (output) 
 // eps: floating point error threshold
 // glo_num_idx: global number of grid points (i,j,k)
 //
-void dense(float **density, int nblocks, double times[DENSE_MAX_TIMES], 
+void dense(float **density, int nblocks,
 	   MPI_Comm comm, int num_given_bounds, float *given_mins, 
 	   float *given_maxs, bool project, float *proj_plane, 
 	   float mass, float *data_mins, float *data_maxs, 
-	   dblock_t **dblocks, float *grid_phys_mins, float *grid_phys_maxs,
+	   dblock_t *dblocks, float *grid_phys_mins, float *grid_phys_maxs,
 	   float *grid_step_size, float eps, int *glo_num_idx) {
 
   // local block grid parameters
@@ -156,11 +155,6 @@ void dense(float **density, int nblocks, double times[DENSE_MAX_TIMES],
 
   }
 
-  MPI_Barrier(comm);
-  times[COMP_TIME] = MPI_Wtime() - times[COMP_TIME];
-  times[OUTPUT_TIME] = MPI_Wtime();
-
-
   // cleanup
   DIY_Flush_neighbors(0, items, num_items, &ItemDtype);
   delete[] num_items;
@@ -180,7 +174,7 @@ void dense(float **density, int nblocks, double times[DENSE_MAX_TIMES],
 // proj_plane: normal to projection plane (x,y,z)
 // grid_phys_mins: physical global min grid corner position (x,y,z)
 // grid_step_size: physical size of one grid space (x,y,z)
-// dblocks: pointers to local delaunay tessellation blocks
+// dblocks: local delaunay tessellation blocks
 // data_mins, data_maxs: global data physical extent (x,y,z)
 // eps: floating point error tolerance
 // mass: mass of 1 particle
@@ -190,7 +184,7 @@ void dense(float **density, int nblocks, double times[DENSE_MAX_TIMES],
 void IterateCells(int block, int *block_min_idx, int *block_num_idx, 
 		  float **density, bool project, float *proj_plane,
 		  float *grid_phys_mins, float *grid_step_size, 
-		  dblock_t **dblocks, float *data_mins, float *data_maxs, 
+		  dblock_t *dblocks, float *data_mins, float *data_maxs, 
 		  float eps, float mass) {
 
   int alloc_grid_pts = 0; // number of grid points allocated
@@ -204,21 +198,21 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 	       grid_step_size[0] * grid_step_size[1] * grid_step_size[2]);
 
   // cells
-  for (int cell = 0; cell < dblocks[block]->num_orig_particles; cell++) {
+  for (int cell = 0; cell < dblocks[block].num_orig_particles; cell++) {
 
     float cell_min[3], cell_max[3]; // cell bounds
     float grid_pos[3]; // physical position of grid point
 
     // skip inccomplete cells
-    if (!complete(cell, dblocks[block]->tets, dblocks[block]->num_tets,
-		  dblocks[block]->vert_to_tet[cell]))
+    if (!complete(cell, dblocks[block].tets, dblocks[block].num_tets,
+		  dblocks[block].vert_to_tet[cell]))
       continue;
 
     vector <float> normals; // cell normals
     vector <vector <float> > face_verts; // vertex positions in each face
 
     // cell bounds
-    CellBounds(dblocks[block], cell, cell_min, cell_max, normals, face_verts);
+    CellBounds(&dblocks[block], cell, cell_min, cell_max, normals, face_verts);
 
     // grid points covered by this cell
     num_grid_pts = CellGridPts(cell_min, cell_max, grid_pts, border, 
@@ -240,16 +234,16 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
       idx2phys(grid_pts[i].idx, grid_pos, grid_step_size, grid_phys_mins);
 
       // assign density to grid points in the block
-      if (grid_pos[0] >= dblocks[block]->mins[0] &&
-	  (grid_pos[0] < dblocks[block]->maxs[0]  ||
+      if (grid_pos[0] >= dblocks[block].mins[0] &&
+	  (grid_pos[0] < dblocks[block].maxs[0]  ||
 	   fabs(grid_pos[0] - data_maxs[0]) < eps) &&
 
-	  grid_pos[1] >= dblocks[block]->mins[1] &&
-	  (grid_pos[1] < dblocks[block]->maxs[1]  ||
+	  grid_pos[1] >= dblocks[block].mins[1] &&
+	  (grid_pos[1] < dblocks[block].maxs[1]  ||
 	   fabs(grid_pos[1] - data_maxs[1]) < eps) &&
 
-	  grid_pos[2] >= dblocks[block]->mins[2] &&
-	  (grid_pos[2] < dblocks[block]->maxs[2]  ||
+	  grid_pos[2] >= dblocks[block].mins[2] &&
+	  (grid_pos[2] < dblocks[block].maxs[2]  ||
 	   fabs(grid_pos[2] - data_maxs[2]) < eps) ) {
 
 	// assign the density to the local block density array
@@ -293,7 +287,7 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 // proj_plane: normal to projection plane (x,y,z)
 // grid_phys_mins: physical global min grid corner position (x,y,z)
 // grid_step_size: physical size of one grid space (x,y,z)
-// dblocks: pointers to local delaunay tessellation blocks
+// dblocks: local delaunay tessellation blocks
 // data_mins, data_maxs: global data physical extent (x,y,z)
 // eps: floating point error tolerance
 // mass: mass of 1 particle
@@ -303,7 +297,7 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
 void IterateCellsOMP(int block, int *block_min_idx, int *block_num_idx, 
 		     float **density, bool project, float *proj_plane,
 		     float *grid_phys_mins, float *grid_step_size, 
-		     dblock_t **dblocks, float *data_mins, float *data_maxs, 
+		     dblock_t *dblocks, float *data_mins, float *data_maxs, 
 		     float eps, float mass) {
 
   int nthreads; // number of threads currently being used
@@ -330,21 +324,22 @@ void IterateCellsOMP(int block, int *block_min_idx, int *block_num_idx,
 #pragma omp for
 
     // cells
-    for (int cell = 0; cell < dblocks[block]->num_orig_particles; cell++) {
+    for (int cell = 0; cell < dblocks[block].num_orig_particles; cell++) {
 
       float cell_min[3], cell_max[3]; // cell bounds
       float grid_pos[3]; // physical position of grid point
 
       // skip inccomplete cells
-      if (!complete(cell, dblocks[block]->tets, dblocks[block]->num_tets,
-		    dblocks[block]->vert_to_tet[cell]))
+      if (!complete(cell, dblocks[block].tets, dblocks[block].num_tets,
+		    dblocks[block].vert_to_tet[cell]))
 	continue;
 
       vector <float> normals; // cell normals
       vector <vector <float> > face_verts; // vertex positions in each face
 
       // cell bounds
-      CellBounds(dblocks[block], cell, cell_min, cell_max, normals, face_verts);
+      CellBounds(&dblocks[block], cell, cell_min, cell_max, normals, 
+		 face_verts);
 
       // grid points covered by this cell
       num_grid_pts = CellGridPts(cell_min, cell_max, grid_pts, border, 
@@ -367,16 +362,16 @@ void IterateCellsOMP(int block, int *block_min_idx, int *block_num_idx,
 	idx2phys(grid_pts[i].idx, grid_pos, grid_step_size, grid_phys_mins);
 
 	// assign density to grid points in the block
-	if (grid_pos[0] >= dblocks[block]->mins[0] &&
-	    (grid_pos[0] < dblocks[block]->maxs[0]  ||
+	if (grid_pos[0] >= dblocks[block].mins[0] &&
+	    (grid_pos[0] < dblocks[block].maxs[0]  ||
 	     fabs(grid_pos[0] - data_maxs[0]) < eps) &&
 
-	    grid_pos[1] >= dblocks[block]->mins[1] &&
-	    (grid_pos[1] < dblocks[block]->maxs[1]  ||
+	    grid_pos[1] >= dblocks[block].mins[1] &&
+	    (grid_pos[1] < dblocks[block].maxs[1]  ||
 	     fabs(grid_pos[1] - data_maxs[1]) < eps) &&
 
-	    grid_pos[2] >= dblocks[block]->mins[2] &&
-	    (grid_pos[2] < dblocks[block]->maxs[2]  ||
+	    grid_pos[2] >= dblocks[block].mins[2] &&
+	    (grid_pos[2] < dblocks[block].maxs[2]  ||
 	     fabs(grid_pos[2] - data_maxs[2]) < eps) ) {
 
 	  // assign the density to the local block density array
@@ -444,7 +439,7 @@ void IterateCellsOMP(int block, int *block_min_idx, int *block_num_idx,
 // proj_plane: normal to projection plane (x,y,z)
 // grid_phys_mins: physical global min grid corner position (x,y,z)
 // grid_step_size: physical size of one grid space (x,y,z)
-// dblocks: pointers to local delaunay tessellation blocks
+// dblocks: local delaunay tessellation blocks
 // eps: floating point error tolerance
 // mass: mass of 1 particle
 //
@@ -453,7 +448,7 @@ void IterateCellsOMP(int block, int *block_min_idx, int *block_num_idx,
 void IterateCellsCic(int block, int *block_min_idx, int *block_num_idx, 
 		     float **density, bool project, float *proj_plane,
 		     float *grid_phys_mins, float *grid_step_size, 
-		     dblock_t **dblocks, float *data_maxs, 
+		     dblock_t *dblocks, float *data_maxs, 
 		     float eps, float mass) {
 
   float grid_pos[3]; // physical position of grid point
@@ -464,7 +459,7 @@ void IterateCellsCic(int block, int *block_min_idx, int *block_num_idx,
 	       grid_step_size[0] * grid_step_size[1] * grid_step_size[2]);
 
   // cells
-  for (int cell = 0; cell < dblocks[block]->num_orig_particles; cell++) {
+  for (int cell = 0; cell < dblocks[block].num_orig_particles; cell++) {
 
     // consitency check
     check_mass++;
@@ -473,7 +468,7 @@ void IterateCellsCic(int block, int *block_min_idx, int *block_num_idx,
     vector<int> grid_idxs; // grid idxs that get a fraction of the mass
     vector<float> grid_masses; // mass given to each grid_idx
 
-    float *pt = &(dblocks[block]->particles[3 * cell]); // x,y,z of particle
+    float *pt = &(dblocks[block].particles[3 * cell]); // x,y,z of particle
 
     DistributeScalarCIC(pt, mass, grid_idxs, grid_masses, grid_step_size, 
 			grid_phys_mins, eps);
@@ -486,16 +481,16 @@ void IterateCellsCic(int block, int *block_min_idx, int *block_num_idx,
       idx2phys(&(grid_idxs[3 * i]), grid_pos, grid_step_size, grid_phys_mins);
 
       // assign density to grid points in the block
-      if (grid_pos[0] >= dblocks[block]->mins[0] &&
-	  (grid_pos[0] < dblocks[block]->maxs[0]  ||
+      if (grid_pos[0] >= dblocks[block].mins[0] &&
+	  (grid_pos[0] < dblocks[block].maxs[0]  ||
 	   fabs(grid_pos[0] - data_maxs[0]) < eps) &&
 
-	  grid_pos[1] >= dblocks[block]->mins[1] &&
-	  (grid_pos[1] < dblocks[block]->maxs[1]  ||
+	  grid_pos[1] >= dblocks[block].mins[1] &&
+	  (grid_pos[1] < dblocks[block].maxs[1]  ||
 	   fabs(grid_pos[1] - data_maxs[1]) < eps) &&
 
-	  grid_pos[2] >= dblocks[block]->mins[2] &&
-	  (grid_pos[2] < dblocks[block]->maxs[2]  ||
+	  grid_pos[2] >= dblocks[block].mins[2] &&
+	  (grid_pos[2] < dblocks[block].maxs[2]  ||
 	   fabs(grid_pos[2] - data_maxs[2]) < eps) ) {
 
 	// assign the density to the local block density array
@@ -535,7 +530,7 @@ void IterateCellsCic(int block, int *block_min_idx, int *block_num_idx,
 // block_min_idx: global grid idx of block minimum grid point (output) (i,j,k)
 // block_max_idx: global grid idx of block maximum grid point (output) (i,j,k)
 // block_num_idx: number of grid points in block (output) (i,j,k)
-// dblocks: pointers to local delaunay blocks
+// dblocks: local delaunay blocks
 // grid_phys_mins: physical min corner of global grid (x,y,z)
 // grid_step_size: physical size of one grid space (x,y,z)
 // eps: floating point error tolerance
@@ -543,66 +538,66 @@ void IterateCellsCic(int block, int *block_min_idx, int *block_num_idx,
 // glo_num_idx: global grid size
 //
 void BlockGridParams(int lid, int *block_min_idx, int *block_max_idx,
-		     int *block_num_idx, dblock_t **dblocks,
+		     int *block_num_idx, dblock_t *dblocks,
 		     float *grid_phys_mins, float *grid_step_size, float eps,
 		     float *data_mins, float *data_maxs, int *glo_num_idx) {
 
   float pos[3]; // temporary position (x,y,z)
 
   // global grid index of block minimum grid point
-  phys2idx(dblocks[lid]->mins, block_min_idx, grid_step_size, grid_phys_mins);
+  phys2idx(dblocks[lid].mins, block_min_idx, grid_step_size, grid_phys_mins);
   idx2phys(block_min_idx, pos, grid_step_size, grid_phys_mins);
-  if (pos[0] < dblocks[lid]->mins[0])
+  if (pos[0] < dblocks[lid].mins[0])
     block_min_idx[0]++;
-  if (pos[1] < dblocks[lid]->mins[1])
+  if (pos[1] < dblocks[lid].mins[1])
     block_min_idx[1]++;
-  if (pos[2] < dblocks[lid]->mins[2])
+  if (pos[2] < dblocks[lid].mins[2])
     block_min_idx[2]++;
   idx2phys(block_min_idx, pos, grid_step_size, grid_phys_mins); // double check adjusted position
-  assert(pos[0] >= dblocks[lid]->mins[0] && pos[1] >= dblocks[lid]->mins[1] &&
-	 pos[2] >= dblocks[lid]->mins[2]);
+  assert(pos[0] >= dblocks[lid].mins[0] && pos[1] >= dblocks[lid].mins[1] &&
+	 pos[2] >= dblocks[lid].mins[2]);
 
   // global grid index of block maximum grid point
-  phys2idx(dblocks[lid]->maxs, block_max_idx, grid_step_size, grid_phys_mins);
+  phys2idx(dblocks[lid].maxs, block_max_idx, grid_step_size, grid_phys_mins);
   idx2phys(block_max_idx, pos, grid_step_size, grid_phys_mins);
-  if (pos[0] + grid_step_size[0] <= dblocks[lid]->maxs[0])
+  if (pos[0] + grid_step_size[0] <= dblocks[lid].maxs[0])
     block_max_idx[0]++;
-  if (pos[1] + grid_step_size[1] <= dblocks[lid]->maxs[1])
+  if (pos[1] + grid_step_size[1] <= dblocks[lid].maxs[1])
     block_max_idx[1]++;
-  if (pos[2] + grid_step_size[2] <= dblocks[lid]->maxs[2])
+  if (pos[2] + grid_step_size[2] <= dblocks[lid].maxs[2])
     block_max_idx[2]++;
   idx2phys(block_max_idx, pos, grid_step_size, grid_phys_mins); // double check adjusted position
-  assert(pos[0] <= dblocks[lid]->maxs[0] && pos[1] <= dblocks[lid]->maxs[1] &&
-	 pos[2] <= dblocks[lid]->maxs[2]);
+  assert(pos[0] <= dblocks[lid].maxs[0] && pos[1] <= dblocks[lid].maxs[1] &&
+	 pos[2] <= dblocks[lid].maxs[2]);
 
   // eliminate duplication at the maximum block border
   if (fabs(data_mins[0] + block_max_idx[0] * grid_step_size[0] -
-	   dblocks[lid]->maxs[0]) < eps && 
-      fabs(dblocks[lid]->maxs[0] - data_maxs[0]) > grid_step_size[0])
+	   dblocks[lid].maxs[0]) < eps && 
+      fabs(dblocks[lid].maxs[0] - data_maxs[0]) > grid_step_size[0])
     block_max_idx[0]--;
   if (fabs(data_mins[1] + block_max_idx[1] * grid_step_size[1] -
-      dblocks[lid]->maxs[1]) < eps &&
-      fabs(dblocks[lid]->maxs[1] - data_maxs[1]) > grid_step_size[1])
+      dblocks[lid].maxs[1]) < eps &&
+      fabs(dblocks[lid].maxs[1] - data_maxs[1]) > grid_step_size[1])
     block_max_idx[1]--;
   if (fabs(data_mins[2] + block_max_idx[2] * grid_step_size[2] -
-      dblocks[lid]->maxs[2]) < eps &&
-      fabs(dblocks[lid]->maxs[2] - data_maxs[2]) > grid_step_size[2])
+      dblocks[lid].maxs[2]) < eps &&
+      fabs(dblocks[lid].maxs[2] - data_maxs[2]) > grid_step_size[2])
     block_max_idx[2]--;
 
   // possibly extend minimum end of blacks at the minimum end of the domain
-  if (fabs(dblocks[lid]->mins[0] - data_mins[0]) < grid_step_size[0])
+  if (fabs(dblocks[lid].mins[0] - data_mins[0]) < grid_step_size[0])
     block_min_idx[0] = 0;
-  if (fabs(dblocks[lid]->mins[1] - data_mins[1]) < grid_step_size[1])
+  if (fabs(dblocks[lid].mins[1] - data_mins[1]) < grid_step_size[1])
     block_min_idx[1] = 0;
-  if (fabs(dblocks[lid]->mins[2] - data_mins[2]) < grid_step_size[2])
+  if (fabs(dblocks[lid].mins[2] - data_mins[2]) < grid_step_size[2])
     block_min_idx[2] = 0;
 
   // possibly extend maximum end of blacks at the maximum end of the domain
-  if (fabs(dblocks[lid]->maxs[0] - data_maxs[0]) < grid_step_size[0])
+  if (fabs(dblocks[lid].maxs[0] - data_maxs[0]) < grid_step_size[0])
     block_max_idx[0] = glo_num_idx[0] - 1;
-  if (fabs(dblocks[lid]->maxs[1] - data_maxs[1]) < grid_step_size[1])
+  if (fabs(dblocks[lid].maxs[1] - data_maxs[1]) < grid_step_size[1])
     block_max_idx[1] = glo_num_idx[1] - 1;
-  if (fabs(dblocks[lid]->maxs[2] - data_maxs[2]) < grid_step_size[2])
+  if (fabs(dblocks[lid].maxs[2] - data_maxs[2]) < grid_step_size[2])
     block_max_idx[2] = glo_num_idx[2] - 1;
 
   // compute number of grid points in local block
@@ -726,7 +721,7 @@ void ItemDtype(DIY_Datatype *dtype) {
 // outfile: output file name
 // project: whether to project to 2D
 // glo_num_idx: global number of grid points (i,j,k)
-// dblocks: pointers to local delaunay blocks
+// dblocks: local delaunay blocks
 // eps: floating point error tolerance
 // data_mins, data_maxs: data global physical extents (x,y,z)
 // num_fiven_bounds: number of given extents
@@ -734,7 +729,7 @@ void ItemDtype(DIY_Datatype *dtype) {
 //
 void WriteGrid(float **density, MPI_Comm comm, int nblocks, int mblocks,
 	       char *outfile, bool project, int *glo_num_idx,
-	       dblock_t **dblocks, float eps, float *data_mins,
+	       dblock_t *dblocks, float eps, float *data_mins,
 	       float *data_maxs, int num_given_bounds, float *given_mins,
 	       float *given_maxs) {
 

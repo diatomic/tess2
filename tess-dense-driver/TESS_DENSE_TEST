@@ -28,11 +28,10 @@ ARCH=MAC_OSX
 #ARCH=XE
 
 # number of procs
-# must be <= tb
 num_procs=8
 
 # procs per node
-ppn=2 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
+ppn=8 # adjustable for BG/Q, allowed 1, 2, 4, 8, 16, 32, 64
 
 # number of BG/P nodes for vn mode
 num_nodes=$[$num_procs / $ppn]
@@ -41,23 +40,39 @@ if [ $num_nodes -lt 1 ]; then
 fi
 
 # executable
-exe=./dense
+exe=${HOME}/tess/tess-dense-driver/tess-dense
 
-# input file
-#infile="/projects/SSSPPg/tpeterka/128p4096b-vor.out.nc"
-#infile="../driver/vor.out.nc"
-infile="../tess-driver/del.out.nc"
-#infile="vor.out-100K-2b.nc"
-#infile="vor-99.out.nc"
-#infile="7445077095.out.nc"
-#infile="${HOME}/tess/post-tess-driver/6606356352.out.nc"
-#infile="${HOME}/tess/post-tess-driver/7445077095.out.nc"
-#infile="${HOME}/tess/post-tess-driver/nfw-1e5.out.nc"
-#infile="cnfw_2e5.out.nc"
-#infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/voronoi-results/nfw.out.nc"
-#infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/cic-results/cnfw_2e5.out.nc"
+# total number of blocks in the domain
+tb=$[$num_procs * 1]
+#tb=4
 
-# output file
+# data size x y z (always 3D)
+#dsize="3 2 2"
+#dsize="3 3 3"
+#dsize="4 4 4"
+#dsize="5 5 5"
+#dsize="6 6 6"
+#dsize="8 8 8"
+#dsize="10 10 10"
+#dsize="16 16 16"
+dsize="32 32 32"
+#dsize="64 64 64"
+#dsize="128 128 128"
+#dsize="256 256 256"
+
+jitter=2.0
+
+# volume range (-1.0: unused)
+minv=-1.0
+maxv=-1.0
+
+# wrapped neighbors 0 or 1
+wrap=0
+
+# walls 0 or 1 (wrap should be 0)
+walls=0
+
+# output file name
 outfile="dense.raw"
 
 # sample grid size (number of points) x y z
@@ -88,8 +103,7 @@ gmax="1.5 1.5"
 #
 # program arguments
 #
-
-args="$infile $outfile $gsize $project $mass $ng $gmin $gmax"
+args="$tb $dsize $jitter $minv $maxv $wrap $walls $outfile $gsize $project $mass $ng $gmin $gmax"
 
 #------
 #
@@ -110,11 +124,11 @@ fi
 
 if [ "$ARCH" = "LINUX" ]; then
 
-mpiexec -n $num_procs $exe $args
+#mpiexec -n $num_procs $exe $args
 
 #mpiexec -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 
-#mpiexec -n $num_procs valgrind -q $exe $args
+mpiexec -n $num_procs valgrind -q $exe $args
 
 #mpiexec -n $num_procs valgrind -q --leak-check=yes $exe $args
 
@@ -122,7 +136,7 @@ fi
 
 if [ "$ARCH" = "BGQ" ]; then
 
-qsub -n $num_nodes --mode c$ppn -A SSSPPg -t 60 $exe $args
+qsub -n $num_nodes --mode c$ppn -A SDAV -t 60 $exe $args
 
 fi
 

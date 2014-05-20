@@ -98,7 +98,7 @@ void tess_init(int num_blocks, int *gids,
   }
 
   // init times 
-  for (i = 0; i < MAX_TIMES; i++)
+  for (i = 0; i < TESS_MAX_TIMES; i++)
     times[i] = 0.0;
 
   // init DIY 
@@ -144,7 +144,7 @@ void tess_init_diy_exist(int num_blocks, float *global_mins,
   }
 
   // init times 
-  for (i = 0; i < MAX_TIMES; i++)
+  for (i = 0; i < TESS_MAX_TIMES; i++)
     times[i] = 0.0;
 
 }
@@ -270,6 +270,74 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
 }
 // --------------------------------------------------------------------------
 //
+//   test of parallel tesselation with an existing
+//   diy domain, assumes DIY_Init and DIY_Decompose done already
+//
+//   only for newer delaunay format, does not support old voronoi version
+//
+//   nblocks: number of local blocks
+//   data_size: domain grid size (x, y, z)
+//   jitter: maximum amount to randomly move each particle
+//   minvol, maxvol: filter range for which cells to keep
+//   pass -1.0 to skip either or both bounds
+//   wrap: whether wraparound neighbors are used
+//   twalls_on: whether walls boundaries are used
+//   times: times for particle exchange, voronoi cells, convex hulls, and output
+//   mpi_comm: MPI communicator
+//
+//   returns: array of local delaunay blocks
+//
+struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter, 
+				     float minvol, float maxvol, int wrap,
+				     int twalls_on, double *times,
+				     MPI_Comm mpi_comm) {
+
+  float **particles; // particles[block_num][particle] 
+		     // where each particle is 3 values, px, py, pz 
+  int *num_particles; // number of particles in each block 
+  struct dblock_t *ret_blocks; // returned delaunay blocks
+
+  comm = mpi_comm;
+  min_vol = minvol;
+  max_vol = maxvol;
+  wrap_neighbors = wrap;
+  walls_on = twalls_on;
+  
+  // data extents 
+  for(int i = 0; i < 3; i++) {
+    data_mins[i] = 0.0;
+    data_maxs[i] = data_size[i] - 1.0;
+  }
+
+  // generate test points in each block 
+  particles = (float **)malloc(nblocks * sizeof(float *));
+  num_particles = (int *)malloc(nblocks * sizeof(int));
+  for (int i = 0; i < nblocks; i++)
+    num_particles[i] = gen_particles(i, &particles[i], jitter);
+
+#ifdef TET
+
+  // compute tessellations 
+  ret_blocks = delaunay(nblocks, particles, num_particles, times, (char *)"");
+
+#else
+
+  fprintf(stderr, "tess_test_diy_exist is not designed for voronoi format\n");
+  ret_blocks = NULL;
+
+#endif
+
+  // cleanup 
+  for (int i = 0; i < nblocks; i++)
+    free(particles[i]);
+  free(particles);
+  free(num_particles);
+
+  return ret_blocks;
+
+}
+// --------------------------------------------------------------------------
+//
 //   parallel voronoi and delaunay tesselation
 //
 //   nblocks: local number of blocks
@@ -291,7 +359,7 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
   MPI_Comm_rank(comm, &rank);
 
   // init timing 
-  for (i = 0; i < MAX_TIMES; i++)
+  for (i = 0; i < TESS_MAX_TIMES; i++)
     times[i] = 0.0;
   timing(times, TOT_TIME, -1);
 
@@ -525,10 +593,12 @@ void voronoi_delaunay(int nblocks, float **particles, int *num_particles,
 //   where each particle is 3 values, px, py, pz
 //   num_particles; number of particles in each block
 //   times: times for particle exchange, voronoi cells, convex hulls, and output
-//   out_file: output file name
+//   out_file: output file name (pass null string if writing is not desired)
+//
+//   returns: array of local delaunay blocks when writing is disabled
 // 
-void delaunay(int nblocks, float **particles, int *num_particles, 
-	      double *times, char *out_file) {
+struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles, 
+			  double *times, char *out_file) {
 
   int rank; // MPI rank 
   void* ds; // persistent delaunay data structures
@@ -536,13 +606,13 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   MPI_Comm_rank(comm, &rank);
 
   // init timing 
-  for (int i = 0; i < MAX_TIMES; i++)
+  for (int i = 0; i < TESS_MAX_TIMES; i++)
     times[i] = 0.0;
   timing(times, TOT_TIME, -1);
 
   // initialize data structures
   int **hdrs; // headers 
-  struct dblock_t *dblocks; // voronoi blocks 
+  struct dblock_t *dblocks; // delaunay blocks 
   ds = init_delaunay_data_structures(nblocks);
   create_dblocks(nblocks, dblocks, hdrs, particles, num_particles);
   
@@ -664,11 +734,24 @@ void delaunay(int nblocks, float **particles, int *num_particles,
   // collect stats 
   collect_dstats(nblocks, dblocks, times);
 
-  // cleanup 
-  destroy_dblocks(nblocks, dblocks, hdrs);
+  // cleanup or return dblocks
+  dblock_t *ret_blocks; // array of local blocks to be returned
+  if (out_file[0]) {
+    destroy_dblocks(nblocks, dblocks, hdrs);
+    ret_blocks = NULL;
+  }
+  else {
+    for (int i = 0; i < nblocks; i++) {
+      if (hdrs && hdrs[i])
+	delete[] hdrs[i];
+    }
+    ret_blocks = dblocks;
+  }
   
   // profile
   get_mem(9, dwell);
+
+  return ret_blocks;
 
 }
 // --------------------------------------------------------------------------
@@ -1327,8 +1410,8 @@ void collect_dstats(int nblocks, struct dblock_t *dblocks, double *times) {
 
   MPI_Comm_rank(comm, &rank);
 
-  double max_times[MAX_TIMES];
-  MPI_Reduce( times, max_times, MAX_TIMES, MPI_DOUBLE, MPI_MAX, 0, comm);
+  double max_times[TESS_MAX_TIMES];
+  MPI_Reduce( times, max_times, TESS_MAX_TIMES, MPI_DOUBLE, MPI_MAX, 0, comm);
 
   // TODO: need to first compute over all blocks
   const int MAX_QUANTS = 10;

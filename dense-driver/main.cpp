@@ -39,7 +39,7 @@ int main(int argc, char** argv) {
   int rank, groupsize; // MPI usual
   int did; // domain id
   MPI_Comm comm = MPI_COMM_WORLD; // MPI communicator
-  dblock_t **dblocks; // delaunay local blocks
+  dblock_t *dblocks; // delaunay local blocks
   float eps = 0.0001; // epsilon for floating point values to be equal
   float data_mins[3], data_maxs[3]; // data global bounds
 
@@ -96,8 +96,8 @@ int main(int argc, char** argv) {
   bb_t bounds[nblocks]; // block bounds
   for (int i = 0; i < nblocks; i++) {
     for (int j = 0; j < dim; j++) {
-      bounds[i].min[j] = dblocks[i]->mins[j];
-      bounds[i].max[j] = dblocks[i]->maxs[j];
+      bounds[i].min[j] = dblocks[i].mins[j];
+      bounds[i].max[j] = dblocks[i].maxs[j];
     }
   }
   int maxblocks; // max blocks in any process
@@ -138,9 +138,12 @@ int main(int argc, char** argv) {
 
   // compute the density
   float *density[nblocks];
-  dense(density, nblocks, times, comm, num_given_bounds, given_mins, 
+  dense(density, nblocks, comm, num_given_bounds, given_mins, 
 	given_maxs, project, proj_plane, mass, data_mins, data_maxs, dblocks,
 	grid_phys_mins, grid_phys_maxs, grid_step_size, eps, glo_num_idx);
+
+  MPI_Barrier(comm);
+  times[COMP_TIME] = MPI_Wtime() - times[COMP_TIME];
 
   // write file
   times[OUTPUT_TIME] = MPI_Wtime();

@@ -37,37 +37,38 @@ struct grid_pt_t {
 };
 
 // timing
-#define DENSE_MAX_TIMES 4
+#define DENSE_MAX_TIMES 5
 #define INPUT_TIME 0
 #define COMP_TIME 1
 #define OUTPUT_TIME 2
 #define TOTAL_TIME 3
+#define TESS_TIME 4
 
 // function prototypes
-void dense(float **density, int nblocks, double times[DENSE_MAX_TIMES], 
+void dense(float **density, int nblocks,
 	   MPI_Comm comm, int num_given_bounds, float *given_mins, 
 	   float *given_maxs, bool project, float *proj_plane, 
 	   float mass, float *data_mins, float *data_maxs, 
-	   dblock_t **dblocks, float *grid_phys_mins, float *grid_phys_maxs,
+	   dblock_t *dblocks, float *grid_phys_mins, float *grid_phys_maxs,
 	   float *grid_step_size, float eps, int *glo_num_idx);
 void BlockGridParams(int lid, int *block_min_idx, int *block_max_idx,
-		     int *block_num_idx, dblock_t **dblocks,
+		     int *block_num_idx, dblock_t *dblocks,
 		     float *grid_phys_mins, float *grid_step_size, float eps,
 		     float *data_mins, float *data_maxs, int *glo_num_idx);
 void IterateCells(int block, int *block_min_idx, int *block_num_idx, 
 		  float **density, bool project, float *proj_plane,
 		  float *grid_phys_mins, float *grid_step_size, 
-		  dblock_t **dblocks, float *data_mins, float *data_maxs, 
+		  dblock_t *dblocks, float *data_mins, float *data_maxs, 
 		  float eps, float mass);
 void IterateCellsOMP(int block, int *block_min_idx, int *block_num_idx, 
 		     float **density, bool project, float *proj_plane,
 		     float *grid_phys_mins, float *grid_step_size, 
-		     dblock_t **dblocks, float *data_mins, float *data_maxs, 
+		     dblock_t *dblocks, float *data_mins, float *data_maxs, 
 		     float eps, float mass);
 void IterateCellsCic(int block, int *block_min_idx, int *block_num_idx, 
 		     float **density, bool project, float *proj_plane,
 		     float *grid_phys_mins, float *grid_step_size, 
-		     dblock_t **dblocks, float *data_maxs, 
+		     dblock_t *dblocks, float *data_maxs, 
 		     float eps, float mass);
 void CellBounds(dblock_t *dblock, int cell, float *cell_min, float *cell_max, 
 		vector<float> &normals, vector <vector <float> > &face_verts);
@@ -92,7 +93,7 @@ void GridStepParams(int num_given_bounds, float *given_mins,
 void ItemDtype(DIY_Datatype *dtype);
 void WriteGrid(float **density, MPI_Comm comm, int nblocks, 
 	       int mblocks, char *outfile, bool project, int *glo_num_idx,
-	       dblock_t **dblocks, float eps, float *data_mins,
+	       dblock_t *dblocks, float eps, float *data_mins,
 	       float *data_maxs, int num_given_bounds, float *fiven_mins,
 	       float *given_maxs);
 void handle_error(int errcode, char *str, MPI_Comm comm);

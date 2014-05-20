@@ -145,7 +145,7 @@ vec3d data_min, data_max;
 
 // local blocks
 #ifdef TET
-dblock_t **blocks; // newer delaunay blocks
+dblock_t *blocks; // newer delaunay blocks
 #else
 vblock_t **blocks; // older voronoi and delaunay blocks
 #endif
@@ -262,25 +262,25 @@ int main(int argc, char** argv) {
   // get overall data extent
   for (int i = 0; i < nblocks; i++) {
     if (i == 0) {
-      data_min.x = blocks[i]->mins[0];
-      data_min.y = blocks[i]->mins[1];
-      data_min.z = blocks[i]->mins[2];
-      data_max.x = blocks[i]->maxs[0];
-      data_max.y = blocks[i]->maxs[1];
-      data_max.z = blocks[i]->maxs[2];
+      data_min.x = blocks[i].mins[0];
+      data_min.y = blocks[i].mins[1];
+      data_min.z = blocks[i].mins[2];
+      data_max.x = blocks[i].maxs[0];
+      data_max.y = blocks[i].maxs[1];
+      data_max.z = blocks[i].maxs[2];
     }
-    if (blocks[i]->mins[0] < data_min.x)
-      data_min.x = blocks[i]->mins[0];
-    if (blocks[i]->mins[1] < data_min.y)
-      data_min.y = blocks[i]->mins[1];
-    if (blocks[i]->mins[2] < data_min.z)
-      data_min.z = blocks[i]->mins[2];
-    if (blocks[i]->maxs[0] > data_max.x)
-      data_max.x = blocks[i]->maxs[0];
-    if (blocks[i]->maxs[1] > data_max.y)
-      data_max.y = blocks[i]->maxs[1];
-    if (blocks[i]->maxs[2] > data_max.z)
-      data_max.z = blocks[i]->maxs[2];
+    if (blocks[i].mins[0] < data_min.x)
+      data_min.x = blocks[i].mins[0];
+    if (blocks[i].mins[1] < data_min.y)
+      data_min.y = blocks[i].mins[1];
+    if (blocks[i].mins[2] < data_min.z)
+      data_min.z = blocks[i].mins[2];
+    if (blocks[i].maxs[0] > data_max.x)
+      data_max.x = blocks[i].maxs[0];
+    if (blocks[i].maxs[1] > data_max.y)
+      data_max.y = blocks[i].maxs[1];
+    if (blocks[i].maxs[2] > data_max.z)
+      data_max.z = blocks[i].maxs[2];
   }
 
   // debug
@@ -348,7 +348,7 @@ void display() {
   // block bounds
   if (block_mode) {
     for (int i = 0; i < nblocks; i++)
-      draw_cube(blocks[i]->mins, blocks[i]->maxs, 1.0, 0.0, 1.0);
+      draw_cube(blocks[i].mins, blocks[i].maxs, 1.0, 0.0, 1.0);
   }
 
   // cell verts
@@ -1504,19 +1504,19 @@ void PrepCellVertRendering() {
   for (int b = 0; b < nblocks; b++) { // blocks
 
     // tets
-    for (int t = 0; t < blocks[b]->num_tets; t++) {
+    for (int t = 0; t < blocks[b].num_tets; t++) {
 
       // push voronoi vertex for rendering
       // voronoi vertex is the circumcenter of the tet
       vec3d center;
       circumcenter(&center.x,
-		   &(blocks[b]->tets[t]), blocks[b]->particles);
+		   &(blocks[b].tets[t]), blocks[b].particles);
 
 #if 0	// debug purpuses only
-      const tet_t& tt = blocks[b]->tets[t];
-      float dist = distance(&center.x, &blocks[b]->particles[3*tt.verts[0]]);
+      const tet_t& tt = blocks[b].tets[t];
+      float dist = distance(&center.x, &blocks[b].particles[3*tt.verts[0]]);
       for (int i = 1; i < 4; ++i) {
-	float dist2 = distance(&center.x, &blocks[b]->particles[3*tt.verts[i]]);
+	float dist2 = distance(&center.x, &blocks[b].particles[3*tt.verts[i]]);
 	if (fabs(dist - dist2) > .00001) {
 	  fprintf(stderr, "Warning: %f %f\n", dist, dist2);
 	}
@@ -1544,21 +1544,21 @@ void PrepCellRendering(int &num_vis_cells) {
   for (int b = 0; b < nblocks; b++) { // blocks
 
     // for all voronoi cells
-    for (int p = 0; p < blocks[b]->num_orig_particles; p++) {
+    for (int p = 0; p < blocks[b].num_orig_particles; p++) {
 
       // tet
-      int t = blocks[b]->vert_to_tet[p];
+      int t = blocks[b].vert_to_tet[p];
 
       // skip tets with missing neighbors
-      if (blocks[b]->tets[t].tets[0] == -1 || blocks[b]->tets[t].tets[1] == -1 ||
-	  blocks[b]->tets[t].tets[2] == -1 || blocks[b]->tets[t].tets[3] == -1)  {
+      if (blocks[b].tets[t].tets[0] == -1 || blocks[b].tets[t].tets[1] == -1 ||
+	  blocks[b].tets[t].tets[2] == -1 || blocks[b].tets[t].tets[3] == -1)  {
 	continue;
       }
 
       // neighbor edges a vector of (vertex u, tet of vertex u) pairs 
       // that neighbor vertex v
       vector< pair<int, int> > nbrs;
-      bool finite = neighbor_edges(nbrs, p, blocks[b]->tets, t);
+      bool finite = neighbor_edges(nbrs, p, blocks[b].tets, t);
 
       // skip tet vertices corresponding to incomplete voronoi cells
       if (!finite) 
@@ -1579,13 +1579,13 @@ void PrepCellRendering(int &num_vis_cells) {
 	int u  = nbrs[i].first;
 	int ut = nbrs[i].second;
 	std::vector<int> edge_link;
-	fill_edge_link(edge_link, p, u, ut, blocks[b]->tets);
+	fill_edge_link(edge_link, p, u, ut, blocks[b].tets);
 
 	// following is equivalent of all vertices in a face
 	for (int j = 0; j < (int)edge_link.size(); ++j) {
 	  vec3d center;
 	  circumcenter((float *)&(center.x), 
-		       &(blocks[b]->tets[edge_link[j]]), blocks[b]->particles);
+		       &(blocks[b].tets[edge_link[j]]), blocks[b].particles);
 	  // filter out cells far outside the overal extents
 	  if (center.x > data_max.x + (data_max.x - data_min.x) * (ds - 1) ||
 	      center.x < data_min.x - (data_max.x - data_min.x) * (ds - 1) ||
@@ -1652,59 +1652,59 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
   for (int b = 0; b < nblocks; b++) { // blocks
 
     // local tets
-    for (int t = 0; t < blocks[b]->num_tets; t++) {
+    for (int t = 0; t < blocks[b].num_tets; t++) {
 
       // skip tets with missing neighbors
-      if (blocks[b]->tets[t].tets[0] == -1 ||
-	  blocks[b]->tets[t].tets[1] == -1 ||
-	  blocks[b]->tets[t].tets[2] == -1 ||
-	  blocks[b]->tets[t].tets[3] == -1) {
+      if (blocks[b].tets[t].tets[0] == -1 ||
+	  blocks[b].tets[t].tets[1] == -1 ||
+	  blocks[b].tets[t].tets[2] == -1 ||
+	  blocks[b].tets[t].tets[3] == -1) {
 	continue;
       }
 
       // skip tet tets with vertices corresponding to incomplete voronoi cells
       vector< pair<int, int> > nbrs;
-      if (!neighbor_edges(nbrs, blocks[b]->tets[t].verts[0], blocks[b]->tets, t) ||
-	  !neighbor_edges(nbrs, blocks[b]->tets[t].verts[1], blocks[b]->tets, t) ||
-	  !neighbor_edges(nbrs, blocks[b]->tets[t].verts[2], blocks[b]->tets, t) ||
-	  !neighbor_edges(nbrs, blocks[b]->tets[t].verts[3], blocks[b]->tets, t)) {
+      if (!neighbor_edges(nbrs, blocks[b].tets[t].verts[0], blocks[b].tets, t) ||
+	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[1], blocks[b].tets, t) ||
+	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[2], blocks[b].tets, t) ||
+	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[3], blocks[b].tets, t)) {
 	continue;
       }
 
       for (int v = 0; v < 4; v++) {
 
-	int s = blocks[b]->tets[t].verts[v]; // index pf particle
+	int s = blocks[b].tets[t].verts[v]; // index pf particle
 	vec3d p; // coordinates for tet vertices
 
-	if (s < blocks[b]->num_orig_particles) { // local
+	if (s < blocks[b].num_orig_particles) { // local
 
-	  p.x = blocks[b]->particles[3 * s];
-	  p.y = blocks[b]->particles[3 * s + 1];
-	  p.z = blocks[b]->particles[3 * s + 2];
+	  p.x = blocks[b].particles[3 * s];
+	  p.y = blocks[b].particles[3 * s + 1];
+	  p.z = blocks[b].particles[3 * s + 2];
 
 	}
 	else { // remote
 
-	  int r = s - blocks[b]->num_orig_particles; //index into rem_tet_verts
-	  int g = blocks[b]->rem_tet_verts[r].gid; // gid of remote block
-	  int n = blocks[b]->rem_tet_verts[r].nid; // nid of remote particle
+	  int r = s - blocks[b].num_orig_particles; //index into rem_tet_verts
+	  int g = blocks[b].rem_tet_verts[r].gid; // gid of remote block
+	  int n = blocks[b].rem_tet_verts[r].nid; // nid of remote particle
 
-	  p.x = blocks[gid2lid[g]]->particles[3 * n];
-	  p.y = blocks[gid2lid[g]]->particles[3 * n + 1];
-	  p.z = blocks[gid2lid[g]]->particles[3 * n + 2];
+	  p.x = blocks[gid2lid[g]].particles[3 * n];
+	  p.y = blocks[gid2lid[g]].particles[3 * n + 1];
+	  p.z = blocks[gid2lid[g]].particles[3 * n + 2];
 
 	  // wraparound transform
-	  if ((blocks[b]->rem_tet_verts[r].dir & DIY_X0) == DIY_X0)
+	  if ((blocks[b].rem_tet_verts[r].dir & DIY_X0) == DIY_X0)
 	    p.x += (data_max.x - data_min.x);
-	  if ((blocks[b]->rem_tet_verts[r].dir & DIY_X1) == DIY_X1)
+	  if ((blocks[b].rem_tet_verts[r].dir & DIY_X1) == DIY_X1)
 	    p.x -= (data_max.x - data_min.x);
-	  if ((blocks[b]->rem_tet_verts[r].dir & DIY_Y0) == DIY_Y0)
+	  if ((blocks[b].rem_tet_verts[r].dir & DIY_Y0) == DIY_Y0)
 	    p.y += (data_max.y - data_min.y);
-	  if ((blocks[b]->rem_tet_verts[r].dir & DIY_Y1) == DIY_Y1)
+	  if ((blocks[b].rem_tet_verts[r].dir & DIY_Y1) == DIY_Y1)
 	    p.y -= (data_max.y - data_min.y);
-	  if ((blocks[b]->rem_tet_verts[r].dir & DIY_Z0) == DIY_Z0)
+	  if ((blocks[b].rem_tet_verts[r].dir & DIY_Z0) == DIY_Z0)
 	    p.z += (data_max.z - data_min.z);
-	  if ((blocks[b]->rem_tet_verts[r].dir & DIY_Z1) == DIY_Z1)
+	  if ((blocks[b].rem_tet_verts[r].dir & DIY_Z1) == DIY_Z1)
 	    p.z -= (data_max.z - data_min.z);
 
 	}
@@ -1834,12 +1834,12 @@ void PrepSiteRendering(int &num_sites) {
 
     // sites
     n = 0;
-    for (int j = 0; j < blocks[i]->num_orig_particles; j++) {
+    for (int j = 0; j < blocks[i].num_orig_particles; j++) {
 
       vec3d s;
-      s.x = blocks[i]->particles[n];
-      s.y = blocks[i]->particles[n + 1];
-      s.z = blocks[i]->particles[n + 2];
+      s.x = blocks[i].particles[n];
+      s.y = blocks[i].particles[n + 1];
+      s.z = blocks[i].particles[n + 2];
       n += 3;
       sites.push_back(s);
 
@@ -1868,48 +1868,48 @@ void PrepCellRendering(int &num_vis_cells) {
 
   for (int i = 0; i < nblocks; i++) { // blocks
 
-    for (int j = 0; j < blocks[i]->num_complete_cells; j++) { // cells
+    for (int j = 0; j < blocks[i].num_complete_cells; j++) { // cells
 
-      int cell = blocks[i]->complete_cells[j]; // current cell
+      int cell = blocks[i].complete_cells[j]; // current cell
       int num_faces; // number of faces in the current cell
       int num_verts; // number of vertices in the current face
 
-      if (cell < blocks[i]->num_orig_particles - 1)
-	num_faces = blocks[i]->cell_faces_start[cell + 1] -
-	  blocks[i]->cell_faces_start[cell];
+      if (cell < blocks[i].num_orig_particles - 1)
+	num_faces = blocks[i].cell_faces_start[cell + 1] -
+	  blocks[i].cell_faces_start[cell];
       else
-	num_faces = blocks[i]->tot_num_cell_faces -
-	  blocks[i]->cell_faces_start[cell];
+	num_faces = blocks[i].tot_num_cell_faces -
+	  blocks[i].cell_faces_start[cell];
 
       for (int k = 0; k < num_faces; k++) { // faces
 
-	int start = blocks[i]->cell_faces_start[cell];
-	int face = blocks[i]->cell_faces[start + k];
-	num_verts = blocks[i]->faces[face].num_verts;
+	int start = blocks[i].cell_faces_start[cell];
+	int face = blocks[i].cell_faces[start + k];
+	num_verts = blocks[i].faces[face].num_verts;
 
-	if (blocks[i]->vols[j] >= min_vol &&
-	    (max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol)) {
+	if (blocks[i].vols[j] >= min_vol &&
+	    (max_vol <= 0.0 || blocks[i].vols[j] <= max_vol)) {
 	  num_face_verts.push_back(num_verts);
-	  face_vols.push_back(blocks[i]->vols[j]);
+	  face_vols.push_back(blocks[i].vols[j]);
 	  if (i == 0 && j == 0)
-	    min_vol_act = blocks[i]->vols[j];
-	  if (blocks[i]->vols[j] < min_vol_act)
-	    min_vol_act = blocks[i]->vols[j];
-	  if (blocks[i]->vols[j] > max_vol_act)
-	    max_vol_act = blocks[i]->vols[j];
+	    min_vol_act = blocks[i].vols[j];
+	  if (blocks[i].vols[j] < min_vol_act)
+	    min_vol_act = blocks[i].vols[j];
+	  if (blocks[i].vols[j] > max_vol_act)
+	    max_vol_act = blocks[i].vols[j];
 	}
 
 	int v0; // starting vertex of this face in verts list
 
 	for (int l = 0; l < num_verts; l++) { // vertices
 
-	  int v = blocks[i]->faces[face].verts[l];
+	  int v = blocks[i].faces[face].verts[l];
 	  vec3d s;
-	  s.x = blocks[i]->save_verts[3 * v];
-	  s.y = blocks[i]->save_verts[3 * v + 1];
-	  s.z = blocks[i]->save_verts[3 * v + 2];
-	  if (blocks[i]->vols[j] >= min_vol &&
-	      (max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol)) {
+	  s.x = blocks[i].save_verts[3 * v];
+	  s.y = blocks[i].save_verts[3 * v + 1];
+	  s.z = blocks[i].save_verts[3 * v + 2];
+	  if (blocks[i].vols[j] >= min_vol &&
+	      (max_vol <= 0.0 || blocks[i].vols[j] <= max_vol)) {
 	    verts.push_back(s);
 	    if (l == 0)
 	      v0 = (int)verts.size() - 1; // note starting vertex of this face
@@ -1937,8 +1937,8 @@ void PrepCellRendering(int &num_vis_cells) {
 
       } // faces
 
-      if (blocks[i]->vols[j] >= min_vol &&
-	  (max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol))
+      if (blocks[i].vols[j] >= min_vol &&
+	  (max_vol <= 0.0 || blocks[i].vols[j] <= max_vol))
 	num_vis_cells++;
 
     } // cells
@@ -1962,28 +1962,28 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
   for (int i = 0; i < nblocks; i++) { // blocks
 
     // local tets
-    for (int j = 0; j < blocks[i]->num_loc_tets; j++) {
+    for (int j = 0; j < blocks[i].num_loc_tets; j++) {
 
       // site indices for tet vertices
-      int s0 = blocks[i]->loc_tets[4 * j];
-      int s1 = blocks[i]->loc_tets[4 * j + 1];
-      int s2 = blocks[i]->loc_tets[4 * j + 2];
-      int s3 = blocks[i]->loc_tets[4 * j + 3];
+      int s0 = blocks[i].loc_tets[4 * j];
+      int s1 = blocks[i].loc_tets[4 * j + 1];
+      int s2 = blocks[i].loc_tets[4 * j + 2];
+      int s3 = blocks[i].loc_tets[4 * j + 3];
 
       // coordinates for tet vertices
       vec3d p0, p1, p2, p3;
-      p0.x = blocks[i]->sites[3 * s0];
-      p0.y = blocks[i]->sites[3 * s0 + 1];
-      p0.z = blocks[i]->sites[3 * s0 + 2];
-      p1.x = blocks[i]->sites[3 * s1];
-      p1.y = blocks[i]->sites[3 * s1 + 1];
-      p1.z = blocks[i]->sites[3 * s1 + 2];
-      p2.x = blocks[i]->sites[3 * s2];
-      p2.y = blocks[i]->sites[3 * s2 + 1];
-      p2.z = blocks[i]->sites[3 * s2 + 2];
-      p3.x = blocks[i]->sites[3 * s3];
-      p3.y = blocks[i]->sites[3 * s3 + 1];
-      p3.z = blocks[i]->sites[3 * s3 + 2];
+      p0.x = blocks[i].sites[3 * s0];
+      p0.y = blocks[i].sites[3 * s0 + 1];
+      p0.z = blocks[i].sites[3 * s0 + 2];
+      p1.x = blocks[i].sites[3 * s1];
+      p1.y = blocks[i].sites[3 * s1 + 1];
+      p1.z = blocks[i].sites[3 * s1 + 2];
+      p2.x = blocks[i].sites[3 * s2];
+      p2.y = blocks[i].sites[3 * s2 + 1];
+      p2.z = blocks[i].sites[3 * s2 + 2];
+      p3.x = blocks[i].sites[3 * s3];
+      p3.y = blocks[i].sites[3 * s3 + 1];
+      p3.z = blocks[i].sites[3 * s3 + 2];
 
       // add the vertices
       tet_verts.push_back(p0);
@@ -1996,98 +1996,98 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
     } // local tets
 
     // remote tets
-    for (int j = 0; j < blocks[i]->num_rem_tets; j++) {
+    for (int j = 0; j < blocks[i].num_rem_tets; j++) {
 
       // gids for tet vertices
-      int g0 = blocks[i]->rem_tet_gids[4 * j];
-      int g1 = blocks[i]->rem_tet_gids[4 * j + 1];
-      int g2 = blocks[i]->rem_tet_gids[4 * j + 2];
-      int g3 = blocks[i]->rem_tet_gids[4 * j + 3];
+      int g0 = blocks[i].rem_tet_gids[4 * j];
+      int g1 = blocks[i].rem_tet_gids[4 * j + 1];
+      int g2 = blocks[i].rem_tet_gids[4 * j + 2];
+      int g3 = blocks[i].rem_tet_gids[4 * j + 3];
 
       // site indices for tet vertices
-      int s0 = blocks[i]->rem_tet_nids[4 * j];
-      int s1 = blocks[i]->rem_tet_nids[4 * j + 1];
-      int s2 = blocks[i]->rem_tet_nids[4 * j + 2];
-      int s3 = blocks[i]->rem_tet_nids[4 * j + 3];
+      int s0 = blocks[i].rem_tet_nids[4 * j];
+      int s1 = blocks[i].rem_tet_nids[4 * j + 1];
+      int s2 = blocks[i].rem_tet_nids[4 * j + 2];
+      int s3 = blocks[i].rem_tet_nids[4 * j + 3];
 
       // coordinates for tet vertices
       // assuming that gid = lid, ie, blocks were written and read in gid order
       vec3d p0, p1, p2, p3;
 
       // p0
-      p0.x = blocks[gid2lid[g0]]->sites[3 * s0];
-      p0.y = blocks[gid2lid[g0]]->sites[3 * s0 + 1];
-      p0.z = blocks[gid2lid[g0]]->sites[3 * s0 + 2];
+      p0.x = blocks[gid2lid[g0]].sites[3 * s0];
+      p0.y = blocks[gid2lid[g0]].sites[3 * s0 + 1];
+      p0.z = blocks[gid2lid[g0]].sites[3 * s0 + 2];
 
       // wraparound transform
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j] & DIY_X0) == DIY_X0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_X0) == DIY_X0)
 	p0.x += (data_max.x - data_min.x);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j] & DIY_X1) == DIY_X1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_X1) == DIY_X1)
 	p0.x -= (data_max.x - data_min.x);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j] & DIY_Y0) == DIY_Y0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_Y0) == DIY_Y0)
 	p0.y += (data_max.y - data_min.y);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j] & DIY_Y1) == DIY_Y1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_Y1) == DIY_Y1)
 	p0.y -= (data_max.y - data_min.y);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j] & DIY_Z0) == DIY_Z0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_Z0) == DIY_Z0)
 	p0.z += (data_max.z - data_min.z);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j] & DIY_Z1) == DIY_Z1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_Z1) == DIY_Z1)
 	p0.z -= (data_max.z - data_min.z);
 
       // p1
-      p1.x = blocks[gid2lid[g1]]->sites[3 * s1];
-      p1.y = blocks[gid2lid[g1]]->sites[3 * s1 + 1];
-      p1.z = blocks[gid2lid[g1]]->sites[3 * s1 + 2];
+      p1.x = blocks[gid2lid[g1]].sites[3 * s1];
+      p1.y = blocks[gid2lid[g1]].sites[3 * s1 + 1];
+      p1.z = blocks[gid2lid[g1]].sites[3 * s1 + 2];
 
       // wraparound transform
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 1] & DIY_X0) == DIY_X0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_X0) == DIY_X0)
 	p1.x += (data_max.x - data_min.x);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 1] & DIY_X1) == DIY_X1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_X1) == DIY_X1)
 	p1.x -= (data_max.x - data_min.x);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 1] & DIY_Y0) == DIY_Y0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_Y0) == DIY_Y0)
 	p1.y += (data_max.y - data_min.y);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 1] & DIY_Y1) == DIY_Y1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_Y1) == DIY_Y1)
 	p1.y -= (data_max.y - data_min.y);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 1] & DIY_Z0) == DIY_Z0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_Z0) == DIY_Z0)
 	p1.z += (data_max.z - data_min.z);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 1] & DIY_Z1) == DIY_Z1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_Z1) == DIY_Z1)
 	p1.z -= (data_max.z - data_min.z);
 
       // p2
-      p2.x = blocks[gid2lid[g2]]->sites[3 * s2];
-      p2.y = blocks[gid2lid[g2]]->sites[3 * s2 + 1];
-      p2.z = blocks[gid2lid[g2]]->sites[3 * s2 + 2];
+      p2.x = blocks[gid2lid[g2]].sites[3 * s2];
+      p2.y = blocks[gid2lid[g2]].sites[3 * s2 + 1];
+      p2.z = blocks[gid2lid[g2]].sites[3 * s2 + 2];
 
       // wraparound transform
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 2] & DIY_X0) == DIY_X0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_X0) == DIY_X0)
 	p2.x += (data_max.x - data_min.x);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 2] & DIY_X1) == DIY_X1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_X1) == DIY_X1)
 	p2.x -= (data_max.x - data_min.x);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 2] & DIY_Y0) == DIY_Y0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_Y0) == DIY_Y0)
 	p2.y += (data_max.y - data_min.y);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 2] & DIY_Y1) == DIY_Y1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_Y1) == DIY_Y1)
 	p2.y -= (data_max.y - data_min.y);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 2] & DIY_Z0) == DIY_Z0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_Z0) == DIY_Z0)
 	p2.z += (data_max.z - data_min.z);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 2] & DIY_Z1) == DIY_Z1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_Z1) == DIY_Z1)
 	p2.z -= (data_max.z - data_min.z);
 
       // p3
-      p3.x = blocks[gid2lid[g3]]->sites[3 * s3];
-      p3.y = blocks[gid2lid[g3]]->sites[3 * s3 + 1];
-      p3.z = blocks[gid2lid[g3]]->sites[3 * s3 + 2];
+      p3.x = blocks[gid2lid[g3]].sites[3 * s3];
+      p3.y = blocks[gid2lid[g3]].sites[3 * s3 + 1];
+      p3.z = blocks[gid2lid[g3]].sites[3 * s3 + 2];
 
       // wraparaound transform
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 3] & DIY_X0) == DIY_X0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_X0) == DIY_X0)
 	p3.x += (data_max.x - data_min.x);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 3] & DIY_X1) == DIY_X1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_X1) == DIY_X1)
 	p3.x -= (data_max.x - data_min.x);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 3] & DIY_Y0) == DIY_Y0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_Y0) == DIY_Y0)
 	p3.y += (data_max.y - data_min.y);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 3] & DIY_Y1) == DIY_Y1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_Y1) == DIY_Y1)
 	p3.y -= (data_max.y - data_min.y);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 3] & DIY_Z0) == DIY_Z0)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_Z0) == DIY_Z0)
 	p3.z += (data_max.z - data_min.z);
-      if ((blocks[i]->rem_tet_wrap_dirs[4 * j + 3] & DIY_Z1) == DIY_Z1)
+      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_Z1) == DIY_Z1)
 	p3.z -= (data_max.z - data_min.z);
 
       // add the vertices
@@ -2212,12 +2212,12 @@ void PrepSiteRendering(int &num_sites) {
 
     // sites
     n = 0;
-    for (int j = 0; j < blocks[i]->num_orig_particles; j++) {
+    for (int j = 0; j < blocks[i].num_orig_particles; j++) {
 
       vec3d s;
-      s.x = blocks[i]->sites[n];
-      s.y = blocks[i]->sites[n + 1];
-      s.z = blocks[i]->sites[n + 2];
+      s.x = blocks[i].sites[n];
+      s.y = blocks[i].sites[n + 1];
+      s.z = blocks[i].sites[n + 2];
       n += 3;
       sites.push_back(s);
 

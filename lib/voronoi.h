@@ -36,7 +36,7 @@
 #define MAX_NEIGHBORS 27 /* maximum number of neighbor blocks */
 
 /* timing info */
-#define MAX_TIMES 9 /* max number of timing components */
+#define TESS_MAX_TIMES 9 /* max number of timing components */
 #define TOT_TIME 0 /* total time */
 #define LOC1_TIME 1 /* first local delaunay */
 #define LOC2_TIME 2 /* second local delaunay */
