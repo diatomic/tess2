@@ -19,5 +19,6 @@ all clean:
 	cd tess-driver && $(MAKE) $@
 	cd dense-driver && $(MAKE) $@
 	cd post-tess-driver && $(MAKE) $@
+	cd tess-dense-driver && $(MAKE) $@
 
 
