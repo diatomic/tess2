@@ -1189,8 +1189,8 @@ void SummaryStats(double *times, MPI_Comm comm, float *grid_step_size,
 	    glo_max_cell_grid_pts);
     fprintf(stderr, "max_dense = %.3e tot_mass = %.3e (should be %.3e)\n",
 	    glo_max_dense, glo_tot_mass, glo_check_mass);
-    fprintf(stderr, "Total number of cell interior evaluations = %.lld\n", 
-	    tot_interior_evals);
+    fprintf(stderr, "Total number of cell interior evaluations = %lld\n", 
+	    (long long)tot_interior_evals);
     fprintf(stderr, "Total time = %.3lf s = \n", times[TOTAL_TIME]);
     fprintf(stderr, "%.3lf s input + %.3lf s density computation + "
 	    "%.3lf s output\n",

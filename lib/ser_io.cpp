@@ -352,8 +352,8 @@ void SER_IO::ReadBlock(FILE *fd, dblock_t* &d, int64_t ofst) {
       Swap((char *)d->tets[i].tets, 4, sizeof(int));
     }
     for (int i = 0; i < d->num_rem_tet_verts; i++) {
-      Swap((char *)d->rem_tet_verts[i].gid, 1, sizeof(int));
-      Swap((char *)d->rem_tet_verts[i].nid, 1, sizeof(int));
+      Swap((char *)&(d->rem_tet_verts[i].gid), 1, sizeof(int));
+      Swap((char *)&(d->rem_tet_verts[i].nid), 1, sizeof(int));
       // no need to swap dir, unsigned char
     }
 

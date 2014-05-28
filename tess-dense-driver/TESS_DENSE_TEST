@@ -20,8 +20,8 @@
 # without permission
 #
 #----------------------------------------------------------------------------
-ARCH=MAC_OSX
-#ARCH=LINUX
+#ARCH=MAC_OSX
+ARCH=LINUX
 #ARCH=BGQ
 #ARCH=FUSION
 #ARCH=XT
@@ -124,11 +124,11 @@ fi
 
 if [ "$ARCH" = "LINUX" ]; then
 
-#mpiexec -n $num_procs $exe $args
+mpiexec -n $num_procs $exe $args
 
 #mpiexec -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
 
-mpiexec -n $num_procs valgrind -q $exe $args
+#mpiexec -n $num_procs valgrind -q $exe $args
 
 #mpiexec -n $num_procs valgrind -q --leak-check=yes $exe $args
 
