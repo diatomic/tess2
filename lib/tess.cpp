@@ -39,6 +39,9 @@
 
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>
+#include "builtins.h"
+#define __builtin_ctzll(x) __cnttz8(x)
+#define __builtin_clzll(x) __cntlz8(x);
 #endif
 
 using namespace std;
