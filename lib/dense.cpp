@@ -657,19 +657,19 @@ void CellBounds(dblock_t *dblock, int cell, float *cell_min, float *cell_max,
       face_verts[k].push_back(vv[2]);
 
       // extrema for entire cell
-      if (k == 0 && l == 0 || vv[0] < cell_min[0])
+      if ((k == 0 && l == 0) || vv[0] < cell_min[0])
 	cell_min[0] = vv[0];
-      if (k == 0 && l == 0 || vv[0] > cell_max[0])
+      if ((k == 0 && l == 0) || vv[0] > cell_max[0])
 	cell_max[0] = vv[0];
 
-      if (k == 0 && l == 0 || vv[1] < cell_min[1])
+      if ((k == 0 && l == 0) || vv[1] < cell_min[1])
 	cell_min[1] = vv[1];
-      if (k == 0 && l == 0 || vv[1] > cell_max[1])
+      if ((k == 0 && l == 0) || vv[1] > cell_max[1])
 	cell_max[1] = vv[1];
 
-      if (k == 0 && l == 0 || vv[2] < cell_min[2])
+      if ((k == 0 && l == 0) || vv[2] < cell_min[2])
 	cell_min[2] = vv[2];
-      if (k == 0 && l == 0 || vv[2] > cell_max[2])
+      if ((k == 0 && l == 0) || vv[2] > cell_max[2])
 	cell_max[2] = vv[2];
 
     } // vertices
