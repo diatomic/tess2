@@ -128,7 +128,7 @@ void dense(float **density, int nblocks,
 
     for (int j = 0; j < num_items[block]; j++) {
 
-      grid_pt_t *grid_pt = (grid_pt_t*)(items[block][j]);
+      grid_pt_t *grid_pt = DIY_Exchd_item(grid_pt_t, items, block, j);
 
       // make sure this point really goes to this block, points right on
       // the max block boundary may get sent inadvertently sent here
@@ -144,6 +144,7 @@ void dense(float **density, int nblocks,
       int block_grid_idx[3]; // indices in local block array
       Global2LocalIdx(grid_pt->idx, block_grid_idx, block_min_idx);
       int idx = index(block_grid_idx, block_num_idx, project, proj_plane);
+
       density[block][idx] += (grid_pt->mass / div);
 
       // debug
@@ -704,8 +705,8 @@ void CellBounds(dblock_t *dblock, int cell, float *cell_min, float *cell_max,
 void ItemDtype(DIY_Datatype *dtype) {
 
   struct map_block_t map[] = {
-    {DIY_INT,   OFST, 3, offsetof(grid_pt_t, idx)}, // global grid index
-    {DIY_FLOAT, OFST, 1, offsetof(grid_pt_t, mass)}, // mass
+    {DIY_INT,    OFST, 3, offsetof(grid_pt_t, idx)}, // global grid index
+    {DIY_DOUBLE, OFST, 1, offsetof(grid_pt_t, mass)}, // mass
   };
   DIY_Create_struct_datatype(0, 2, map, dtype);
 
