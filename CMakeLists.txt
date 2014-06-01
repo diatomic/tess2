@@ -72,6 +72,7 @@ if 			    (OPENMP_FOUND)
     set 		    (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 else			    ()
     message		    ("OpenMP not found")
+    add_definitions	    (-DTESS_NO_OPENMP)
 endif()
 
 # OpenGL

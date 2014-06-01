@@ -13,7 +13,9 @@
 //
 //--------------------------------------------------------------------------
 #include "tess/dense.hpp"
+#ifndef TESS_NO_OPENMP
 #include <omp.h>
+#endif
 
 using namespace std;
 
@@ -275,6 +277,7 @@ void IterateCells(int block, int *block_min_idx, int *block_num_idx,
     free(border);
 
 }
+#ifndef TESS_NO_OPENMP
 //--------------------------------------------------------------------------
 //
 // iterate over cells and assign single density to grid point
@@ -422,6 +425,7 @@ void IterateCellsOMP(int block, int *block_min_idx, int *block_num_idx,
     enq_grid_pts[i].clear();
 
 }
+#endif
 //--------------------------------------------------------------------------
 //
 // iterate over cells and assigns density to grid points
