@@ -1,5 +1,5 @@
-#include "tess.h"
-#include "tess-qhull.h"
+#include "tess/tess.h"
+#include "tess/tess-qhull.h"
 
 /*--------------------------------------------------------------------------*/
 /* Initialization and destruction of Delaunay data structures is not used with

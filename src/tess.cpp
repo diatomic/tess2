@@ -21,9 +21,9 @@
 
 #include "mpi.h"
 #include "diy.h"
-#include "tess.h"
-#include "tess.hpp"
-#include "io.h"
+#include "tess/tess.h"
+#include "tess/tess.hpp"
+#include "tess/io.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -34,8 +34,8 @@
 #include <vector>
 #include <set>
 #include <algorithm>
-#include "tet.h"
-#include "tet-neighbors.h"
+#include "tess/tet.h"
+#include "tess/tet-neighbors.h"
 
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>

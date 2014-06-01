@@ -3,7 +3,7 @@
 #include <H5Cpp.h>
 
 #include "pread.h"
-#include <swap.hpp>
+#include <tess/swap.hpp>
 
 void read_particles(char *infile, int rank, int size,
 		    std::vector <float> &particles,

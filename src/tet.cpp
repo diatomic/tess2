@@ -5,8 +5,8 @@
 #include <set>
 #include <queue>
 
-#include "tet.h"
-#include "tet-neighbors.h"
+#include "tess/tet.h"
+#include "tess/tet-neighbors.h"
 
 // finds index of v in tet->verts
 int find(tet_t* tet, int v)

@@ -13,7 +13,7 @@
 //
 //---------------------------------------------------------------------------
 #include <stdio.h>
-#include "swap.hpp"
+#include "tess/swap.hpp"
 
 //
 // swaps bytes

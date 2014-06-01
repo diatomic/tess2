@@ -17,8 +17,8 @@
 #include "zlib.h"
 #endif
 
-#include "ser_io.hpp"
-#include "swap.hpp"
+#include "tess/ser_io.hpp"
+#include "tess/swap.hpp"
 
 //----------------------------------------------------------------------------
 //

@@ -12,7 +12,7 @@
 // See COPYRIGHT in top-level directory.
 //
 //--------------------------------------------------------------------------
-#include "dense.hpp"
+#include "tess/dense.hpp"
 #include <omp.h>
 
 using namespace std;

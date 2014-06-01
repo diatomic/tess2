@@ -5,8 +5,8 @@
 //
 #include "mpi.h"
 #include <assert.h>
-#include "tess.h"
-#include "dense.hpp"
+#include "tess/tess.h"
+#include "tess/dense.hpp"
 
 void GetArgs(int argc, char **argv, int &tb, int *dsize, float *jitter,
 	     float *minvol, float *maxvol, int *wrap, int *walls, 

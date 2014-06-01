@@ -1,6 +1,6 @@
-#include "tess.h"
-#include "tess-cgal.h"
-#include "tet-neighbors.h"
+#include "tess/tess.h"
+#include "tess/tess-cgal.h"
+#include "tess/tet-neighbors.h"
 #include <vector>
 
 //----------------------------------------------------------------------------

@@ -1,0 +1,6 @@
+add_subdirectory	    (tess-driver)
+add_subdirectory	    (dense)
+add_subdirectory	    (tess-dense)
+add_subdirectory	    (post-tess)
+add_subdirectory	    (pread-voronoi)
+add_subdirectory	    (hacc-post-tess)

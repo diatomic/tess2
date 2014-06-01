@@ -1,6 +1,6 @@
 #include "mpi.h"
 #include <assert.h>
-#include "tess.h"
+#include "tess/tess.h"
 #include <vector>
 #include <stdio.h>
 #include "pread.h"

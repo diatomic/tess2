@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include "ser_io.hpp"
+#include "tess/ser_io.hpp"
 
 using namespace std;
 

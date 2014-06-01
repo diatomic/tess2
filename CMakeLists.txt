@@ -70,6 +70,8 @@ find_package		    (OpenMP)
 if 			    (OPENMP_FOUND)
     set 		    (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set 		    (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+else			    ()
+    message		    ("OpenMP not found")
 endif()
 
 # OpenGL
@@ -96,7 +98,7 @@ find_library                (GenericIO_LIBRARY NAMES	GenericIO)
 endif			    (hacc_test)
 
 set                         (CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-isystem")
-include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/lib
+include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 			     ${DIY_INCLUDE_DIRS}
 			     ${PNetCDF_INCLUDE_DIR}
 			     ${GenericIO_INCLUDE_DIR}
@@ -124,10 +126,6 @@ if                          (debug)
     endif                   (LIBDW_LIBRARY)
 endif                       (debug)
 
-add_subdirectory	    (lib)
-add_subdirectory	    (tess-driver)
-add_subdirectory	    (dense-driver)
-add_subdirectory	    (tess-dense-driver)
-add_subdirectory	    (post-tess-driver)
-add_subdirectory	    (pread-voronoi)
-add_subdirectory	    (hacc-post-tess-driver)
+add_subdirectory	    (src)
+add_subdirectory	    (examples)
+add_subdirectory	    (tools)

@@ -19,9 +19,9 @@
 #include <assert.h>
 #include <mpi.h>
 #include <pnetcdf.h>
-#include "voronoi.h"
+#include "tess/voronoi.h"
 #include "diy.h"
-#include "io.h"
+#include "tess/io.h"
 
 /*---------------------------------------------------------------------------
  *  pnetcdf delaunay file schema

@@ -1,6 +1,6 @@
 #include "mpi.h"
 #include <assert.h>
-#include "tess.h"
+#include "tess/tess.h"
 
 void GetArgs(int argc, char **argv, int &tb, int *dsize, float *jitter,
 	     float *minvol, float *maxvol, int *wrap, int *walls, char *outfile);

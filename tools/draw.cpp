@@ -19,10 +19,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
-#include "delaunay.h"
-#include "voronoi.h"
-#include "ser_io.hpp"
-#include "tet-neighbors.h"
+#include "tess/delaunay.h"
+#include "tess/voronoi.h"
+#include "tess/ser_io.hpp"
+#include "tess/tet-neighbors.h"
 #include <math.h>
 
 #if defined(MAC_OSX)
@@ -40,7 +40,7 @@
 
 #ifndef SERIAL_IO
 #include "mpi.h"
-#include "io.h"
+#include "tess/io.h"
 #endif
 
 using namespace std;
@@ -1490,7 +1490,7 @@ void PrepRenderingData(int *gid2lid) {
 
 #ifdef TET
 
-#include "tet.h"
+#include "tess/tet.h"
 
 // prep rendering for newer dblock model
 

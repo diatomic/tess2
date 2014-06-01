@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <vector>
-#include "dense.hpp"
+#include "tess/dense.hpp"
 
 using namespace std;
 
