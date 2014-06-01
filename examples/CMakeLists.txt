@@ -1,4 +1,4 @@
-add_subdirectory	    (tess-driver)
+add_subdirectory	    (test-tess)
 add_subdirectory	    (dense)
 add_subdirectory	    (tess-dense)
 add_subdirectory	    (post-tess)
