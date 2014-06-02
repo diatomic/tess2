@@ -11,10 +11,10 @@
 #
 #----------------------------------------------------------------------------
 
-include ../user_defs.mk
+include ../../user_defs.mk
 
-INCLUDES = $(DIY_INC) $(DELAUNAY_INC) $(PNETCDF_INC) -I../lib
-LIBS = -L../lib -ltess $(DIY_LIB) $(PNETCDF_LIB) $(DELAUNAY_LIB)
+INCLUDES = $(DIY_INC) $(DELAUNAY_INC) $(PNETCDF_INC) -I../../include
+LIBS = -L../../lib -ltess $(DIY_LIB) $(PNETCDF_LIB) $(DELAUNAY_LIB)
 
 ###########
 
@@ -62,7 +62,7 @@ default: all
 
 all: delaunay
 
-delaunay: $(OBJS) ../lib/libtess.a
+delaunay: $(OBJS) ../../lib/libtess.a
 	$(CXX) -o delaunay $(OBJS) $(LIBS)
 
 clean:

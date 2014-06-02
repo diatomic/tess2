@@ -11,10 +11,10 @@
 #
 #----------------------------------------------------------------------------
 
-include ../user_defs.mk
+include ../../user_defs.mk
 
-INCLUDES = -I../lib $(DIY_INC) $(DELAUNAY_INC) $(PNETCDF_INC)
-LIBS = -L../lib -ltess $(DIY_LIB) $(PNETCDF_LIB) $(DELAUNAY_LIB) -fopenmp
+INCLUDES = -I../../include $(DIY_INC) $(DELAUNAY_INC) $(PNETCDF_INC)
+LIBS = -L../../lib -ltess $(DIY_LIB) $(PNETCDF_LIB) $(DELAUNAY_LIB) -fopenmp
 
 ###########
 
@@ -62,7 +62,7 @@ default: all
 
 all: dense
 
-dense: $(OBJS) ../lib/libtess.a
+dense: $(OBJS) ../../lib/libtess.a
 	$(CXX) -o dense $(OBJS) $(LIBS)
 
 clean:

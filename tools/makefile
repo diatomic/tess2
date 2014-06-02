@@ -13,8 +13,8 @@
 
 include ../user_defs.mk
 
-INCLUDES = $(DIY_INC) $(DELAUNAY_INC) $(PNETCDF_INC)
-LIBS = $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB) -L. -ltess
+INCLUDES = -I../include $(DIY_INC) $(DELAUNAY_INC) $(PNETCDF_INC)
+LIBS = $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB) -L../lib -ltess
 
 ###########
 
@@ -52,9 +52,8 @@ endif
 
 ###########
 
-TESS_OBJS = tess.o io.o swap.o tet.o utils.o dense.o $(TESS_CONV_OBJ)
-DRAW_OBJS = draw.o ser_io.o swap.o io.o
-DUMP_OBJS = dump.o ser_io.o swap.o
+DRAW_OBJS = draw.o
+DUMP_OBJS = dump.o
 
 .SUFFIXES: .c .cpp
 
@@ -66,25 +65,17 @@ DUMP_OBJS = dump.o ser_io.o swap.o
 
 default: all
 
-ifeq ($(ARCH), BGP)
-all: libtess.a dump
-else
 ifeq ($(ARCH), BGQ)
-all: libtess.a dump
+all: dump
 else
-all: libtess.a draw dump
+all: draw dump
 endif
-endif
-
-libtess.a: $(TESS_OBJS)
-	rm -f $@
-	ar -cru $@ $(TESS_OBJS)
 
 draw: $(DRAW_OBJS) 
 	$(CXX) -o draw $(DRAW_OBJS) $(GL_LIBS) $(LIBS)
 
 dump: $(DUMP_OBJS) 
-	$(CXX) -o dump $(DUMP_OBJS)
+	$(CXX) -o dump $(DUMP_OBJS) $(LIBS)
 
 clean:
-	rm -f *.o *.a
+	rm -f *.o draw dump

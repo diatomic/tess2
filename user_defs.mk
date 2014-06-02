@@ -26,7 +26,12 @@ ARCH = MAC_OSX
 CONV = QHULL
 #CONV = CGAL
 
-# 3. Set your dependency paths and build options here
+# 3. Select whether and what type of SMP threading is used (optional)
+
+#TESS_THREAD = TESS_OMP
+# define new modes, PTHERAD, TBB, CUDA, etc. as they are implemented
+
+# 4. Set your dependency paths and build options here
 
 ifeq ($(ARCH), BGQ) # BG/Q version
 
@@ -78,6 +83,9 @@ CCFLAGS = -DPNETCDF_IO
 # users should not need to edit beyond this point
 #
 #----------------------------------------------------------------------------
+ifeq ($(TESS_THREAD), TESS_OMP)
+CCFLAGS += -DTESS_OMP
+endif
 
 ifeq ($(CONV), QHULL) # qhull version
 

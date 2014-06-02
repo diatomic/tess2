@@ -15,10 +15,10 @@
 default: all
 
 all clean:
-	cd lib && $(MAKE) $@
-	cd tess-driver && $(MAKE) $@
-	cd dense-driver && $(MAKE) $@
-	cd post-tess-driver && $(MAKE) $@
-	cd tess-dense-driver && $(MAKE) $@
+	cd src && $(MAKE) $@
+	cd examples/test-tess && $(MAKE) $@
+	cd examples/dense && $(MAKE) $@
+	cd examples/post-tess && $(MAKE) $@
+	cd examples/tess-dense && $(MAKE) $@
 
 

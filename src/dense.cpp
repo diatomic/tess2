@@ -97,15 +97,17 @@ void dense(float **density, int nblocks,
 
     // iterate over cells, distributing density onto grid points
 
+#ifdef TESS_OMP
+    // tess-based multithread estimator
+    IterateCellsOMP(block, block_min_idx, block_num_idx, density, project,
+		 proj_plane, grid_phys_mins, grid_step_size, dblocks, 
+		 data_mins, data_maxs, eps, mass);
+#else
     // tess-based single-thread estimator
     IterateCells(block, block_min_idx, block_num_idx, density, project,
 		 proj_plane, grid_phys_mins, grid_step_size, dblocks, 
 		 data_mins, data_maxs, eps, mass);
-
-    // tess-based multithread estimator
-//     IterateCellsOMP(block, block_min_idx, block_num_idx, density, project,
-// 		 proj_plane, grid_phys_mins, grid_step_size, dblocks, 
-// 		 data_mins, data_maxs, eps, mass);
+#endif
 
     // for comarison, CIC-based estimator
 //     IterateCellsCic(block, block_min_idx, block_num_idx, density, project,

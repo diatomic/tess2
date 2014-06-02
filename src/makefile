@@ -11,18 +11,19 @@
 #
 #----------------------------------------------------------------------------
 
-include ../../user_defs.mk
+include ../user_defs.mk
 
-INCLUDES = $(DIY_INC) $(DELAUANAY_INC) $(PNETCDF_INC) -I../../include
-LIBS = -L../../lib -ltess $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB)
+INCLUDES = -I../include $(DIY_INC) $(DELAUNAY_INC) $(PNETCDF_INC)
+LIBS = $(DIY_LIB) $(DELAUNAY_LIB) $(PNETCDF_LIB) -L. -ltess
 
 ###########
 
 ifeq ($(ARCH), MAC_OSX) # mac version
 
-CCFLAGS = -g
-CCFLAGS += -DMAC_OSX -fopenmp
+CCFLAGS += -g -Wall -Wextra
+CCFLAGS += -DMAC_OSX $(TIMING) -fopenmp
 CCFLAGS += ${DELAUNAY_CCFLAGS}
+GL_LIBS = -framework GLUT -framework OpenGL
 
 endif
 
@@ -30,19 +31,19 @@ endif
 
 ifeq ($(ARCH), LINUX) # linux version
 
-CCFLAGS = -g
-CCFLAGS += -DLINUX
+CCFLAGS += -g
+CCFLAGS += -DLINUX $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}
+GL_LIBS = -lglut -lGLU -lGL
 
 endif
 
 ###########
 
-
 ifeq ($(ARCH), BGQ) # BG/Q version
 
-CCFLAGS = -O3
-#CCFLAGS = -g
+CCFLAGS += -O3
+#CCFLAGS += -g
 CCFLAGS += -DBGQ $(TIMING)
 CCFLAGS += ${DELAUNAY_CCFLAGS}
 GL_LIBS =
@@ -51,20 +52,24 @@ endif
 
 ###########
 
-OBJS = main.o
+TESS_OBJS = tess.o io.o swap.o tet.o utils.o dense.o ser_io.o $(TESS_CONV_OBJ)
 
+.SUFFIXES: .c .cpp
 
-.SUFFIXES: .cpp
+.c.o:
+	$(CC) -c $(CCFLAGS) $(INCLUDES) $<
 
 .cpp.o:
 	$(CXX) -c $(CCFLAGS) $(INCLUDES) $<
 
 default: all
 
-all: post-delaunay
+all: libtess.a
 
-post-delaunay: $(OBJS) ../../lib/libtess.a
-	$(CXX) -o post-delaunay $(OBJS) $(LIBS)
+libtess.a: $(TESS_OBJS)
+	rm -f $@
+	ar -cru $@ $(TESS_OBJS)
+	mv libtess.a ../lib
 
 clean:
-	rm -f *.o 
+	rm -f *.o *.a

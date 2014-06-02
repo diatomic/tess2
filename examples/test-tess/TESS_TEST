@@ -40,7 +40,7 @@ if [ $num_nodes -lt 1 ]; then
 fi
 
 # executable
-exe=${HOME}/tess/tess-driver/delaunay
+exe=./delaunay
 
 # total number of blocks in the domain
 tb=$[$num_procs * 1]
