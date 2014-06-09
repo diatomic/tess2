@@ -1163,6 +1163,13 @@ void wall_d_particles(struct dblock_t *dblock) {
             }
         }
       
+     //TEST
+     /*
+   for (int wi = 0; wi < num_walls; wi++)
+    wall_cut[wi] = 1;
+      */
+      
+      
     /*
     for (int wi = 0; wi < num_walls; wi++)
         fprintf(stderr,"%d",wall_cut[wi]);
@@ -1197,7 +1204,7 @@ void wall_d_particles(struct dblock_t *dblock) {
     if (new_points.size()) {
         int n = (dblock->num_particles - dblock->num_orig_particles);
         int new_remote_particles = new_points.size()/3 + n;
-        fprintf(stderr, "Adding total of %d particles to %d, %d\n", new_remote_particles-n,n, dblock->num_orig_particles);
+       // fprintf(stderr, "Adding total of %d particles to %d, %d\n", new_remote_particles-n,n, dblock->num_orig_particles);
         
         dblock->num_rem_tet_verts = new_remote_particles;
         dblock->rem_tet_verts =  (struct remote_vert_t *)realloc(dblock->rem_tet_verts,
@@ -1224,7 +1231,7 @@ void wall_d_particles(struct dblock_t *dblock) {
    }
    
   
-  fprintf(stderr, "dblock has %d and %d\n",  dblock->num_orig_particles, dblock->num_particles);
+//  fprintf(stderr, "dblock has %d and %d\n",  dblock->num_orig_particles, dblock->num_particles);
 
 
     // CLP cleanup 
