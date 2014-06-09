@@ -626,7 +626,7 @@ struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
 
   // create local delaunay cells
   local_dcells(nblocks, dblocks, ds);
-
+  
   // profile
   get_mem(2, dwell);
   timing(times, INC1_TIME, LOC1_TIME);
@@ -685,10 +685,15 @@ struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
   for (int i = 0; i < nblocks; ++i)
     sent_particles[i].clear();
   delete[] sent_particles;
-
+  
   // profile
   get_mem(6, dwell);
   timing(times, NEIGH2_TIME, INC2_TIME);
+  
+  // Generate particles to create wall
+  if (!wrap_neighbors && walls_on)
+    for (int i = 0; i < nblocks; i++)
+        wall_d_particles(&dblocks[i]);
 
   // cleanup local temporary blocks 
   reset_dblocks(nblocks, dblocks);
@@ -707,7 +712,7 @@ struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
 
   // create all final cells 
   local_dcells(nblocks, dblocks, ds);
-
+  
   // profile
   get_mem(8, dwell);
   timing(times, OUT_TIME, LOC3_TIME);
@@ -1084,6 +1089,150 @@ void neighbor_d_particles(int nblocks, dblock_t *dblocks) {
   free(recv_particles);
 
 }
+// --------------------------------------------------------------------------
+//
+//   CLP Add wall particles
+//
+//   nblocks: local number of blocks
+//   dblocks: local blocks
+//
+void wall_d_particles(struct dblock_t *dblock) {
+ 
+  //   using data_mins and data_maxs
+  //   Currently assuimg walls on all sides, but format can easily be 
+  //   modified to be ANY set of walls 
+  struct wall_t *walls = NULL;
+  int num_walls = 0;
+
+  create_walls(&num_walls,&walls);
+  
+  //fprintf(stderr, "Wrap %d, Walls %d, Num_walls %d\n", wrap_neighbors,walls_on,num_walls);
+
+  int* wall_cut = (int *)malloc(num_walls * sizeof(int));
+ 
+ 
+  std::vector<double> new_points;
+  double jitter = 1e-6;
+
+   // Find all particles that need to be mirrored.
+  for (int p = 0; p < dblock->num_orig_particles; ++p) {
+  
+     //  zero generate-wall-point array (length of number of walls)
+     for (int wi = 0; wi < num_walls; wi++) wall_cut[wi] = 0;
+
+     // Determine if the cell is complete
+    vector< pair<int, int> > nbrs;
+    bool finite = neighbor_edges(nbrs, p, dblock->tets, dblock->vert_to_tet[p]);
+
+    //fprintf(stderr, "particle %d/%d, %d\n", p,dblock->num_orig_particles,finite);
+      
+      
+      if (!finite) {
+          //  set the mirror-generate array to all ones
+          // (extra calculations but simpler to assume!) 
+          for (int wi = 0; wi < num_walls; wi++)
+                wall_cut[wi] = 1;
+        }
+      else {
+        // loop throug the list of all the Voronoi cell vertices of the point.  See if any are outside a wall.
+        
+        // neighbor edges a vector of (vertex u, tet of vertex u) pairs
+        // that neighbor vertex v
+       // vector< pair<int, int> > nbrs;
+        //bool finite = neighbor_edges(nbrs, p, dblock->tets, dblock->vert_to_tet[p]);
+        
+        // the following loop is the equivalent of
+        // for all faces in a voronoi cell
+        for (int i = 0; i < (int)nbrs.size(); ++i) {
+
+            // get edge link
+            int u  = nbrs[i].first;
+            int ut = nbrs[i].second;
+            std::vector<int> edge_link;
+            fill_edge_link(edge_link, p, u, ut, dblock->tets);
+
+            // following is equivalent of all vertices in a face
+            for (int j = 0; j < (int)edge_link.size(); ++j) {
+                float pt[3];
+                circumcenter(pt,&(dblock->tets[edge_link[j]]), dblock->particles);
+                for (int wi = 0; wi < num_walls; wi++)
+                    if (!wall_cut[wi])
+                        wall_cut[wi] = test_outside(pt,&walls[wi]);
+                    
+                 }
+            }
+        }
+      
+    /*
+    for (int wi = 0; wi < num_walls; wi++)
+        fprintf(stderr,"%d",wall_cut[wi]);
+    fprintf(stderr,"\n");
+    */
+    // Make the mirrored particles
+    //   For each mirror-generate index that is 1,
+    //   generate the mirror point given site rp and the wall
+    //   Create list of points
+    for (int wi =0; wi < num_walls; wi++) {
+
+      if (wall_cut[wi]) {
+        float rpt[3];
+        float spt[3];
+        spt[0] = dblock->particles[3 * p];
+        spt[1] = dblock->particles[3 * p + 1];
+        spt[2] = dblock->particles[3 * p + 2];
+        generate_mirror(rpt,spt,&walls[wi]);
+        new_points.push_back(rpt[0]);
+        new_points.push_back(rpt[1]);
+        new_points.push_back(rpt[2]);
+        //fprintf(stderr, "Adding a particles for %d/%d, %d\n", p,dblock->num_orig_particles,finite);
+
+        }
+    }
+
+  }
+  
+  // Add all the new points to the dblock.
+
+  
+    if (new_points.size()) {
+        int n = (dblock->num_particles - dblock->num_orig_particles);
+        int new_remote_particles = new_points.size()/3 + n;
+        fprintf(stderr, "Adding total of %d particles to %d, %d\n", new_remote_particles-n,n, dblock->num_orig_particles);
+        
+        dblock->num_rem_tet_verts = new_remote_particles;
+        dblock->rem_tet_verts =  (struct remote_vert_t *)realloc(dblock->rem_tet_verts,
+                          new_remote_particles * 
+                          sizeof(struct remote_vert_t));
+ 
+    
+
+      // grow space 
+      dblock->particles = (float *)realloc(dblock->particles,(dblock->num_particles*3 + new_points.size())*sizeof(float));
+
+      // copy new particles
+      for (int j = 0; j < new_points.size(); j=j+3) {
+        
+        dblock->particles[3 * dblock->num_particles    ] = new_points[j    ] + rand() / (double)RAND_MAX * 2 * jitter - jitter;
+        dblock->particles[3 * dblock->num_particles + 1] = new_points[j + 1] + rand() / (double)RAND_MAX * 2 * jitter - jitter;
+        dblock->particles[3 * dblock->num_particles + 2] = new_points[j + 2] + rand() / (double)RAND_MAX * 2 * jitter - jitter;
+        dblock->rem_tet_verts[n].gid = -1;
+        dblock->rem_tet_verts[n].nid = -1;
+        dblock->rem_tet_verts[n].dir = 0x00;
+        dblock->num_particles++;
+        n++;
+      }
+   }
+   
+  
+  fprintf(stderr, "dblock has %d and %d\n",  dblock->num_orig_particles, dblock->num_particles);
+
+
+    // CLP cleanup 
+  free(wall_cut);
+  destroy_walls(num_walls, walls);
+
+}
+
 // --------------------------------------------------------------------------
 //
 //   exchanges is_complete list for exchanged particles with neighbors
@@ -3055,7 +3204,7 @@ int gen_particles(int lid, float **particles, float jitter) {
   int sizes[3]; // number of grid points 
   int i, j, k;
   int n = 0;
-  int num_particles; // throreticl num particles with duplicates at 
+  int num_particles; // theoretical num particles with duplicates at 
 		     // block boundaries 
   int act_num_particles; // actual number of particles unique across blocks 
   float jit; // random jitter amount, 0 - MAX_JITTER 
@@ -3643,7 +3792,7 @@ int test_outside(const float *pt,const struct wall_t *wall) {
 //   rpt
 //   pt: site-point
 //   wall: wall
-// 
+//
 void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall) {
 
   // signed distance from wall to site point 

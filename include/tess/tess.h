@@ -72,7 +72,7 @@ void tess(float **particles, int *num_particles, char *out_file);
 
 void voronoi_delaunay(int nblocks, float **particles, int *num_particles, 
 		      double *times, char *out_file);
-struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles, 
+struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
 			  double *times, char *out_file);
 int gen_particles(int lid, float **particles, float jitter);
 #ifdef __cplusplus
@@ -135,6 +135,7 @@ void neighbor_particles(int nblocks, float **particles,
 			int *num_particles, int *num_orig_particles,
 			int **gids, int **nids, unsigned char **dirs);
 void neighbor_d_particles(int nblocks, struct dblock_t *dblocks);
+
 
 #ifdef __cplusplus
 extern "C"

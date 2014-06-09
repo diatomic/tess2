@@ -77,7 +77,7 @@ vec2d aspect; // scaling due to window aspect ratio
 float near = 0.1;
 
 // data overall extent scaling factor for clipping cells
-float ds = 1.0;
+float ds = 2;
 
 // window size
 // vec2d win_size = {1024, 512};
@@ -1116,6 +1116,7 @@ void filter_volume(float min_vol, float max_vol) {
     int  n = 0;
     int m = 0;
 
+
     for (int j = 0; j < blocks[i]->num_complete_cells; j++) { // cells
 
       int cell = blocks[i]->complete_cells[j]; // current cell
@@ -1541,7 +1542,9 @@ void PrepCellRendering(int &num_vis_cells) {
   int v0 = 0; // starting vertex of the current face
   num_vis_cells = 0; // number of visible cells
 
+
   for (int b = 0; b < nblocks; b++) { // blocks
+
 
     // for all voronoi cells
     for (int p = 0; p < blocks[b].num_orig_particles; p++) {
@@ -1552,6 +1555,9 @@ void PrepCellRendering(int &num_vis_cells) {
       // skip tets with missing neighbors
       if (blocks[b].tets[t].tets[0] == -1 || blocks[b].tets[t].tets[1] == -1 ||
 	  blocks[b].tets[t].tets[2] == -1 || blocks[b].tets[t].tets[3] == -1)  {
+      
+        fprintf(stderr, "Block %d, Particle %d/%d has a missing neighbor\n", b, p,blocks[b].num_orig_particles);
+
 	continue;
       }
 
@@ -1561,8 +1567,10 @@ void PrepCellRendering(int &num_vis_cells) {
       bool finite = neighbor_edges(nbrs, p, blocks[b].tets, t);
 
       // skip tet vertices corresponding to incomplete voronoi cells
-      if (!finite) 
+      if (!finite) {fprintf(stderr, "Block %d, Particle %d/%d is not finite\n", b, p,blocks[b].num_orig_particles);
 	continue;
+      }
+
 
       bool keep = true; // this cell passes all tests, volume, data extents
       vector <vec3d> temp_verts; // verts in this cell
@@ -1593,7 +1601,8 @@ void PrepCellRendering(int &num_vis_cells) {
 	      center.y < data_min.y - (data_max.y - data_min.y) * (ds - 1) ||
 	      center.z > data_max.z + (data_max.z - data_min.z) * (ds - 1) ||
 	      center.z < data_min.z - (data_max.z - data_min.z) * (ds - 1))
-	    keep = false;
+	    { keep = false;  fprintf(stderr, "%f, %f, %f \n", center.x,center.y,center.z);}
+
 	  temp_verts.push_back(center);
 	}
 
@@ -1630,6 +1639,7 @@ void PrepCellRendering(int &num_vis_cells) {
 	  vor_normals.push_back(temp_vor_normals[k]);
 	num_vis_cells++;
       }
+      else fprintf(stderr, "Block %d, Particle %d/%d is outside extents\n", b, p,blocks[b].num_orig_particles);
 
     } // voronoi cells
 
@@ -1688,6 +1698,11 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
 	  int r = s - blocks[b].num_orig_particles; //index into rem_tet_verts
 	  int g = blocks[b].rem_tet_verts[r].gid; // gid of remote block
 	  int n = blocks[b].rem_tet_verts[r].nid; // nid of remote particle
+      
+      if (g < 0) {
+        //fprintf(stderr, "Using fake point\n");
+        continue;}
+      
 
 	  p.x = blocks[gid2lid[g]].particles[3 * n];
 	  p.y = blocks[gid2lid[g]].particles[3 * n + 1];
