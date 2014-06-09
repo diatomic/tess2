@@ -29,6 +29,7 @@ void incomplete_dcells_initial(struct dblock_t *tblock, int lid,
 void incomplete_dcells_final(struct dblock_t *dblock, int lid,
 			     vector <set <gb_t> > &sent_particles,
 			     vector <int> &convex_hull_particles);
+void wall_d_particles(struct dblock_t *dblock);
 void neighbor_d_is_complete(int nblocks, struct dblock_t *dblocks,
 			    struct remote_ic_t **rics,
 			    vector <struct sent_t> *sent_particles);
