@@ -77,7 +77,7 @@ vec2d aspect; // scaling due to window aspect ratio
 float near = 0.1;
 
 // data overall extent scaling factor for clipping cells
-float ds = 2;
+float ds = 1.01;
 
 // window size
 // vec2d win_size = {1024, 512};
@@ -432,6 +432,7 @@ void display() {
 	if (clip == 0.0 || sites[i].z < z_clip)
 	  glVertex3f(sites[i].x, sites[i].y, sites[i].z);
       }
+      
       glEnd();
     }
     glDisable(GL_COLOR_MATERIAL);
@@ -1399,7 +1400,7 @@ void Normal(vec3d *verts, vec3d &normal) {
   normal.x = v0.y * v1.z - v0.z * v1.y;
   normal.y = v0.z * v1.x - v0.x * v1.z;
   normal.z = v0.x * v1.y - v0.y * v1.x;
-
+  
   float mag = sqrt(normal.x * normal.x + normal.y * normal.y +
 		   normal.z * normal.z);
   // normalize
@@ -1410,7 +1411,6 @@ void Normal(vec3d *verts, vec3d &normal) {
 }
 //--------------------------------------------------------------------------
 //
-// DEPRECATED
 //
 // compute normal of a face using Newell's method
 //
@@ -1555,9 +1555,7 @@ void PrepCellRendering(int &num_vis_cells) {
       // skip tets with missing neighbors
       if (blocks[b].tets[t].tets[0] == -1 || blocks[b].tets[t].tets[1] == -1 ||
 	  blocks[b].tets[t].tets[2] == -1 || blocks[b].tets[t].tets[3] == -1)  {
-      
-        fprintf(stderr, "Block %d, Particle %d/%d has a missing neighbor\n", b, p,blocks[b].num_orig_particles);
-
+        //fprintf(stderr, "Block %d, Particle %d/%d has a missing neighbor\n", b, p,blocks[b].num_orig_particles);
 	continue;
       }
 
@@ -1567,9 +1565,10 @@ void PrepCellRendering(int &num_vis_cells) {
       bool finite = neighbor_edges(nbrs, p, blocks[b].tets, t);
 
       // skip tet vertices corresponding to incomplete voronoi cells
-      if (!finite) {fprintf(stderr, "Block %d, Particle %d/%d is not finite\n", b, p,blocks[b].num_orig_particles);
-	continue;
-      }
+      if (!finite) {
+      //fprintf(stderr, "Block %d, Particle %d/%d is not finite\n", b, p,blocks[b].num_orig_particles);
+        continue;
+        }
 
 
       bool keep = true; // this cell passes all tests, volume, data extents
@@ -1586,14 +1585,16 @@ void PrepCellRendering(int &num_vis_cells) {
 	// get edge link
 	int u  = nbrs[i].first;
 	int ut = nbrs[i].second;
-	std::vector<int> edge_link;
+    std::vector<int> edge_link;
 	fill_edge_link(edge_link, p, u, ut, blocks[b].tets);
 
 	// following is equivalent of all vertices in a face
 	for (int j = 0; j < (int)edge_link.size(); ++j) {
+    
 	  vec3d center;
 	  circumcenter((float *)&(center.x), 
 		       &(blocks[b].tets[edge_link[j]]), blocks[b].particles);
+      
 	  // filter out cells far outside the overal extents
 	  if (center.x > data_max.x + (data_max.x - data_min.x) * (ds - 1) ||
 	      center.x < data_min.x - (data_max.x - data_min.x) * (ds - 1) ||
@@ -1601,17 +1602,19 @@ void PrepCellRendering(int &num_vis_cells) {
 	      center.y < data_min.y - (data_max.y - data_min.y) * (ds - 1) ||
 	      center.z > data_max.z + (data_max.z - data_min.z) * (ds - 1) ||
 	      center.z < data_min.z - (data_max.z - data_min.z) * (ds - 1))
-	    { keep = false;  fprintf(stderr, "%f, %f, %f \n", center.x,center.y,center.z);}
-
+	    { keep = false;
+        // fprintf(stderr, "Out of Extent Voronoi point, p: %d, i: %d, j: %d, %f, %f, %f \n", p, i, j, center.x,center.y,center.z);
+        }
+    
 	  temp_verts.push_back(center);
 	}
-
+        
 	temp_num_face_verts.push_back(edge_link.size());
 
 	// face normal (flat shading, one normal per face)
 	vec3d normal;
-	Normal(&temp_verts[v0], normal);
-
+	NewellNormal(&temp_verts[v0], edge_link.size(), normal);
+    
 	// check sign of dot product of normal with vector from site 
 	// to first face vertex to see if normal has correct direction
 	// want outward normal
@@ -1638,8 +1641,9 @@ void PrepCellRendering(int &num_vis_cells) {
 	for (int k = 0; k < (int)temp_vor_normals.size(); k++)
 	  vor_normals.push_back(temp_vor_normals[k]);
 	num_vis_cells++;
+
       }
-      else fprintf(stderr, "Block %d, Particle %d/%d is outside extents\n", b, p,blocks[b].num_orig_particles);
+
 
     } // voronoi cells
 
@@ -1759,7 +1763,7 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       tri[2].x = tet_verts[n    ].x;
       tri[2].y = tet_verts[n    ].y;
       tri[2].z = tet_verts[n    ].z;
-      Normal(tri, normal);
+      NewellNormal(tri,3,normal);
       v.x = tet_verts[n].x - centroid.x;
       v.y = tet_verts[n].y - centroid.y;
       v.z = tet_verts[n].z - centroid.z;
@@ -1779,7 +1783,7 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       tri[2].x = tet_verts[n + 1].x;
       tri[2].y = tet_verts[n + 1].y;
       tri[2].z = tet_verts[n + 1].z;
-      Normal(tri, normal);
+      NewellNormal(tri,3,normal);
       v.x = tet_verts[n + 1].x - centroid.x;
       v.y = tet_verts[n + 1].y - centroid.y;
       v.z = tet_verts[n + 1].z - centroid.z;
@@ -1799,7 +1803,7 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       tri[2].x = tet_verts[n + 2].x;
       tri[2].y = tet_verts[n + 2].y;
       tri[2].z = tet_verts[n + 2].z;
-      Normal(tri, normal);
+      NewellNormal(tri,3,normal);
       v.x = tet_verts[n + 2].x - centroid.x;
       v.y = tet_verts[n + 2].y - centroid.y;
       v.z = tet_verts[n + 2].z - centroid.z;
@@ -1819,7 +1823,7 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       tri[2].x = tet_verts[n + 3].x;
       tri[2].y = tet_verts[n + 3].y;
       tri[2].z = tet_verts[n + 3].z;
-      Normal(tri, normal);
+      NewellNormal(tri,3,normal);
       v.x = tet_verts[n + 3].x - centroid.x;
       v.y = tet_verts[n + 3].y - centroid.y;
       v.z = tet_verts[n + 3].z - centroid.z;
@@ -1934,7 +1938,7 @@ void PrepCellRendering(int &num_vis_cells) {
 
 	// face normal (flat shading, one normal per face)
 	vec3d normal;
-	Normal(&verts[v0], normal);
+	NewellNormal(&verts[v0],(int)verts.size(),normal);
 
 	// check sign of dot product of normal with vector from site 
 	// to first face vertex to see if normal has correct direction
@@ -2137,7 +2141,7 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       tri[2].x = tet_verts[n    ].x;
       tri[2].y = tet_verts[n    ].y;
       tri[2].z = tet_verts[n    ].z;
-      Normal(tri, normal);
+      NewellNormal(tri,3,normal);
       v.x = tet_verts[n].x - centroid.x;
       v.y = tet_verts[n].y - centroid.y;
       v.z = tet_verts[n].z - centroid.z;
@@ -2157,7 +2161,7 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       tri[2].x = tet_verts[n + 1].x;
       tri[2].y = tet_verts[n + 1].y;
       tri[2].z = tet_verts[n + 1].z;
-      Normal(tri, normal);
+      NewellNormal(tri,3,normal);
       v.x = tet_verts[n + 1].x - centroid.x;
       v.y = tet_verts[n + 1].y - centroid.y;
       v.z = tet_verts[n + 1].z - centroid.z;
@@ -2177,7 +2181,7 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       tri[2].x = tet_verts[n + 2].x;
       tri[2].y = tet_verts[n + 2].y;
       tri[2].z = tet_verts[n + 2].z;
-      Normal(tri, normal);
+      NewellNormal(tri,3,normal);
       v.x = tet_verts[n + 2].x - centroid.x;
       v.y = tet_verts[n + 2].y - centroid.y;
       v.z = tet_verts[n + 2].z - centroid.z;
@@ -2197,7 +2201,7 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       tri[2].x = tet_verts[n + 3].x;
       tri[2].y = tet_verts[n + 3].y;
       tri[2].z = tet_verts[n + 3].z;
-      Normal(tri, normal);
+      NewellNormal(tri,3,normal);
       v.x = tet_verts[n + 3].x - centroid.x;
       v.y = tet_verts[n + 3].y - centroid.y;
       v.z = tet_verts[n + 3].z - centroid.z;

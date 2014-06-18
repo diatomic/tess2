@@ -1110,9 +1110,8 @@ void wall_d_particles(struct dblock_t *dblock) {
 
   int* wall_cut = (int *)malloc(num_walls * sizeof(int));
  
- 
   std::vector<double> new_points;
-  double jitter = 1e-6;
+  double jitter = 0;
 
    // Find all particles that need to be mirrored.
   for (int p = 0; p < dblock->num_orig_particles; ++p) {
@@ -1163,18 +1162,7 @@ void wall_d_particles(struct dblock_t *dblock) {
             }
         }
       
-     //TEST
-     /*
-   for (int wi = 0; wi < num_walls; wi++)
-    wall_cut[wi] = 1;
-      */
-      
-      
-    /*
-    for (int wi = 0; wi < num_walls; wi++)
-        fprintf(stderr,"%d",wall_cut[wi]);
-    fprintf(stderr,"\n");
-    */
+
     // Make the mirrored particles
     //   For each mirror-generate index that is 1,
     //   generate the mirror point given site rp and the wall
@@ -1191,7 +1179,7 @@ void wall_d_particles(struct dblock_t *dblock) {
         new_points.push_back(rpt[0]);
         new_points.push_back(rpt[1]);
         new_points.push_back(rpt[2]);
-        //fprintf(stderr, "Adding a particles for %d/%d, %d\n", p,dblock->num_orig_particles,finite);
+        //fprintf(stderr, "Adding particle %d (%f,%f,%f) for %d/%d, %d\n",dblock->num_particles+new_points.size()/3-1,rpt[0],rpt[1], rpt[2], p,dblock->num_orig_particles,finite);
 
         }
     }
@@ -1218,7 +1206,7 @@ void wall_d_particles(struct dblock_t *dblock) {
 
       // copy new particles
       for (int j = 0; j < new_points.size(); j=j+3) {
-        
+        //rand();
         dblock->particles[3 * dblock->num_particles    ] = new_points[j    ] + rand() / (double)RAND_MAX * 2 * jitter - jitter;
         dblock->particles[3 * dblock->num_particles + 1] = new_points[j + 1] + rand() / (double)RAND_MAX * 2 * jitter - jitter;
         dblock->particles[3 * dblock->num_particles + 2] = new_points[j + 2] + rand() / (double)RAND_MAX * 2 * jitter - jitter;
