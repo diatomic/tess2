@@ -1111,7 +1111,6 @@ void wall_d_particles(struct dblock_t *dblock) {
   int* wall_cut = (int *)malloc(num_walls * sizeof(int));
  
   std::vector<double> new_points;
-  double jitter = 0;
 
    // Find all particles that need to be mirrored.
   for (int p = 0; p < dblock->num_orig_particles; ++p) {
@@ -1207,9 +1206,9 @@ void wall_d_particles(struct dblock_t *dblock) {
       // copy new particles
       for (int j = 0; j < new_points.size(); j=j+3) {
         //rand();
-        dblock->particles[3 * dblock->num_particles    ] = new_points[j    ] + rand() / (double)RAND_MAX * 2 * jitter - jitter;
-        dblock->particles[3 * dblock->num_particles + 1] = new_points[j + 1] + rand() / (double)RAND_MAX * 2 * jitter - jitter;
-        dblock->particles[3 * dblock->num_particles + 2] = new_points[j + 2] + rand() / (double)RAND_MAX * 2 * jitter - jitter;
+        dblock->particles[3 * dblock->num_particles    ] = new_points[j    ];
+        dblock->particles[3 * dblock->num_particles + 1] = new_points[j + 1];
+        dblock->particles[3 * dblock->num_particles + 2] = new_points[j + 2];
         dblock->rem_tet_verts[n].gid = -1;
         dblock->rem_tet_verts[n].nid = -1;
         dblock->rem_tet_verts[n].dir = 0x00;
