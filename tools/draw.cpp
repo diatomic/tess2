@@ -1384,6 +1384,8 @@ void Centroid(vec3d *verts, int num_verts, vec3d &centroid) {
 // verts: 3 vertices in order around a face
 // normal: (output) the normal of (verts[0] - verts[1] ) x (verts[2] - verts[1])
 //
+// DEPRECATED - if applied to three points on a face and two of the points happen to not be distinct, this method breaks
+
 void Normal(vec3d *verts, vec3d &normal) {
 
 
