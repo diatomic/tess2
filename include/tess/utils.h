@@ -36,10 +36,5 @@ void add_pt(float *val, float **vals, int *numvals, int *maxvals,
 #ifdef __cplusplus
 extern "C"
 #endif
-void add_sent(struct sent_t val, struct sent_t **vals, int *numvals, 
-	      int *maxvals, int chunk_size);
-#ifdef __cplusplus
-extern "C"
-#endif
 void add_empty_int(int **vals, int index, int *numitems, int *maxitems, 
 		   int chunk_size, int init_val);

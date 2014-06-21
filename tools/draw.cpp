@@ -13,16 +13,13 @@
 //
 //--------------------------------------------------------------------------
 
-// using new tet data model (eventually default)
-#define TET
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
 #include "tess/delaunay.h"
-#include "tess/voronoi.h"
 #include "tess/ser_io.hpp"
 #include "tess/tet-neighbors.h"
+#include "tess/tet.h"
 #include <math.h>
 
 #if defined(MAC_OSX)
@@ -107,14 +104,6 @@ bool draw_tess = false;
 bool draw_del = false;
 bool draw_verts = false;
 
-// volume filtering
-float min_vol = 0.0; // desired min vol threshold
-float max_vol = 0.0; // desired max vol threshold
-float min_vol_act = 0.0; // actual min vol we have
-float max_vol_act = 0.0; // actual max vol we have
-float min_vol_clamp = 1.0e-6; // clamp min_vol_act to this value
-float vol_step = 0.001;
-
 vec3d sizes; // individual data sizes in each dimension
 float size; // one overall number for data size, max of individual sizes
 float sphere_rad; // sphere radius
@@ -144,11 +133,7 @@ vector <float> face_vols;
 vec3d data_min, data_max;
 
 // local blocks
-#ifdef TET
 dblock_t *blocks; // newer delaunay blocks
-#else
-vblock_t **blocks; // older voronoi and delaunay blocks
-#endif
 int nblocks;
 
 // general prupose quadrics
@@ -184,12 +169,7 @@ void init_model();
 void init_viewport(bool reset);
 void headlight();
 void Centroid(vec3d *verts, int num_verts, vec3d &centroid);
-void Normal(vec3d *verts, vec3d &normal);
 void NewellNormal(vec3d *verts, int num_verts, vec3d &normal);
-void filter_volume(float min_vol, float max_vol);
-void clip_cells(float z_clip);
-void CellBounds(vblock_t *vblock, int cell,
-		float *cell_min, float *cell_max, float *centroid);
 void PrepRenderingData(int *gid2lid);
 void PrepSiteRendering(int &num_sites);
 void PrepCellRendering(int &num_visible_cells);
@@ -200,19 +180,10 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int* gid2lid);
 
 int main(int argc, char** argv) {
 
-  if (argc < 3) {
-    fprintf(stderr, "Usage: draw <filename> <swap (0 or 1)>"
-	    " [min. volume (optional)] [max volume (optional)]\n");
+  if (argc < 2) {
+    fprintf(stderr, "Usage: draw <filename>\n");
     exit(0);
   }
-
-  int swap_bytes = atoi(argv[2]);
-
-  if (argc > 3)
-    min_vol = atof(argv[3]);
-
-  if (argc > 4)
-    max_vol = atof(argv[4]);
 
   // read the file
 
@@ -223,16 +194,11 @@ int main(int argc, char** argv) {
   int *num_neighbors; // number of neighbors for each local block (unused)
   int **neighbors; // neighbors of each local block (unused)
   int **neigh_procs; // procs of neighbors of each local block (unused)
-  swap_bytes = swap_bytes; // quiet compiler warning, unused w/ pnetcdf
+
   MPI_Init(&argc, &argv);
 
-#ifdef TET
-  pnetcdf_d_read(&nblocks, &tot_blocks, &blocks, argv[1], MPI_COMM_WORLD,
-		 &gids, &num_neighbors, &neighbors, &neigh_procs);
-#else
   pnetcdf_read(&nblocks, &tot_blocks, &blocks, argv[1], MPI_COMM_WORLD,
 	       &gids, &num_neighbors, &neighbors, &neigh_procs);
-#endif
 
   MPI_Finalize();
   // mapping of gid to lid
@@ -249,7 +215,7 @@ int main(int argc, char** argv) {
 
 #else
 
-  SER_IO *io = new SER_IO(swap_bytes); // io object
+  SER_IO *io = new SER_IO(0); // io object
   nblocks = io->ReadAllBlocks(argv[1], blocks, false);
 
   // mapping of gid to lid
@@ -341,9 +307,6 @@ void display() {
   glTranslatef(-site_center.x, -site_center.y, -site_center.z);
 
   glEnable(GL_COLOR_MATERIAL);
-
-  // axes
-//   draw_axes();
 
   // block bounds
   if (block_mode) {
@@ -449,110 +412,51 @@ void display() {
       glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, spec);
       glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, shine);
 
-      if (color_density) {
 
-	n = 0;
+      GLfloat mat[] = {0.65, 0.65, 0.85, 1.0};
+      glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, mat);
+      n = 0;
 
-	// for all faces
-	for (int i = 0; i < (int)num_face_verts.size(); i++) {
+      // for all faces
+      for (int i = 0; i < (int)num_face_verts.size(); i++) {
 
-	  // scan all vertices to see if the face should be clipped or drawn
-	  bool draw_face = true;
+	// scan all vertices to see if the face should be clipped or drawn
+	bool draw_face = true;
+	if (clip > 0.0) {
+	  int m = n;
+	  for (int j = 0; j < num_face_verts[i]; j++) {
+	    if (verts[m].z > z_clip) {
+	      draw_face = false;
+	      break;
+	    }
+	    m++;
+	  }
+	}
+
+	if (draw_face) {
+	  // shift the face to set it back from the edges
+	  float dx = vor_normals[i].x * d;
+	  float dy = vor_normals[i].y * d;
+	  float dz = vor_normals[i].z * d;
 	  if (clip > 0.0) {
-	    int m = n;
-	    for (int j = 0; j < num_face_verts[i]; j++) {
-	      if (verts[m].z > z_clip) {
-		draw_face = false;
-		break;
-	      }
-	      m++;
-	    }
+	    dx = 0.0;
+	    dy = 0.0;
+	    dz = 0.0;
 	  }
-
-	  if (draw_face) {
-	    // logartithmic face color from red = small vol to blue = big vol
-	    float r, b;
-	    b = (log10f(face_vols[i]) - log10f(min_vol_act)) / 
-	      (log10f(max_vol_act) - log10f(min_vol_act));
-	    r = 1.0 - b;
-	    GLfloat mat[] = {r, 0.1, b, 1.0};
-	    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, mat);
-	    // shift the face to set it back from the edges
-	    float dx = vor_normals[i].x * d;
-	    float dy = vor_normals[i].y * d;
-	    float dz = vor_normals[i].z * d;
-	    if (clip > 0.0) {
-	      dx = 0.0;
-	      dy = 0.0;
-	      dz = 0.0;
-	    }
-	    glBegin(GL_POLYGON);
-	    // draw the face
-	    for (int j = 0; j < num_face_verts[i]; j++) {
-	      if (clip == 0.0 || verts[n].z - dz < z_clip) {
-		glNormal3f(vor_normals[i].x, vor_normals[i].y, vor_normals[i].z);
-		glVertex3f(verts[n].x - dx, verts[n].y - dy, verts[n].z - dz);
-	      }
-	      n++;
-	    }
-	    glEnd();
+	  // draw the face
+	  glBegin(GL_POLYGON);
+	  for (int j = 0; j < num_face_verts[i]; j++) {
+	    glNormal3f(vor_normals[i].x, vor_normals[i].y, vor_normals[i].z);
+	    glVertex3f(verts[n].x - dx, verts[n].y - dy, verts[n].z - dz);
+	    n++;
 	  }
+	  glEnd();
+	}
 
-	  else // just need to increment n
-	    n += num_face_verts[i];
+	else // just need to increment n
+	  n += num_face_verts[i];
 
-	} // for all faces
-
-      } // color density
-
-      else { // ! color_density
-
-	GLfloat mat[] = {0.65, 0.65, 0.85, 1.0};
-	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, mat);
-	n = 0;
-
-	// for all faces
-	for (int i = 0; i < (int)num_face_verts.size(); i++) {
-
-	  // scan all vertices to see if the face should be clipped or drawn
-	  bool draw_face = true;
-	  if (clip > 0.0) {
-	    int m = n;
-	    for (int j = 0; j < num_face_verts[i]; j++) {
-	      if (verts[m].z > z_clip) {
-		draw_face = false;
-		break;
-	      }
-	      m++;
-	    }
-	  }
-
-	  if (draw_face) {
-	    // shift the face to set it back from the edges
-	    float dx = vor_normals[i].x * d;
-	    float dy = vor_normals[i].y * d;
-	    float dz = vor_normals[i].z * d;
-	    if (clip > 0.0) {
-	      dx = 0.0;
-	      dy = 0.0;
-	      dz = 0.0;
-	    }
-	    // draw the face
-	    glBegin(GL_POLYGON);
-	    for (int j = 0; j < num_face_verts[i]; j++) {
-	      glNormal3f(vor_normals[i].x, vor_normals[i].y, vor_normals[i].z);
-	      glVertex3f(verts[n].x - dx, verts[n].y - dy, verts[n].z - dz);
-	      n++;
-	    }
-	    glEnd();
-	  }
-
-	  else // just need to increment n
-	    n += num_face_verts[i];
-
-	} // for all faces
-
-      } // ! color density
+      } // for all faces
 
     } // draw fancy
 
@@ -1014,268 +918,11 @@ void key(unsigned char key, int x, int y) {
   case 'f': // toggle fancy rendering
     draw_fancy = !draw_fancy;
     break;
-  case 'c': // increase near clip plane
-    clip += 0.1;
-    if (clip >= 1.0)
-      clip = 1.0;
-    z_clip = site_max.z - clip * (site_max.z - site_min.z);
-    fprintf(stderr, "clipping at = %.1f of z range\n", clip);
-    break;
-  case 'C': // decrease near clip plane
-    clip -= 0.1;
-    if (clip <= 0.0)
-      clip = 0.0;
-    z_clip = site_max.z - clip * (site_max.z - site_min.z);
-    fprintf(stderr, "clipping at = %.1f of z range\n", clip);
-    break;
-  case 'v': // restrict (minimum) volume range
-    min_vol += vol_step;
-    fprintf(stderr, "Minimum volume = %.4lf\n", min_vol);
-    filter_volume(min_vol, max_vol);
-    break;
-  case 'V': //  expand (minimum) volume range
-    min_vol -= vol_step;
-    if (min_vol < 0.0)
-      min_vol = 0.0;
-    fprintf(stderr, "Minimum volume = %.4lf\n", min_vol);
-    filter_volume(min_vol, max_vol);
-    break;
-  case 'x': // restrict (maximum) volume range
-    max_vol -= vol_step;
-    if (max_vol < 0.0)
-      max_vol = 0.0;
-    fprintf(stderr, "Maximum volume = %.4lf\n", max_vol);
-    filter_volume(min_vol, max_vol);
-    break;
-  case 'X': //  expand (maximum) volume range
-    max_vol += vol_step;
-    fprintf(stderr, "Maximum volume = %.4lf\n", max_vol);
-    filter_volume(min_vol, max_vol);
-    break;
-  case 'R': // reset volume range
-    min_vol = 0.0;
-    fprintf(stderr, "Minimum volume = %.4lf\n", min_vol);
-    filter_volume(min_vol, max_vol);
-    break;
-  case 's': // decrease volume step size
-    vol_step *= 0.1;
-    if (vol_step < 0.0001)
-      vol_step = 0.0001;
-    fprintf(stderr, "Volume step size = %.4lf\n", vol_step);
-    break;
-  case 'S': // increase volume step size
-    vol_step *= 10.0;
-    fprintf(stderr, "Volume step size = %.4lf\n", vol_step);
-    break;
   default:
     break;
 
   }
 }
-//--------------------------------------------------------------------------
-
-#ifdef TET
-
-// dblock version of filtering and clipping
-
-//
-// filter volume
-//
-void filter_volume(float min_vol, float max_vol) {
-
-
-}
-//--------------------------------------------------------------------------
-//
-// clip cells
-//
-void clip_cells(float z_clip) {
-
-
-}
-//--------------------------------------------------------------------------
-
-#else
-
-// vblock version of filtering and clipping
-
-//--------------------------------------------------------------------------
-//
-// filter volume
-//
-void filter_volume(float min_vol, float max_vol) {
-
-  int num_vis_cells = 0; // number of visible cells
-
-  num_face_verts.clear();
-  verts.clear();
-  face_vols.clear();
-
-  // package rendering data
-  for (int i = 0; i < nblocks; i++) { // blocks
-
-    int  n = 0;
-    int m = 0;
-
-
-    for (int j = 0; j < blocks[i]->num_complete_cells; j++) { // cells
-
-      int cell = blocks[i]->complete_cells[j]; // current cell
-      int num_faces; // number of face in the current cell
-      int num_verts; // number of vertices in the current face
-
-      if (cell < blocks[i]->num_orig_particles - 1)
-	num_faces = blocks[i]->cell_faces_start[cell + 1] -
-	  blocks[i]->cell_faces_start[cell];
-      else
-	num_faces = blocks[i]->tot_num_cell_faces -
-	  blocks[i]->cell_faces_start[cell];
-
-      for (int k = 0; k < num_faces; k++) { // faces
-
-	int start = blocks[i]->cell_faces_start[cell];
-	int face = blocks[i]->cell_faces[start + k];
-	num_verts = blocks[i]->faces[face].num_verts;
-
-	if (blocks[i]->vols[j] >= min_vol &&
-	    (max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol)) {
-	  num_face_verts.push_back(num_verts);
-	  face_vols.push_back(blocks[i]->vols[j]);
-	}
-
-	for (int l = 0; l < num_verts; l++) { // vertices
-
-	  int v = blocks[i]->faces[face].verts[l];
-	  vec3d s;
-	  s.x = blocks[i]->save_verts[3 * v];
-	  s.y = blocks[i]->save_verts[3 * v + 1];
-	  s.z = blocks[i]->save_verts[3 * v + 2];
-	  m++;
-	  if (blocks[i]->vols[j] >= min_vol &&
-	      (max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol))
-	    verts.push_back(s);
-
-	} // vertices
-
-	n++;
-
-      } // faces
-
-      if (blocks[i]->vols[j] >= min_vol &&
-	  (max_vol <= 0.0 || blocks[i]->vols[j] <= max_vol))
-	num_vis_cells++;
-
-    } // cells
-
-  } // blocks
-
-  fprintf(stderr, "Number of visible cells = %d\n", num_vis_cells);
-
-}
-//--------------------------------------------------------------------------
-//
-// clip cells
-//
-void clip_cells(float z_clip) {
-
-  float cell_min[3], cell_max[3], cell_centroid[3]; // cell bounds
-
-  sites.clear();
-
-  // blocks
-  for (int block = 0; block< nblocks; block++) {
-
-    // cells
-    for (int cell = 0; cell < blocks[block]->num_complete_cells; cell++) {
-
-      // cell bounds
-      CellBounds(blocks[block], cell, cell_min, cell_max, cell_centroid);
-
-      if (cell_min[2] < z_clip) {
-	vec3d s;
-	int n = blocks[block]->complete_cells[cell];
-	s.x = blocks[block]->sites[3 * n];
-	s.y = blocks[block]->sites[3 * n + 1];
-	s.z = blocks[block]->sites[3 * n + 2];
-	sites.push_back(s);
-      }
-
-    } // cells
-
-  } // blocks
-
-}
-//--------------------------------------------------------------------------
-
-#endif
-
-//--------------------------------------------------------------------------
-//
-// get cell bounds
-//
-// vblock: one voronoi block
-// cell: current cell counter
-// cell_min, cell_max: cell bounds (output)
-// centroid: centroid, mean of all vertices (output)
-//
-void CellBounds(vblock_t *vblock, int cell,
-		float *cell_min, float *cell_max, float *centroid) {
-
-  centroid[0] = 0.0;
-  centroid[1] = 0.0;
-  centroid[2] = 0.0;
-  int tot_verts = 0;
-
-  int num_faces; // number of face in the current cell
-  int num_verts; // number of vertices in the current face
-
-  if (cell < vblock->num_orig_particles - 1)
-    num_faces = vblock->cell_faces_start[cell + 1] -
-      vblock->cell_faces_start[cell];
-  else
-    num_faces = vblock->tot_num_cell_faces -
-      vblock->cell_faces_start[cell];
-
-  // get cell bounds
-  for (int k = 0; k < num_faces; k++) { // faces
-
-    int start = vblock->cell_faces_start[cell];
-    int face = vblock->cell_faces[start + k];
-    num_verts = vblock->faces[face].num_verts;
-
-    for (int l = 0; l < num_verts; l++) { // vertices
-
-      int v = vblock->faces[face].verts[l];
-	  
-      if (k == 0 && l == 0 || vblock->save_verts[3 * v] < cell_min[0])
-	cell_min[0] = vblock->save_verts[3 * v];
-      if (k == 0 && l == 0 || vblock->save_verts[3 * v] > cell_max[0])
-	cell_max[0] = vblock->save_verts[3 * v];
-      centroid[0] += vblock->save_verts[3 * v];
-
-      if (k == 0 && l == 0 || vblock->save_verts[3 * v + 1] < cell_min[1])
-	cell_min[1] = vblock->save_verts[3 * v + 1];
-      if (k == 0 && l == 0 || vblock->save_verts[3 * v + 1] > cell_max[1])
-	cell_max[1] = vblock->save_verts[3 * v + 1];
-      centroid[1] += vblock->save_verts[3 * v + 1];
-
-      if (k == 0 && l == 0 || vblock->save_verts[3 * v + 2] < cell_min[2])
-	cell_min[2] = vblock->save_verts[3 * v + 2];
-      if (k == 0 && l == 0 || vblock->save_verts[3 * v + 2] > cell_max[2])
-	cell_max[2] = vblock->save_verts[3 * v + 2];
-      centroid[2] += vblock->save_verts[3 * v + 2];
-
-      tot_verts++;
-
-    } // vertices
-
-  } // faces
-
-  centroid[0] /= tot_verts;
-  centroid[1] /= tot_verts;
-  centroid[2] /= tot_verts;
-
-} 
 //--------------------------------------------------------------------------
 //
 // timer events
@@ -1379,40 +1026,6 @@ void Centroid(vec3d *verts, int num_verts, vec3d &centroid) {
 }
 //--------------------------------------------------------------------------
 //
-// compute normal of a face using cross product
-//
-// verts: 3 vertices in order around a face
-// normal: (output) the normal of (verts[0] - verts[1] ) x (verts[2] - verts[1])
-//
-// DEPRECATED - if applied to three points on a face and two of the points happen to not be distinct, this method breaks
-
-void Normal(vec3d *verts, vec3d &normal) {
-
-
-  vec3d v0, v1;
-
-  v0.x = verts[0].x - verts[1].x;
-  v0.y = verts[0].y - verts[1].y;
-  v0.z = verts[0].z - verts[1].z;
-
-  v1.x = verts[2].x - verts[1].x;
-  v1.y = verts[2].y - verts[1].y;
-  v1.z = verts[2].z - verts[1].z;
-
-  normal.x = v0.y * v1.z - v0.z * v1.y;
-  normal.y = v0.z * v1.x - v0.x * v1.z;
-  normal.z = v0.x * v1.y - v0.y * v1.x;
-  
-  float mag = sqrt(normal.x * normal.x + normal.y * normal.y +
-		   normal.z * normal.z);
-  // normalize
-  normal.x /= mag;
-  normal.y /= mag;
-  normal.z /= mag;
-
-}
-//--------------------------------------------------------------------------
-//
 //
 // compute normal of a face using Newell's method
 //
@@ -1465,38 +1078,16 @@ void PrepRenderingData(int *gid2lid) {
   // voronoi cells
   PrepCellRendering(num_vis_cells);
 
-#ifdef TET
-  // voronoi cell verts (for debugging)
-  PrepCellVertRendering();
-#endif
-
   // delauany tets
   PrepTetRendering(num_loc_tets, num_rem_tets, gid2lid);
 
-  if (min_vol_act < min_vol_clamp)
-    min_vol_act = min_vol_clamp;
-  if (min_vol == 0.0)
-    min_vol = min_vol_act;
-  if (max_vol == 0.0)
-    max_vol = max_vol_act;
-
   fprintf(stderr, "Number of particles = %d\n"
 	  "Number of visible cells = %d\n"
-	  "Number of tets = %d (%d local + %d remote)\n"
-	  "Minimum volume = %.4f Maximum volume = %.4f\n",
+	  "Number of tets = %d (%d local + %d remote)\n",
 	  (int)sites.size(), num_vis_cells, 
-	  num_loc_tets + num_rem_tets, num_loc_tets, num_rem_tets,
-	  min_vol, max_vol);
+	  num_loc_tets + num_rem_tets, num_loc_tets, num_rem_tets);
 
 }
-//--------------------------------------------------------------------------
-
-#ifdef TET
-
-#include "tess/tet.h"
-
-// prep rendering for newer dblock model
-
 //--------------------------------------------------------------------------
 //
 // package cell vertices for rendering
@@ -1556,10 +1147,8 @@ void PrepCellRendering(int &num_vis_cells) {
 
       // skip tets with missing neighbors
       if (blocks[b].tets[t].tets[0] == -1 || blocks[b].tets[t].tets[1] == -1 ||
-	  blocks[b].tets[t].tets[2] == -1 || blocks[b].tets[t].tets[3] == -1)  {
-        //fprintf(stderr, "Block %d, Particle %d/%d has a missing neighbor\n", b, p,blocks[b].num_orig_particles);
+	  blocks[b].tets[t].tets[2] == -1 || blocks[b].tets[t].tets[3] == -1)
 	continue;
-      }
 
       // neighbor edges a vector of (vertex u, tet of vertex u) pairs 
       // that neighbor vertex v
@@ -1567,11 +1156,8 @@ void PrepCellRendering(int &num_vis_cells) {
       bool finite = neighbor_edges(nbrs, p, blocks[b].tets, t);
 
       // skip tet vertices corresponding to incomplete voronoi cells
-      if (!finite) {
-      //fprintf(stderr, "Block %d, Particle %d/%d is not finite\n", b, p,blocks[b].num_orig_particles);
+      if (!finite)
         continue;
-        }
-
 
       bool keep = true; // this cell passes all tests, volume, data extents
       vector <vec3d> temp_verts; // verts in this cell
@@ -1587,7 +1173,7 @@ void PrepCellRendering(int &num_vis_cells) {
 	// get edge link
 	int u  = nbrs[i].first;
 	int ut = nbrs[i].second;
-    std::vector<int> edge_link;
+	std::vector<int> edge_link;
 	fill_edge_link(edge_link, p, u, ut, blocks[b].tets);
 
 	// following is equivalent of all vertices in a face
@@ -1604,11 +1190,10 @@ void PrepCellRendering(int &num_vis_cells) {
 	      center.y < data_min.y - (data_max.y - data_min.y) * (ds - 1) ||
 	      center.z > data_max.z + (data_max.z - data_min.z) * (ds - 1) ||
 	      center.z < data_min.z - (data_max.z - data_min.z) * (ds - 1))
-	    { keep = false;
-        // fprintf(stderr, "Out of Extent Voronoi point, p: %d, i: %d, j: %d, %f, %f, %f \n", p, i, j, center.x,center.y,center.z);
-        }
+	    keep = false;
     
 	  temp_verts.push_back(center);
+
 	}
         
 	temp_num_face_verts.push_back(edge_link.size());
@@ -1633,8 +1218,8 @@ void PrepCellRendering(int &num_vis_cells) {
 
       } // for all faces in a voronoi cell
 
-	// keep the cell
-	// todo: check the cell volume here against min,max thresholds
+      // keep the cell
+      // todo: check the cell volume here against min,max thresholds
       if (keep) {
 	for (int k = 0; k < (int)temp_verts.size(); k++)
 	  verts.push_back(temp_verts[k]);
@@ -1645,7 +1230,6 @@ void PrepCellRendering(int &num_vis_cells) {
 	num_vis_cells++;
 
       }
-
 
     } // voronoi cells
 
@@ -1705,9 +1289,9 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
 	  int g = blocks[b].rem_tet_verts[r].gid; // gid of remote block
 	  int n = blocks[b].rem_tet_verts[r].nid; // nid of remote particle
       
-      if (g < 0) {
-        //fprintf(stderr, "Using fake point\n");
-        continue;}
+	  if (g < 0) {
+	    //fprintf(stderr, "Using fake point\n");
+	    continue;}
       
 
 	  p.x = blocks[gid2lid[g]].particles[3 * n];
@@ -1872,383 +1456,3 @@ void PrepSiteRendering(int &num_sites) {
 
 }
 //--------------------------------------------------------------------------
-
-#else
-
-// prep rendering for older vblock model
-
-//--------------------------------------------------------------------------
-//
-// package cell faces for rendering
-//
-// num_vis_cells: (output) number of visible cells
-//
-void PrepCellRendering(int &num_vis_cells) {
-
-  num_vis_cells = 0; // numbe of visible cells
-
-  for (int i = 0; i < nblocks; i++) { // blocks
-
-    for (int j = 0; j < blocks[i].num_complete_cells; j++) { // cells
-
-      int cell = blocks[i].complete_cells[j]; // current cell
-      int num_faces; // number of faces in the current cell
-      int num_verts; // number of vertices in the current face
-
-      if (cell < blocks[i].num_orig_particles - 1)
-	num_faces = blocks[i].cell_faces_start[cell + 1] -
-	  blocks[i].cell_faces_start[cell];
-      else
-	num_faces = blocks[i].tot_num_cell_faces -
-	  blocks[i].cell_faces_start[cell];
-
-      for (int k = 0; k < num_faces; k++) { // faces
-
-	int start = blocks[i].cell_faces_start[cell];
-	int face = blocks[i].cell_faces[start + k];
-	num_verts = blocks[i].faces[face].num_verts;
-
-	if (blocks[i].vols[j] >= min_vol &&
-	    (max_vol <= 0.0 || blocks[i].vols[j] <= max_vol)) {
-	  num_face_verts.push_back(num_verts);
-	  face_vols.push_back(blocks[i].vols[j]);
-	  if (i == 0 && j == 0)
-	    min_vol_act = blocks[i].vols[j];
-	  if (blocks[i].vols[j] < min_vol_act)
-	    min_vol_act = blocks[i].vols[j];
-	  if (blocks[i].vols[j] > max_vol_act)
-	    max_vol_act = blocks[i].vols[j];
-	}
-
-	int v0; // starting vertex of this face in verts list
-
-	for (int l = 0; l < num_verts; l++) { // vertices
-
-	  int v = blocks[i].faces[face].verts[l];
-	  vec3d s;
-	  s.x = blocks[i].save_verts[3 * v];
-	  s.y = blocks[i].save_verts[3 * v + 1];
-	  s.z = blocks[i].save_verts[3 * v + 2];
-	  if (blocks[i].vols[j] >= min_vol &&
-	      (max_vol <= 0.0 || blocks[i].vols[j] <= max_vol)) {
-	    verts.push_back(s);
-	    if (l == 0)
-	      v0 = (int)verts.size() - 1; // note starting vertex of this face
-	  }
-
-	} // vertices
-
-	// face normal (flat shading, one normal per face)
-	vec3d normal;
-	NewellNormal(&verts[v0],(int)verts.size(),normal);
-
-	// check sign of dot product of normal with vector from site 
-	// to first face vertex to see if normal has correct direction
-	// want outward normal
-	vec3d v;
-	v.x = verts[v0].x - sites[cell].x;
-	v.y = verts[v0].y - sites[cell].y;
-	v.z = verts[v0].z - sites[cell].z;
-	if (v.x * normal.x + v.y * normal.y + v.z * normal.z < 0.0) {
-	  normal.x *= -1.0;
-	  normal.y *= -1.0;
-	  normal.z *= -1.0;
-	}
-	vor_normals.push_back(normal);
-
-      } // faces
-
-      if (blocks[i].vols[j] >= min_vol &&
-	  (max_vol <= 0.0 || blocks[i].vols[j] <= max_vol))
-	num_vis_cells++;
-
-    } // cells
-
-  } // blocks
-
-}
-//--------------------------------------------------------------------------
-//
-// package tets for rendering
-//
-// num_loc_tets: (output) number of local tets
-// num_rem_tets: (output) number of remote tets
-// gid2lid: mapping of gids to lids
-//
-void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
-
-  num_loc_tets = 0;
-  num_rem_tets = 0;
-
-  for (int i = 0; i < nblocks; i++) { // blocks
-
-    // local tets
-    for (int j = 0; j < blocks[i].num_loc_tets; j++) {
-
-      // site indices for tet vertices
-      int s0 = blocks[i].loc_tets[4 * j];
-      int s1 = blocks[i].loc_tets[4 * j + 1];
-      int s2 = blocks[i].loc_tets[4 * j + 2];
-      int s3 = blocks[i].loc_tets[4 * j + 3];
-
-      // coordinates for tet vertices
-      vec3d p0, p1, p2, p3;
-      p0.x = blocks[i].sites[3 * s0];
-      p0.y = blocks[i].sites[3 * s0 + 1];
-      p0.z = blocks[i].sites[3 * s0 + 2];
-      p1.x = blocks[i].sites[3 * s1];
-      p1.y = blocks[i].sites[3 * s1 + 1];
-      p1.z = blocks[i].sites[3 * s1 + 2];
-      p2.x = blocks[i].sites[3 * s2];
-      p2.y = blocks[i].sites[3 * s2 + 1];
-      p2.z = blocks[i].sites[3 * s2 + 2];
-      p3.x = blocks[i].sites[3 * s3];
-      p3.y = blocks[i].sites[3 * s3 + 1];
-      p3.z = blocks[i].sites[3 * s3 + 2];
-
-      // add the vertices
-      tet_verts.push_back(p0);
-      tet_verts.push_back(p1);
-      tet_verts.push_back(p2);
-      tet_verts.push_back(p3);
-
-      num_loc_tets++;
-
-    } // local tets
-
-    // remote tets
-    for (int j = 0; j < blocks[i].num_rem_tets; j++) {
-
-      // gids for tet vertices
-      int g0 = blocks[i].rem_tet_gids[4 * j];
-      int g1 = blocks[i].rem_tet_gids[4 * j + 1];
-      int g2 = blocks[i].rem_tet_gids[4 * j + 2];
-      int g3 = blocks[i].rem_tet_gids[4 * j + 3];
-
-      // site indices for tet vertices
-      int s0 = blocks[i].rem_tet_nids[4 * j];
-      int s1 = blocks[i].rem_tet_nids[4 * j + 1];
-      int s2 = blocks[i].rem_tet_nids[4 * j + 2];
-      int s3 = blocks[i].rem_tet_nids[4 * j + 3];
-
-      // coordinates for tet vertices
-      // assuming that gid = lid, ie, blocks were written and read in gid order
-      vec3d p0, p1, p2, p3;
-
-      // p0
-      p0.x = blocks[gid2lid[g0]].sites[3 * s0];
-      p0.y = blocks[gid2lid[g0]].sites[3 * s0 + 1];
-      p0.z = blocks[gid2lid[g0]].sites[3 * s0 + 2];
-
-      // wraparound transform
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_X0) == DIY_X0)
-	p0.x += (data_max.x - data_min.x);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_X1) == DIY_X1)
-	p0.x -= (data_max.x - data_min.x);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_Y0) == DIY_Y0)
-	p0.y += (data_max.y - data_min.y);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_Y1) == DIY_Y1)
-	p0.y -= (data_max.y - data_min.y);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_Z0) == DIY_Z0)
-	p0.z += (data_max.z - data_min.z);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j] & DIY_Z1) == DIY_Z1)
-	p0.z -= (data_max.z - data_min.z);
-
-      // p1
-      p1.x = blocks[gid2lid[g1]].sites[3 * s1];
-      p1.y = blocks[gid2lid[g1]].sites[3 * s1 + 1];
-      p1.z = blocks[gid2lid[g1]].sites[3 * s1 + 2];
-
-      // wraparound transform
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_X0) == DIY_X0)
-	p1.x += (data_max.x - data_min.x);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_X1) == DIY_X1)
-	p1.x -= (data_max.x - data_min.x);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_Y0) == DIY_Y0)
-	p1.y += (data_max.y - data_min.y);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_Y1) == DIY_Y1)
-	p1.y -= (data_max.y - data_min.y);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_Z0) == DIY_Z0)
-	p1.z += (data_max.z - data_min.z);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 1] & DIY_Z1) == DIY_Z1)
-	p1.z -= (data_max.z - data_min.z);
-
-      // p2
-      p2.x = blocks[gid2lid[g2]].sites[3 * s2];
-      p2.y = blocks[gid2lid[g2]].sites[3 * s2 + 1];
-      p2.z = blocks[gid2lid[g2]].sites[3 * s2 + 2];
-
-      // wraparound transform
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_X0) == DIY_X0)
-	p2.x += (data_max.x - data_min.x);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_X1) == DIY_X1)
-	p2.x -= (data_max.x - data_min.x);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_Y0) == DIY_Y0)
-	p2.y += (data_max.y - data_min.y);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_Y1) == DIY_Y1)
-	p2.y -= (data_max.y - data_min.y);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_Z0) == DIY_Z0)
-	p2.z += (data_max.z - data_min.z);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 2] & DIY_Z1) == DIY_Z1)
-	p2.z -= (data_max.z - data_min.z);
-
-      // p3
-      p3.x = blocks[gid2lid[g3]].sites[3 * s3];
-      p3.y = blocks[gid2lid[g3]].sites[3 * s3 + 1];
-      p3.z = blocks[gid2lid[g3]].sites[3 * s3 + 2];
-
-      // wraparaound transform
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_X0) == DIY_X0)
-	p3.x += (data_max.x - data_min.x);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_X1) == DIY_X1)
-	p3.x -= (data_max.x - data_min.x);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_Y0) == DIY_Y0)
-	p3.y += (data_max.y - data_min.y);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_Y1) == DIY_Y1)
-	p3.y -= (data_max.y - data_min.y);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_Z0) == DIY_Z0)
-	p3.z += (data_max.z - data_min.z);
-      if ((blocks[i].rem_tet_wrap_dirs[4 * j + 3] & DIY_Z1) == DIY_Z1)
-	p3.z -= (data_max.z - data_min.z);
-
-      // add the vertices
-      tet_verts.push_back(p0);
-      tet_verts.push_back(p1);
-      tet_verts.push_back(p2);
-      tet_verts.push_back(p3);
-
-      num_rem_tets++;
-
-    } // remote tets
-
-    // tet face normals
-    for (int t = 0; t < (int)tet_verts.size() / 4; t++) {
-
-      vec3d normal;
-      vec3d tri[3]; // temporary vertices in one triangle
-      vec3d centroid; // controid of one tett
-      vec3d v; // vector from centroid to first face vertex
-      int n = t * 4;
-
-      Centroid(&tet_verts[n], 4, centroid);
-
-      // flat shading, one normal per face
-      // package verts into a contigous array to compute normal
-      tri[0].x = tet_verts[n + 2].x;
-      tri[0].y = tet_verts[n + 2].y;
-      tri[0].z = tet_verts[n + 2].z;
-      tri[1].x = tet_verts[n + 1].x;
-      tri[1].y = tet_verts[n + 1].y;
-      tri[1].z = tet_verts[n + 1].z;
-      tri[2].x = tet_verts[n    ].x;
-      tri[2].y = tet_verts[n    ].y;
-      tri[2].z = tet_verts[n    ].z;
-      NewellNormal(tri,3,normal);
-      v.x = tet_verts[n].x - centroid.x;
-      v.y = tet_verts[n].y - centroid.y;
-      v.z = tet_verts[n].z - centroid.z;
-      if (v.x * normal.x + v.y * normal.y + v.z * normal.z < 0.0) {
-	normal.x *= -1.0;
-	normal.y *= -1.0;
-	normal.z *= -1.0;
-      }
-      tet_normals.push_back(normal);
-
-      tri[0].x = tet_verts[n + 3].x;
-      tri[0].y = tet_verts[n + 3].y;
-      tri[0].z = tet_verts[n + 3].z;
-      tri[1].x = tet_verts[n    ].x;
-      tri[1].y = tet_verts[n    ].y;
-      tri[1].z = tet_verts[n    ].z;
-      tri[2].x = tet_verts[n + 1].x;
-      tri[2].y = tet_verts[n + 1].y;
-      tri[2].z = tet_verts[n + 1].z;
-      NewellNormal(tri,3,normal);
-      v.x = tet_verts[n + 1].x - centroid.x;
-      v.y = tet_verts[n + 1].y - centroid.y;
-      v.z = tet_verts[n + 1].z - centroid.z;
-      if (v.x * normal.x + v.y * normal.y + v.z * normal.z < 0.0) {
-	normal.x *= -1.0;
-	normal.y *= -1.0;
-	normal.z *= -1.0;
-      }
-      tet_normals.push_back(normal);
-
-      tri[0].x = tet_verts[n    ].x;
-      tri[0].y = tet_verts[n    ].y;
-      tri[0].z = tet_verts[n    ].z;
-      tri[1].x = tet_verts[n + 3].x;
-      tri[1].y = tet_verts[n + 2].y;
-      tri[1].z = tet_verts[n + 3].z;
-      tri[2].x = tet_verts[n + 2].x;
-      tri[2].y = tet_verts[n + 2].y;
-      tri[2].z = tet_verts[n + 2].z;
-      NewellNormal(tri,3,normal);
-      v.x = tet_verts[n + 2].x - centroid.x;
-      v.y = tet_verts[n + 2].y - centroid.y;
-      v.z = tet_verts[n + 2].z - centroid.z;
-      if (v.x * normal.x + v.y * normal.y + v.z * normal.z < 0.0) {
-	normal.x *= -1.0;
-	normal.y *= -1.0;
-	normal.z *= -1.0;
-      }
-      tet_normals.push_back(normal);
-
-      tri[0].x = tet_verts[n + 1].x;
-      tri[0].y = tet_verts[n + 1].y;
-      tri[0].z = tet_verts[n + 1].z;
-      tri[1].x = tet_verts[n + 2].x;
-      tri[1].y = tet_verts[n + 2].y;
-      tri[1].z = tet_verts[n + 2].z;
-      tri[2].x = tet_verts[n + 3].x;
-      tri[2].y = tet_verts[n + 3].y;
-      tri[2].z = tet_verts[n + 3].z;
-      NewellNormal(tri,3,normal);
-      v.x = tet_verts[n + 3].x - centroid.x;
-      v.y = tet_verts[n + 3].y - centroid.y;
-      v.z = tet_verts[n + 3].z - centroid.z;
-      if (v.x * normal.x + v.y * normal.y + v.z * normal.z < 0.0) {
-	normal.x *= -1.0;
-	normal.y *= -1.0;
-	normal.z *= -1.0;
-      }
-      tet_normals.push_back(normal);
-
-    }
-
-  } // blocks
-
-}
-//--------------------------------------------------------------------------
-//
-// package sites for rendering
-//
-// num_sites: (output) number of sites
-//
-void PrepSiteRendering(int &num_sites) {
-
-  int n;
-
-  for (int i = 0; i < nblocks; i++) { // blocks
-
-    // sites
-    n = 0;
-    for (int j = 0; j < blocks[i].num_orig_particles; j++) {
-
-      vec3d s;
-      s.x = blocks[i].sites[n];
-      s.y = blocks[i].sites[n + 1];
-      s.z = blocks[i].sites[n + 2];
-      n += 3;
-      sites.push_back(s);
-
-    }
-
-  } // blocks
-
-  num_sites = (int)sites.size();
-
-}
-//--------------------------------------------------------------------------
-
-#endif

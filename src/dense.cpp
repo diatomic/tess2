@@ -682,7 +682,7 @@ void CellBounds(dblock_t *dblock, int cell, float *cell_min, float *cell_max,
     } // vertices
 
     // normal
-    Normal(&(face_verts[k][0]), n);
+    NewellNormal(&(face_verts[k][0]), edge_link.size(), n);
     // check sign of dot product of normal with vector from site 
     // to first face vertex to see if normal has correct direction
     // want outward normal
@@ -951,56 +951,8 @@ void phys2idx(float *pos, int *grid_idx, float *grid_step_size,
 
 }
 //-----------------------------------------------------------------------
-// DEPRECATED, used in old data model
 //
-// compute normal of a face using Newell's method
-//
-// Newell's method is more robust than simply computing the cross product of
-//   three points when the points are colinear or slightly nonplanar. 
-//
-// vblock: one voronoi block
-// face: face id
-// normal: (output) normal, allocated by caller
-//
-void NewellNormal(vblock_t *vblock, int face, float *normal) {
-
-  int v; // index of vertex
-  float cur[3], next[3]; // current and next vertex
-
-  normal[0] = 0.0;
-  normal[1] = 0.0;
-  normal[2] = 0.0;
-
-  for (int i = 0; i < vblock->faces[face].num_verts; i++) {
-
-    // get current and next vertex going around the face
-    v = vblock->faces[face].verts[i];
-    cur[0] = vblock->save_verts[3 * v];
-    cur[1] = vblock->save_verts[3 * v + 1];
-    cur[2] = vblock->save_verts[3 * v + 2];
-    if (i + 1 < vblock->faces[face].num_verts)
-      v = vblock->faces[face].verts[i + 1]; // next vertex 
-    else
-      v = vblock->faces[face].verts[0]; // next = last = first vertex
-    next[0] = vblock->save_verts[3 * v];
-    next[1] = vblock->save_verts[3 * v + 1];
-    next[2] = vblock->save_verts[3 * v + 2];
-
-    normal[0] += (cur[1] - next[1]) * (cur[2] + next[2]);
-    normal[1] += (cur[2] - next[2]) * (cur[0] + next[0]);
-    normal[2] += (cur[0] - next[0]) * (cur[1] + next[1]);
-
-  }
-
-  // normalize
-  float mag = sqrt(normal[0] * normal[0] + normal[1] * normal[1] +
-		   normal[2] * normal[2]);
-  normal[0] /= mag;
-  normal[1] /= mag;
-  normal[2] /= mag;
-
-}
-//--------------------------------------------------------------------------
+// DEPECATED, using NewellNormal instead
 //
 // compute normal of a face using cross product
 //
@@ -1029,6 +981,43 @@ void Normal(float *verts, float *normal) {
   normal[0] /= mag;
   normal[1] /= mag;
   normal[2] /= mag;
+
+}
+//--------------------------------------------------------------------------
+//
+// compute normal of a face using Newell's method
+//
+// Newell's method is more robust than simply computing the cross product of
+//   three points when the points are colinear or slightly nonplanar. 
+//
+void NewellNormal(float *verts, int num_verts, float *normal) {
+
+  normal[0] = 0.0;
+  normal[1] = 0.0;
+  normal[2] = 0.0;
+
+  for (int i = 0; i < num_verts; i++) {
+    int cur = i;
+    int next = (i + 1) % num_verts;
+    normal[0] += (verts[3 * cur + 1] - verts[3 * next + 1]) * 
+      (verts[3 * cur + 2] + verts[3 * next + 2]);
+    normal[1] += (verts[3 * cur + 2] - verts[3 * next + 2]) * 
+      (verts[3 * cur + 0] + verts[3 * next + 0]);
+    normal[2] += (verts[3 * cur + 0] - verts[3 * next + 0]) * 
+      (verts[3 * cur + 1] + verts[3 * next + 1]);
+}
+
+  float mag = sqrt(normal[0] * normal[0] + normal[1] * normal[1] +
+		   normal[2] * normal[2]);
+  // normalize
+  normal[0] /= mag;
+  normal[1] /= mag;
+  normal[2] /= mag;
+
+  // direction is inward, need to invert
+  normal[0] *= -1.0;
+  normal[1] *= -1.0;
+  normal[2] *= -1.0;
 
 }
 //--------------------------------------------------------------------------

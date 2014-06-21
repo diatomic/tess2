@@ -17,7 +17,6 @@
 
 #include <stdlib.h>	// needed for RAND_MAX
 #include "delaunay.h"
-#include "voronoi.h"
 #include "swap.hpp"
 #include "utils.h"
 #include "diy.h"
@@ -70,52 +69,19 @@ void tess(float **particles, int *num_particles, char *out_file);
 
 /* private */
 
-void voronoi_delaunay(int nblocks, float **particles, int *num_particles, 
-		      double *times, char *out_file);
 struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
 			  double *times, char *out_file);
 int gen_particles(int lid, float **particles, float jitter);
-#ifdef __cplusplus
-extern "C"
-#endif
-void complete_cells(struct vblock_t *vblock, int lid);
-void incomplete_cells_initial(struct vblock_t *tblock, struct vblock_t *vblock, 
-			      int lid, int** convex_hull_particles, 
-			      int* num_convex_hull_particles);
-void incomplete_cells_final(struct vblock_t *tblock, struct vblock_t *vblock, 
-			    int lid, int* convex_hull_particles, 
-			    int num_convex_hull_particles,
-			    struct wall_t *walls,
-			    int num_walls,
-			    float** mirror_particles,
-			    int*  num_mirror_particles);
-#ifdef __cplusplus
-extern "C"
-#endif
-void all_cells(int nblocks, struct vblock_t *vblocks,
-	       int *num_particles, int *num_orig_particles, 
-	       float **particles, int **gids, int **nids, 
-	       unsigned char **dirs, void* ds,
-	       struct tet_t** tets, int* ntets);
-#ifdef __cplusplus
-extern "C"
-#endif
-void cell_faces(struct vblock_t *vblock);
-void create_blocks(int num_blocks, struct vblock_t **vblocks, int ***hdrs);
-void destroy_blocks(int num_blocks, struct vblock_t *vblocks, int **hdrs);
-void destroy_dblocks(int num_blocks, struct dblock_t *dblocks, int **hdrs);
-void reset_blocks(int num_blocks, struct vblock_t *vblocks);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-void local_cells(int nblocks, struct vblock_t *tblocks,
-		 int *num_particles, float **particles, void* ds,
-		 struct tet_t** tets, int* ntets);
+void destroy_blocks(int num_blocks, struct dblock_t *dblocks, int **hdrs);
+
 #ifdef __cplusplus
 extern "C"
 #endif
-void local_dcells(int nblocks, struct dblock_t *dblocks, void *ds);
+void local_cells(int nblocks, struct dblock_t *dblocks, void *ds);
 
 #ifdef __cplusplus
 extern "C"
@@ -131,49 +97,25 @@ extern "C"
 #endif
 void fill_vert_to_tet(struct dblock_t *dblock);
 
-void neighbor_particles(int nblocks, float **particles,
-			int *num_particles, int *num_orig_particles,
-			int **gids, int **nids, unsigned char **dirs);
-void neighbor_d_particles(int nblocks, struct dblock_t *dblocks);
-
-
 #ifdef __cplusplus
 extern "C"
 #endif
-void neighbor_is_complete(int nblocks, struct vblock_t *vblocks,
-			  struct remote_ic_t **rics);
+void get_mem(int breakpoint, int dwell);
 
+void neighbor_particles(int nblocks, struct dblock_t *dblocks);
 void item_type(DIY_Datatype *type);
 void ic_type(DIY_Datatype *dtype);
-void collect_stats(int nblocks, struct vblock_t *vblocks, double *times);
-void collect_dstats(int nblocks, struct dblock_t *dblocks, double *times);
-void aggregate_stats(int nblocks, struct vblock_t *vblocks, 
-		     struct stats_t *loc_stats);
-void average(void *in, void *inout, int *len, MPI_Datatype *type);
-void histogram(void *in, void *inout, int *len, MPI_Datatype *type);
+void collect_stats(int nblocks, struct dblock_t *dblocks, double *times);
 void print_block(struct dblock_t *dblock, int gid);
 void print_particles(float *particles, int num_particles, int gid);
-void prep_out(int nblocks, struct vblock_t *vblocks);
-void prep_d_out(int nblocks, struct dblock_t *dblocks, int **hdrs);
-void save_headers(int nblocks, struct vblock_t *vblocks, int **hdrs);
+void prep_out(int nblocks, struct dblock_t *dblocks, int **hdrs);
 void transform_particle(char *p, unsigned char wrap_dir);
-void neigh_cells(struct vblock_t *vblock, int cell, int face, int cur_vert);
 int compare(const void *a, const void *b);
-int cell_bounds(struct vblock_t *vblock, int cell, int vert);
-void cell_vols(int nblocks, struct vblock_t *vblocks, float **particles);
-void face_areas(int nblocks, struct vblock_t *vblocks);
 void write_particles(int nblocks, float **particles, int *num_particles, 
 		     char *outfile);
 void handle_error(int errcode, MPI_Comm comm, char *str);
-#ifdef __cplusplus
-extern "C"
-#endif
-void gen_tets(int *tet_verts, int num_tets, struct vblock_t *vblock,
-	      int *gids, int *nids, unsigned char *dirs,
+void gen_tets(struct dblock_t *dblock,
 	      struct remote_ic_t *rics, int lid, int num_recvd);
-void gen_d_tets(struct dblock_t *dblock,
-		struct remote_ic_t *rics, int lid, int num_recvd);
-
 void create_walls(int *num_walls, struct wall_t **walls);
 void destroy_walls(int num_walls, struct wall_t *walls);
 int test_outside(const float * pt, const struct wall_t *wall);
@@ -182,10 +124,6 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
 			  int *num_mirror_particles, float **particles,
 			  int *num_particles, int *num_orig_particles,
 			  int **gids, int **nids, unsigned char **dirs);
-#ifdef __cplusplus
-extern "C"
-#endif
-void get_mem(int breakpoint, int dwell);
 void timing(double *times, int start, int stop);
 
 #endif

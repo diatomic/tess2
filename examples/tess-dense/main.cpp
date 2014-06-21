@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
   // cleanup
   for (int i = 0; i < nblocks; i++)
     delete[] density[i];
-  destroy_dblocks(nblocks, dblocks, NULL);
+  destroy_blocks(nblocks, dblocks, NULL);
   DIY_Finalize();
   MPI_Finalize();
 

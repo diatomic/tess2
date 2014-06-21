@@ -19,7 +19,6 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <vector>
-#include "voronoi.h"
 #include "delaunay.h"
 #include <math.h>
 #include "mpi.h"
@@ -87,6 +86,7 @@ int CellInteriorGridPts(int *cell_grid_pts, int *cell_min_grid_idx,
 bool PtInCell(float *pt, vector<float> &normals, 
 	      vector <vector <float> > &face_verts, float eps);
 void Normal(float *verts, float *normal);
+void NewellNormal(float *verts, int num_verts, float *normal);
 void Global2LocalIdx(int *global_idx, int *local_idx, int *block_min_idx);
 void GridStepParams(int num_given_bounds, float *given_mins, 
 		    float *given_maxs, float *data_mins, float *data_maxs, 

@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
   gb_t **diy_neighs; // neighbors in diy global block format
 
   // read tessellation
-  pnetcdf_d_read(&nblocks, &tot_blocks, &dblocks, argv[1], MPI_COMM_WORLD,
+  pnetcdf_read(&nblocks, &tot_blocks, &dblocks, argv[1], MPI_COMM_WORLD,
 	       &gids, &num_neighbors, &neighbors, &neigh_procs);
 
   int wrap = 0; // todo: make wrap an input program argument

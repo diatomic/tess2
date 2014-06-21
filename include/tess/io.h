@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------
  *
- * parallel netcdf I/O for voronoi tesselation
+ * parallel netcdf I/O for tesselation
  *
  * Wei-keng Liao (Northwestern University)
  * Tom Peterka
@@ -39,49 +39,25 @@
 #ifdef __cplusplus
 extern "C"
 #endif
-void diy_write(int nblocks, struct vblock_t *vblocks, int **hdrs,
+void diy_write(int nblocks, struct dblock_t *dblocks, int **hdrs,
 	       char *out_file);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-void diy_dwrite(int nblocks, struct dblock_t *dblocks, int **hdrs,
-	       char *out_file);
-
-#ifdef __cplusplus
-extern "C"
-#endif
-void pnetcdf_write(int nblocks, struct vblock_t *vblocks, 
-		   char *out_file, MPI_Comm comm);
-
-#ifdef __cplusplus
-extern "C"
-#endif
-void pnetcdf_d_write(int nblocks, struct dblock_t *dblocks, 
+void pnetcdf_write(int nblocks, struct dblock_t *dblocks, 
 		     char *out_file, MPI_Comm comm);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-void pnetcdf_read(int *nblocks, int *tot_blocks, struct vblock_t **vblocks, 
-		  char *in_file, MPI_Comm comm, int **gids, 
-		  int **num_neighbors, int ***neighbors, int ***neigh_procs);
-
-#ifdef __cplusplus
-extern "C"
-#endif
-void pnetcdf_d_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks, 
+void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks, 
 		    char *in_file, MPI_Comm comm, int **gids, 
 		    int **num_neighbors, int ***neighbors, int ***neigh_procs);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-void create_datatype(void *vblock, int did, int lid, DIY_Datatype *dtype);
-
-#ifdef __cplusplus
-extern "C"
-#endif
-void create_d_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype);
+void create_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype);
 
 #endif

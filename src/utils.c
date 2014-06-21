@@ -1,5 +1,4 @@
-/* --------------------------------------------------------------------------- */
- 
+/* ------------------------------------------------------------------------- */
 /*
   c utilities
  
@@ -140,47 +139,6 @@ void add_pt(float *val, float **vals, int *numvals, int *maxvals,
   (*vals)[3 * *numvals] = val[0];
   (*vals)[3 * *numvals + 1] = val[1];
   (*vals)[3 * *numvals + 2] = val[2];
-  (*numvals)++;
-
-}
-/* -------------------------------------------------------------------------- */
-/*
-  adds a sent particle to a c-style vector of sent particles
-
-  val: sent particle to be added
-  vals: pointer to dynamic array of sent particles
-  numvals: pointer to number of values currently stored, updated by add_int
-  maxvals: pointer to number of values currently allocated
-  chunk_size: number of values to allocate at a time
-*/
-void add_sent(struct sent_t val, struct sent_t **vals, int *numvals, 
-	      int *maxvals, int chunk_size) {
-
-  int i;
-
-  /*   first time  */
-  if (*maxvals == 0) {
-    *vals = (struct sent_t *)malloc(chunk_size * sizeof(struct sent_t));
-    *numvals = 0;
-    *maxvals = chunk_size;
-  }
-
-/*   grow memory  */
-  else if (*numvals >= *maxvals) {
-    *vals = 
-      (struct sent_t *)realloc(*vals, 
-			       (chunk_size + *maxvals) * 
-			       sizeof(struct sent_t));
-    *maxvals += chunk_size;
-  }
-
-/*   add the element  */
-  (*vals)[*numvals].particle = val.particle;
-  (*vals)[*numvals].num_gbs = val.num_gbs;
-  for (i = 0; i < MAX_NEIGHBORS; i++) {
-    (*vals)[*numvals].neigh_gbs[i].gid = val.neigh_gbs[i].gid;
-    (*vals)[*numvals].neigh_gbs[i].neigh_dir = val.neigh_gbs[i].neigh_dir;
-  }
   (*numvals)++;
 
 }
