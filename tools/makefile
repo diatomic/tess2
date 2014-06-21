@@ -53,7 +53,6 @@ endif
 ###########
 
 DRAW_OBJS = draw.o
-DUMP_OBJS = dump.o
 
 .SUFFIXES: .c .cpp
 
@@ -66,16 +65,13 @@ DUMP_OBJS = dump.o
 default: all
 
 ifeq ($(ARCH), BGQ)
-all: dump
+all:
 else
-all: draw dump
+all: draw
 endif
 
 draw: $(DRAW_OBJS) 
 	$(CXX) -o draw $(DRAW_OBJS) $(GL_LIBS) $(LIBS)
 
-dump: $(DUMP_OBJS) 
-	$(CXX) -o dump $(DUMP_OBJS) $(LIBS)
-
 clean:
-	rm -f *.o draw dump
+	rm -f *.o draw
