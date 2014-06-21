@@ -17,7 +17,6 @@
 // #define MEMORY 
 
 #include "mpi.h"
-#include "diy.h"
 #include "tess/tess.h"
 #include "tess/tess.hpp"
 #include "tess/io.h"
@@ -33,6 +32,12 @@
 #include <algorithm>
 #include "tess/tet.h"
 #include "tess/tet-neighbors.h"
+
+#include <diy/mpi.hpp>
+#include <diy/communicator.hpp>
+#include <diy/master.hpp>
+#include <diy/assigner.hpp>
+#include <diy/serialization.hpp>
 
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>
@@ -52,6 +57,8 @@ static double *times; // timing info
 static int wrap_neighbors; // whether wraparound neighbors are used 
 // CLP - if wrap_neighbors is 0 then check this condition. 
 static int walls_on;
+
+#if 0
 
 // ------------------------------------------------------------------------
 //
@@ -170,68 +177,6 @@ void tess(float **particles, int *num_particles, char *out_file) {
   delaunay(nblocks, particles, num_particles, times, out_file);
 
 }
-// ------------------------------------------------------------------------
-//
-//   test of parallel tesselation
-//
-//   tot_blocks: total number of blocks in the domain
-//   data_size: domain grid size (x, y, z)
-//   jitter: maximum amount to randomly move each particle
-//   minvol, maxvol: filter range for which cells to keep
-//   pass -1.0 to skip either or both bounds
-//   wrap: whether wraparound neighbors are used
-//   twalls_on: whether walls boundaries are used
-//   times: times for particle exchange, voronoi cells, convex hulls, and output
-//   outfile: output file name
-//
-void tess_test(int tot_blocks, int *data_size, float jitter, 
-	       float minvol, float maxvol, int wrap, int twalls_on, 
-	       double *times, char *outfile) {
-
-  float **particles; // particles[block_num][particle] 
-		     // where each particle is 3 values, px, py, pz 
-  int *num_particles; // number of particles in each block 
-  int dim = 3; // 3D 
-  int given[3] = {0, 0, 0}; // no constraints on decomposition in {x, y, z} 
-  int ghost[6] = {0, 0, 0, 0, 0, 0}; // ghost in {-x, +x, -y, +y, -z, +z} 
-  int nblocks; // my local number of blocks 
-  int i;
-
-  comm = MPI_COMM_WORLD;
-  min_vol = minvol;
-  max_vol = maxvol;
-  wrap_neighbors = wrap;
-  walls_on = twalls_on;
-  
-  // data extents 
-  for(i = 0; i < 3; i++) {
-    data_mins[i] = 0.0;
-    data_maxs[i] = data_size[i] - 1.0;
-  }
-
-  // have DIY do the decomposition 
-  DIY_Init(dim, 1, comm);
-  DIY_Decompose(ROUND_ROBIN_ORDER, data_size, tot_blocks, &nblocks, 1, 
-		ghost, given, wrap);
-
-  // generate test points in each block 
-  particles = (float **)malloc(nblocks * sizeof(float *));
-  num_particles = (int *)malloc(nblocks * sizeof(int));
-  for (i = 0; i < nblocks; i++)
-    num_particles[i] = gen_particles(i, &particles[i], jitter);
-
-  // compute tessellations 
-  delaunay(nblocks, particles, num_particles, times, outfile);
-
-  // cleanup 
-  for (i = 0; i < nblocks; i++)
-    free(particles[i]);
-  free(particles);
-  free(num_particles);
-
-  DIY_Finalize();
-
-}
 // --------------------------------------------------------------------------
 //
 //   test of parallel tesselation with an existing
@@ -289,6 +234,90 @@ struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter,
   free(num_particles);
 
   return ret_blocks;
+
+}
+// ------------------------------------------------------------------------
+
+#endif
+
+// ------------------------------------------------------------------------
+//
+//   test of parallel tesselation
+//
+//   tot_blocks: total number of blocks in the domain
+//   data_size: domain grid size (x, y, z)
+//   jitter: maximum amount to randomly move each particle
+//   minvol, maxvol: filter range for which cells to keep
+//   pass -1.0 to skip either or both bounds
+//   wrap: whether wraparound neighbors are used
+//   twalls_on: whether walls boundaries are used
+//   times: times for particle exchange, voronoi cells, convex hulls, and output
+//   outfile: output file name
+//
+void tess_test(int tot_blocks, int *data_size, float jitter, 
+	       float minvol, float maxvol, int wrap, int twalls_on, 
+	       double *times, char *outfile) {
+
+  float **particles; // particles[block_num][particle] 
+		     // where each particle is 3 values, px, py, pz 
+  int *num_particles; // number of particles in each block 
+  int dim = 3; // 3D 
+  int given[3] = {0, 0, 0}; // no constraints on decomposition in {x, y, z} 
+  int ghost[6] = {0, 0, 0, 0, 0, 0}; // ghost in {-x, +x, -y, +y, -z, +z} 
+  int nblocks; // my local number of blocks 
+  int i;
+
+  comm = MPI_COMM_WORLD;
+  min_vol = minvol;
+  max_vol = maxvol;
+  wrap_neighbors = wrap;
+  walls_on = twalls_on;
+  
+  // data extents 
+  for(i = 0; i < 3; i++) {
+    data_mins[i] = 0.0;
+    data_maxs[i] = data_size[i] - 1.0;
+  }
+
+  // init diy
+  diy::mpi::environment     env(argc, argv);
+  diy::mpi::communicator    world;
+
+  int                       nblocks = 4*world.size();
+
+  diy::FileStorage          storage("./DIY.XXXXXX");
+
+  diy::Communicator         comm(world);
+  diy::Master               master(comm,
+                                   &create_block,
+                                   &destroy_block,
+                                   2,
+                                   &storage,
+                                   &save_block,
+                                   &load_block);
+
+  //diy::ContiguousAssigner   assigner(world.size(), nblocks);
+  diy::RoundRobinAssigner   assigner(world.size(), nblocks);
+
+//   // have DIY do the decomposition 
+//   DIY_Init(dim, 1, comm);
+//   DIY_Decompose(ROUND_ROBIN_ORDER, data_size, tot_blocks, &nblocks, 1, 
+// 		ghost, given, wrap);
+
+  // generate test points in each block 
+  particles = (float **)malloc(nblocks * sizeof(float *));
+  num_particles = (int *)malloc(nblocks * sizeof(int));
+  for (i = 0; i < nblocks; i++)
+    num_particles[i] = gen_particles(i, &particles[i], jitter);
+
+  // compute tessellations 
+//   delaunay(nblocks, particles, num_particles, times, outfile);
+
+  // cleanup 
+  for (i = 0; i < nblocks; i++)
+    free(particles[i]);
+  free(particles);
+  free(num_particles);
 
 }
 // --------------------------------------------------------------------------
@@ -489,6 +518,8 @@ void fill_vert_to_tet(dblock_t* dblock) {
 //
 void neighbor_particles(int nblocks, dblock_t *dblocks) {
 
+#if 0
+
   void ***recv_particles; // pointers to particles in ecah block 
 			  //   that are received from neighbors 
   int *num_recv_particles; // number of received particles for each block 
@@ -550,6 +581,8 @@ void neighbor_particles(int nblocks, dblock_t *dblocks) {
   DIY_Flush_neighbors(0, recv_particles, num_recv_particles, &item_type);
   free(num_recv_particles);
   free(recv_particles);
+
+#endif
 
 }
 // --------------------------------------------------------------------------
@@ -677,6 +710,9 @@ void wall_particles(struct dblock_t *dblock) {
 
 }
 // --------------------------------------------------------------------------
+
+#if 0
+
 //
 //  makes DIY datatype for sending / receiving one item
 // 
@@ -693,21 +729,10 @@ void item_type(DIY_Datatype *dtype) {
   DIY_Create_struct_datatype(0, 6, map, dtype);
 
 }
+
+#endif
+
 // --------------------------------------------------------------------------
-// //
-// //  makes DIY datatype for sending / receiving one is_complete entry
-// // 
-// void ic_type(DIY_Datatype *dtype) {
-
-//   struct map_block_t map[] = {
-//     {DIY_INT, OFST, 1, offsetof(struct remote_ic_t, is_complete) },
-//     {DIY_INT, OFST, 1, offsetof(struct remote_ic_t, gid)         },
-//     {DIY_INT, OFST, 1, offsetof(struct remote_ic_t, nid)         },
-//   };
-//   DIY_Create_struct_datatype(0, 3, map, dtype);
-
-// }
-// // --------------------------------------------------------------------------
 //
 //   collects statistics
 //
@@ -782,6 +807,8 @@ void collect_stats(int nblocks, struct dblock_t *dblocks, double *times) {
 // 
 void prep_out(int nblocks, struct dblock_t *dblocks, int **hdrs) {
 
+#if 0
+
   struct bb_t bounds; // block bounds 
 
   // save extents 
@@ -803,6 +830,8 @@ void prep_out(int nblocks, struct dblock_t *dblocks, int **hdrs) {
 
   }
 
+#endif
+
 }
 // --------------------------------------------------------------------------
 //
@@ -820,6 +849,8 @@ void prep_out(int nblocks, struct dblock_t *dblocks, int **hdrs) {
 // 
 void create_blocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs,
 		   float **particles, int *num_particles) {
+
+#if 0
 
   // allocate
   dblocks = new dblock_t[num_blocks];
@@ -848,6 +879,8 @@ void create_blocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs,
     dblocks[i].vert_to_tet = NULL;
 
   }
+
+#endif
 
 }
 // ---------------------------------------------------------------------------
@@ -915,6 +948,8 @@ void reset_blocks(int num_blocks, struct dblock_t* &dblocks) {
 // 
 unsigned char nearest_neighbor(float* p, struct bb_t* bounds) {
 
+#if 0
+
   // TODO: possibly find the 3 closest neighbors, and look at the ratio of
   //   the distances to deal with the corners  
 
@@ -935,6 +970,11 @@ unsigned char nearest_neighbor(float* p, struct bb_t* bounds) {
 
   return dirs[smallest];
 
+#if 0
+
+  // debug, need to return something for now
+  return 0;
+
 }
 // ---------------------------------------------------------------------------
 
@@ -952,6 +992,8 @@ bool operator<(const gb_t& x, const gb_t& y) { return x.gid < y.gid || (x.gid ==
 void incomplete_cells_initial(struct dblock_t *dblock, int lid,
 			      vector < set <gb_t> > &destinations,
 			      vector <int> &convex_hull_particles) {
+
+#if 0
 
   struct bb_t bounds; // block bounds 
   struct remote_particle_t rp; // particle being sent or received 
@@ -1061,6 +1103,8 @@ void incomplete_cells_initial(struct dblock_t *dblock, int lid,
 
   } // for p
 
+#endif
+
 }
 // ---------------------------------------------------------------------------
 //
@@ -1075,6 +1119,8 @@ void incomplete_cells_initial(struct dblock_t *dblock, int lid,
 void incomplete_cells_final(struct dblock_t *dblock, int lid,
 			    vector <set <gb_t> > &destinations,
 			    vector <int> &convex_hull_particles) {
+
+#if 0
 
   struct bb_t bounds; // block bounds 
   struct remote_particle_t rp; // particle being sent or received 
@@ -1174,6 +1220,8 @@ void incomplete_cells_final(struct dblock_t *dblock, int lid,
 
   } // for convex hull particles
 
+#endif
+
 }
 // --------------------------------------------------------------------------
 //
@@ -1190,6 +1238,8 @@ void incomplete_cells_final(struct dblock_t *dblock, int lid,
 //     to free
 // 
 int gen_particles(int lid, float **particles, float jitter) {
+
+#if 0
 
   int sizes[3]; // number of grid points 
   int i, j, k;
@@ -1264,6 +1314,8 @@ int gen_particles(int lid, float **particles, float jitter) {
   act_num_particles = n;
 
   return act_num_particles;
+
+#endif
 
 }
 // --------------------------------------------------------------------------
@@ -1351,6 +1403,8 @@ void print_particles(float *particles, int num_particles, int gid) {
 // 
 void transform_particle(char *p, unsigned char wrap_dir) {
 
+#if 0
+
   // debug 
   float particle[3]; // original particle 
   particle[0] = ((struct remote_particle_t*)p)->x;
@@ -1389,6 +1443,8 @@ void transform_particle(char *p, unsigned char wrap_dir) {
     ((struct remote_particle_t*)p)->z -= (data_maxs[2] - data_mins[2]);
     ((struct remote_particle_t*)p)->dir |= DIY_Z1;
   }
+
+#endif
 
 }
 // --------------------------------------------------------------------------

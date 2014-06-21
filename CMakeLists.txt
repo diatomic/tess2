@@ -82,8 +82,7 @@ find_package		    (OpenGL)
 endif			    (draw)
 
 # DIY
-find_path                   (DIY_INCLUDE_DIRS		diy.h)
-find_library                (DIY_LIBRARY NAMES		diy)
+find_path                   (DIY_INCLUDE_DIRS		diy/types.h)
 
 # PNetCDF
 find_path                   (PNetCDF_INCLUDE_DIR	pnetcdf.h)
@@ -128,5 +127,5 @@ if                          (debug)
 endif                       (debug)
 
 add_subdirectory	    (src)
-add_subdirectory	    (examples)
-add_subdirectory	    (tools)
+#add_subdirectory	    (examples)
+#add_subdirectory	    (tools)
