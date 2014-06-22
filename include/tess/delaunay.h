@@ -17,7 +17,6 @@
 
 #include "tet.h"
 #include <stddef.h>
-#include "diy.h"
 
 /* header */
 #define NUM_VERTS 0 /* indices of header elements */

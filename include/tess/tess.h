@@ -15,13 +15,11 @@
 #ifndef _TESS_H
 #define _TESS_H
 
+#include "mpi.h"
 #include <stdlib.h>	// needed for RAND_MAX
 #include "delaunay.h"
 #include "swap.hpp"
 #include "utils.h"
-#include "diy.h"
-
-extern MPI_Comm comm; /* MPI communicator */
 
 /* public */
 
@@ -31,6 +29,8 @@ extern "C"
 void tess_test(int tot_blocks, int *data_size, float jitter,
 	       float minvol, float maxvol, int wrap, int twalls_on, 
 	       double *all_times, char *outfile);
+
+#if 0
 
 #ifdef __cplusplus
 extern "C"
@@ -66,6 +66,8 @@ void tess_finalize();
 extern "C"
 #endif
 void tess(float **particles, int *num_particles, char *out_file);
+
+#endif
 
 /* private */
 
@@ -103,8 +105,8 @@ extern "C"
 void get_mem(int breakpoint, int dwell);
 
 void neighbor_particles(int nblocks, struct dblock_t *dblocks);
-void item_type(DIY_Datatype *type);
-void ic_type(DIY_Datatype *dtype);
+/* void item_type(DIY_Datatype *type); */
+/* void ic_type(DIY_Datatype *dtype); */
 void collect_stats(int nblocks, struct dblock_t *dblocks, double *times);
 void print_block(struct dblock_t *dblock, int gid);
 void print_particles(float *particles, int num_particles, int gid);

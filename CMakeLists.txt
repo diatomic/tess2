@@ -127,5 +127,5 @@ if                          (debug)
 endif                       (debug)
 
 add_subdirectory	    (src)
-#add_subdirectory	    (examples)
+add_subdirectory	    (examples)
 #add_subdirectory	    (tools)

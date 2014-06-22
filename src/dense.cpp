@@ -12,6 +12,9 @@
 // See COPYRIGHT in top-level directory.
 //
 //--------------------------------------------------------------------------
+
+#if 0
+
 #include "tess/dense.hpp"
 #ifndef TESS_NO_OPENMP
 #include <omp.h>
@@ -1768,3 +1771,5 @@ void DistributeScalarCIC(float *pt, float scalar,
 
 }
 //--------------------------------------------------------------------------
+
+#endif

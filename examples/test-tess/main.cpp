@@ -1,6 +1,8 @@
 #include "mpi.h"
 #include <assert.h>
+#include <string.h>
 #include "tess/tess.h"
+// #include <diy/mpi.hpp>
 
 void GetArgs(int argc, char **argv, int &tb, int *dsize, float *jitter,
 	     float *minvol, float *maxvol, int *wrap, int *walls, char *outfile);
@@ -16,15 +18,14 @@ int main(int argc, char *argv[]) {
   int walls; // apply walls to simulation (wrap must be off)
   char outfile[256]; // output file name
 
-  MPI_Init(&argc, &argv);
+  // init MPI
+//   diy::mpi::environment     env(argc, argv);
 
   GetArgs(argc, argv, tb, dsize, &jitter, &minvol, &maxvol, &wrap, &walls, outfile);
 
   tess_test(tb, dsize, jitter, minvol, maxvol, wrap, walls, times, outfile);
 
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Finalize();
+  // MPI will be finalized automatically by diy
 
   return 0;
 

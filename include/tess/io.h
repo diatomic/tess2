@@ -16,7 +16,6 @@
 #ifndef _IO_H
 #define _IO_H
 
-#include "diy.h"
 #include "delaunay.h"
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -55,9 +54,9 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks,
 		    char *in_file, MPI_Comm comm, int **gids, 
 		    int **num_neighbors, int ***neighbors, int ***neigh_procs);
 
-#ifdef __cplusplus
-extern "C"
-#endif
-void create_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype);
+/* #ifdef __cplusplus */
+/* extern "C" */
+/* #endif */
+/* void create_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype); */
 
 #endif

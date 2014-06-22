@@ -20,7 +20,6 @@
 #include <mpi.h>
 #include <pnetcdf.h>
 #include "tess/delaunay.h"
-#include "diy.h"
 #include "tess/io.h"
 
 /*---------------------------------------------------------------------------
@@ -64,6 +63,8 @@
 */
 void pnetcdf_write(int nblocks, struct dblock_t *dblocks, 
 		   char *out_file, MPI_Comm comm) {
+
+#if 0
 
   int err;
   int ncid, cmode, varids[41], dimids[14], dimids_2D[2];
@@ -307,6 +308,8 @@ void pnetcdf_write(int nblocks, struct dblock_t *dblocks,
 
   err = ncmpi_close(ncid); ERR;
 
+#endif
+
 }
 /*--------------------------------------------------------------------------*/
 /*
@@ -549,6 +552,9 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks,
 
 }
 /*--------------------------------------------------------------------------*/
+
+#if 0
+
 /*
   creates DIY datatype for the subset of the delaunay block to write to disk
 
@@ -644,3 +650,5 @@ void diy_write(int nblocks, struct dblock_t *dblocks, int **hdrs,
 
 }
 /*--------------------------------------------------------------------------*/
+
+#endif

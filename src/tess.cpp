@@ -17,19 +17,20 @@
 // #define MEMORY 
 
 #include "mpi.h"
-#include "tess/tess.h"
-#include "tess/tess.hpp"
-#include "tess/io.h"
 
 #include <stddef.h>
 #include <stdio.h>
 #include <math.h>
 #include <unistd.h>
 #include <sys/resource.h>
-
+#include <assert.h>
 #include <vector>
 #include <set>
 #include <algorithm>
+
+#include "tess/tess.h"
+#include "tess/tess.hpp"
+#include "tess/io.h"
 #include "tess/tet.h"
 #include "tess/tet-neighbors.h"
 
@@ -50,13 +51,14 @@ using namespace std;
 
 static int dim = 3; // everything 3D 
 static float data_mins[3], data_maxs[3]; // extents of overall domain 
-MPI_Comm comm; // MPI communicator 
 static float min_vol, max_vol; // cell volume range 
 static int nblocks; // number of blocks per process 
 static double *times; // timing info 
 static int wrap_neighbors; // whether wraparound neighbors are used 
 // CLP - if wrap_neighbors is 0 then check this condition. 
 static int walls_on;
+static int rank; // my MPI rank
+static MPI_Comm comm = MPI_COMM_WORLD; // MPI communicator TODO: get from diy?
 
 #if 0
 
@@ -267,7 +269,6 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   int nblocks; // my local number of blocks 
   int i;
 
-  comm = MPI_COMM_WORLD;
   min_vol = minvol;
   max_vol = maxvol;
   wrap_neighbors = wrap;
@@ -280,23 +281,18 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   }
 
   // init diy
-  diy::mpi::environment     env(argc, argv);
   diy::mpi::communicator    world;
-
-  int                       nblocks = 4*world.size();
-
   diy::FileStorage          storage("./DIY.XXXXXX");
-
   diy::Communicator         comm(world);
-  diy::Master               master(comm,
-                                   &create_block,
-                                   &destroy_block,
-                                   2,
-                                   &storage,
-                                   &save_block,
-                                   &load_block);
+//   diy::Master               master(comm,
+//                                    &create_block,
+//                                    &destroy_block,
+//                                    2,
+//                                    &storage,
+//                                    &save_block,
+//                                    &load_block);
+  rank = world.rank();
 
-  //diy::ContiguousAssigner   assigner(world.size(), nblocks);
   diy::RoundRobinAssigner   assigner(world.size(), nblocks);
 
 //   // have DIY do the decomposition 
@@ -339,9 +335,7 @@ struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
   int rank; // MPI rank 
   void* ds; // persistent delaunay data structures
 
-  MPI_Comm_rank(comm, &rank);
-
-  // init timing 
+    // init timing 
   for (int i = 0; i < TESS_MAX_TIMES; i++)
     times[i] = 0.0;
   timing(times, TOT_TIME, -1);
@@ -369,10 +363,13 @@ struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
   vector <int> *convex_hull_particles  = new vector<int>[nblocks];
   vector <set <gb_t> > *sent_particles = new vector<set <gb_t> >[nblocks];
 
+#if 0
+
   // determine which cells are incomplete or too close to neighbor 
   for (int i = 0; i < nblocks; i++)
     incomplete_cells_initial(&dblocks[i], i, sent_particles[i],
 			     convex_hull_particles[i]);
+#endif
 
   // profile
   get_mem(3, dwell);
@@ -404,9 +401,13 @@ struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
   get_mem(5, dwell);
   timing(times, INC2_TIME, LOC2_TIME);
 
+#if 0
+
   for (int i = 0; i < nblocks; i++)
     incomplete_cells_final(&dblocks[i], i, sent_particles[i],
 			   convex_hull_particles[i]);
+
+#endif
 
   // cleanup sent particles
   for (int i = 0; i < nblocks; ++i)
@@ -745,9 +746,7 @@ void collect_stats(int nblocks, struct dblock_t *dblocks, double *times) {
   nblocks = nblocks; // quite compiler warning
   int rank;
 
-  MPI_Comm_rank(comm, &rank);
-
-  double max_times[TESS_MAX_TIMES];
+    double max_times[TESS_MAX_TIMES];
   MPI_Reduce( times, max_times, TESS_MAX_TIMES, MPI_DOUBLE, MPI_MAX, 0, comm);
 
   // TODO: need to first compute over all blocks
@@ -970,7 +969,7 @@ unsigned char nearest_neighbor(float* p, struct bb_t* bounds) {
 
   return dirs[smallest];
 
-#if 0
+#endif
 
   // debug, need to return something for now
   return 0;
@@ -978,7 +977,9 @@ unsigned char nearest_neighbor(float* p, struct bb_t* bounds) {
 }
 // ---------------------------------------------------------------------------
 
+#if 0
 bool operator<(const gb_t& x, const gb_t& y) { return x.gid < y.gid || (x.gid == y.gid && x.neigh_dir < y.neigh_dir); }
+#endif
 
 //   determines cells that are incomplete or too close to neighbor such that
 //   they might change after neighbor exchange. The particles corresponding
