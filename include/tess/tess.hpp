@@ -17,6 +17,9 @@
 #include <vector>
 #include <set>
 
+#include <diy/serialization.hpp>
+#include <diy/master.hpp>
+
 using namespace std;
 
 void create_blocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs,
@@ -41,3 +44,9 @@ void neighbor_is_complete(int nblocks, struct dblock_t *dblocks,
 			  vector <struct sent_t> *sent_particles);
 void sample_particles(float *particles, int &num_particles, int sample_rate);
 
+// callbacks for new diy version
+void* create_block();
+void destroy_block(void* b);
+void save_block(const void* b, diy::BinaryBuffer& bb);
+void load_block(void* b, diy::BinaryBuffer& bb);
+void create(int gid, const diy::ContinuousBounds& core, const diy::ContinuousBounds& bounds, const diy::Link& link);

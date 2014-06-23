@@ -39,6 +39,7 @@
 #include <diy/master.hpp>
 #include <diy/assigner.hpp>
 #include <diy/serialization.hpp>
+#include <diy/decomposition.hpp>
 
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>
@@ -255,10 +256,11 @@ struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter,
 //   twalls_on: whether walls boundaries are used
 //   times: times for particle exchange, voronoi cells, convex hulls, and output
 //   outfile: output file name
+//   mpi_comm: MPI communicator
 //
 void tess_test(int tot_blocks, int *data_size, float jitter, 
 	       float minvol, float maxvol, int wrap, int twalls_on, 
-	       double *times, char *outfile) {
+	       double *times, char *outfile, MPI_Comm mpi_comm) {
 
   float **particles; // particles[block_num][particle] 
 		     // where each particle is 3 values, px, py, pz 
@@ -269,52 +271,111 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   int nblocks; // my local number of blocks 
   int i;
 
+  // globals
   min_vol = minvol;
   max_vol = maxvol;
   wrap_neighbors = wrap;
   walls_on = twalls_on;
   
   // data extents 
+  typedef     diy::ContinuousBounds         Bounds;
+  Bounds domain;
   for(i = 0; i < 3; i++) {
+    // TDOD: remove the global data_mins, data_maxs?
     data_mins[i] = 0.0;
     data_maxs[i] = data_size[i] - 1.0;
+    domain.min[i] = 0;
+    domain.max[i] = data_size[i] - 1.0;
   }
 
+  // max number of blocks in memory
+  // pretend all fit for now; TODO, experiment with fewer
+  int max_blocks_mem = tot_blocks;
+
   // init diy
-  diy::mpi::communicator    world;
+  diy::mpi::communicator    world(mpi_comm);
   diy::FileStorage          storage("./DIY.XXXXXX");
   diy::Communicator         comm(world);
-//   diy::Master               master(comm,
-//                                    &create_block,
-//                                    &destroy_block,
-//                                    2,
-//                                    &storage,
-//                                    &save_block,
-//                                    &load_block);
+  diy::Master               master(comm,
+                                   &create_block,
+                                   &destroy_block,
+                                   max_blocks_mem,
+                                   &storage,
+                                   &save_block,
+                                   &load_block);
+  diy::RoundRobinAssigner   assigner(world.size(), tot_blocks);
+
   rank = world.rank();
 
-  diy::RoundRobinAssigner   assigner(world.size(), nblocks);
+  // decompose
+  for (int rank = 0; rank < world.size(); ++ rank)
+  {
+    diy::RegularDecomposer<Bounds>::BoolVector          wrap;
+    diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
+    diy::decompose(3, rank, domain, assigner, create, wrap, ghosts);
+  }
 
-//   // have DIY do the decomposition 
-//   DIY_Init(dim, 1, comm);
-//   DIY_Decompose(ROUND_ROBIN_ORDER, data_size, tot_blocks, &nblocks, 1, 
-// 		ghost, given, wrap);
+  // get local blocks
+  std::vector<int> my_gids;
+  assigner.local_gids(comm.rank(), my_gids);
+  for (unsigned i = 0; i < my_gids.size(); ++i)
+  {
+    int gid = my_gids[i];
 
-  // generate test points in each block 
-  particles = (float **)malloc(nblocks * sizeof(float *));
-  num_particles = (int *)malloc(nblocks * sizeof(int));
-  for (i = 0; i < nblocks; i++)
-    num_particles[i] = gen_particles(i, &particles[i], jitter);
+    diy::Link*    link = new diy::Link;
+    diy::BlockID  neighbor;
 
+    // TODO: no neighbors added to link as yet
+
+    // create the block, generate test particles,  and add the block to the master
+    dblock_t *b = static_cast<dblock_t*>(create_block());
+    gen_particles(b, jitter);
+    master.add(gid, b, link);
+
+    // debug: print bounds
+    std::vector<int> coords;
+    Bounds bounds;
+    diy::RegularDecomposer<Bounds>::fill_bounds(bounds, coords);
+
+  }
+    
   // compute tessellations 
 //   delaunay(nblocks, particles, num_particles, times, outfile);
 
   // cleanup 
-  for (i = 0; i < nblocks; i++)
-    free(particles[i]);
-  free(particles);
-  free(num_particles);
+//   for (i = 0; i < nblocks; i++)
+//     free(particles[i]);
+//   free(particles);
+//   free(num_particles);
 
+}
+// --------------------------------------------------------------------------
+//
+// diy::Master callback functions
+//
+void* create_block()
+{
+  dblock_t* b = new dblock_t;
+  return b;
+}
+
+void destroy_block(void* b)
+{
+  delete static_cast<dblock_t*>(b);
+}
+
+void save_block(const void* b, diy::BinaryBuffer& bb)
+{
+  diy::save(bb, *static_cast<const dblock_t*>(b));
+}
+
+void load_block(void* b, diy::BinaryBuffer& bb)
+{
+  diy::load(bb, *static_cast<dblock_t*>(b));
+}
+
+void create(int gid, const diy::ContinuousBounds& core, const diy::ContinuousBounds& bounds, const diy::Link& link)
+{
 }
 // --------------------------------------------------------------------------
 //
@@ -1228,18 +1289,14 @@ void incomplete_cells_final(struct dblock_t *dblock, int lid,
 //
 //   generates test particles for a  block
 //
-//   lid: local id of block
-//   particles: pointer to particle vector in this order: 
-//   particle0x, particle0y, particle0z, particle1x, particle1y, particle1z, ...
+//   dblock: local block
 //   jitter: maximum amount to randomly move particles
 //
-//   returns: number of particles in this block
-//
-//   side effects: allocates memory for particles, caller's responsibility 
+//   side effects: allocates memory for particles in block, caller's responsibility 
 //     to free
 // 
-int gen_particles(int lid, float **particles, float jitter) {
-
+void gen_particles(dblock_t* dblock, float jitter)
+{
 #if 0
 
   int sizes[3]; // number of grid points 

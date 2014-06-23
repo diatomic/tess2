@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <string.h>
 #include "tess/tess.h"
-// #include <diy/mpi.hpp>
+#include <diy/mpi.hpp>
 
 void GetArgs(int argc, char **argv, int &tb, int *dsize, float *jitter,
 	     float *minvol, float *maxvol, int *wrap, int *walls, char *outfile);
@@ -19,13 +19,14 @@ int main(int argc, char *argv[]) {
   char outfile[256]; // output file name
 
   // init MPI
-//   diy::mpi::environment     env(argc, argv);
+  MPI_Comm comm = MPI_COMM_WORLD;
+  MPI_Init(&argc, &argv);
 
   GetArgs(argc, argv, tb, dsize, &jitter, &minvol, &maxvol, &wrap, &walls, outfile);
 
-  tess_test(tb, dsize, jitter, minvol, maxvol, wrap, walls, times, outfile);
+  tess_test(tb, dsize, jitter, minvol, maxvol, wrap, walls, times, outfile, comm);
 
-  // MPI will be finalized automatically by diy
+  MPI_Finalize();
 
   return 0;
 

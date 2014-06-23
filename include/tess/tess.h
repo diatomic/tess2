@@ -28,7 +28,7 @@ extern "C"
 #endif
 void tess_test(int tot_blocks, int *data_size, float jitter,
 	       float minvol, float maxvol, int wrap, int twalls_on, 
-	       double *all_times, char *outfile);
+	       double *all_times, char *outfile, MPI_Comm mpi_comm);
 
 #if 0
 
@@ -73,7 +73,7 @@ void tess(float **particles, int *num_particles, char *out_file);
 
 struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
 			  double *times, char *out_file);
-int gen_particles(int lid, float **particles, float jitter);
+void gen_particles(struct dblock_t* dblock, float jitter);
 
 #ifdef __cplusplus
 extern "C"
