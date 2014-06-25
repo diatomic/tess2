@@ -12,6 +12,11 @@ void* init_delaunay_data_structures(int nblocks)
   return new Delaunay3D[nblocks];
 }
 
+void init_delaunay_data_structure(dblock_t* b)
+{
+  b->Dt = (void*)(new Delaunay3D);
+}
+
 void clean_delaunay_data_structures(void* ds)
 {
   Delaunay3D* dds = (Delaunay3D*) ds;
@@ -66,6 +71,22 @@ void local_cells(int nblocks, struct dblock_t *dblocks, void *ds) {
 
   }
 
+}
+//----------------------------------------------------------------------------
+//
+//  creates local delaunay cells in one block
+//
+//  b: local block
+//
+void d_local_cells(struct dblock_t *b)
+{
+  Delaunay3D* d = (Delaunay3D*)b->Dt;
+  construct_delaunay(*d, b->num_particles, b->particles);
+  int ntets =  d->number_of_finite_cells();
+  b->num_tets = ntets;
+  b->tets = (struct tet_t*)malloc(ntets * sizeof(struct tet_t));
+  gen_tets(*d, b->tets);
+  fill_vert_to_tet(b);
 }
 //----------------------------------------------------------------------------
 //

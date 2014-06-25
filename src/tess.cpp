@@ -54,12 +54,13 @@ static int dim = 3; // everything 3D
 static float data_mins[3], data_maxs[3]; // extents of overall domain 
 static float min_vol, max_vol; // cell volume range 
 static int nblocks; // number of blocks per process 
-static double *times; // timing info 
+static double times[TESS_MAX_TIMES]; // timing info 
 static int wrap_neighbors; // whether wraparound neighbors are used 
 // CLP - if wrap_neighbors is 0 then check this condition. 
 static int walls_on;
 static int rank; // my MPI rank
 static MPI_Comm comm = MPI_COMM_WORLD; // MPI communicator TODO: get from diy?
+static float jitter; // amount to randomly jitter synthetic particles off grid positions
 
 #if 0
 
@@ -260,27 +261,19 @@ struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter,
 //
 void tess_test(int tot_blocks, int *data_size, float jitter, 
 	       float minvol, float maxvol, int wrap, int twalls_on, 
-	       double *times, char *outfile, MPI_Comm mpi_comm) {
-
-  float **particles; // particles[block_num][particle] 
-		     // where each particle is 3 values, px, py, pz 
-  int *num_particles; // number of particles in each block 
-  int dim = 3; // 3D 
-  int given[3] = {0, 0, 0}; // no constraints on decomposition in {x, y, z} 
-  int ghost[6] = {0, 0, 0, 0, 0, 0}; // ghost in {-x, +x, -y, +y, -z, +z} 
-  int nblocks; // my local number of blocks 
-  int i;
-
+	       double *times, char *outfile, MPI_Comm mpi_comm)
+{
   // globals
-  min_vol = minvol;
-  max_vol = maxvol;
-  wrap_neighbors = wrap;
-  walls_on = twalls_on;
+  ::min_vol = minvol;
+  ::max_vol = maxvol;
+  ::wrap_neighbors = wrap;
+  ::walls_on = twalls_on;
+  ::jitter = jitter;
   
   // data extents 
   typedef     diy::ContinuousBounds         Bounds;
   Bounds domain;
-  for(i = 0; i < 3; i++) {
+  for(int i = 0; i < 3; i++) {
     // TDOD: remove the global data_mins, data_maxs?
     data_mins[i] = 0.0;
     data_maxs[i] = data_size[i] - 1.0;
@@ -304,49 +297,24 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
                                    &save_block,
                                    &load_block);
   diy::RoundRobinAssigner   assigner(world.size(), tot_blocks);
-
-  rank = world.rank();
+  AddBlock create(master);
+  ::rank = world.rank();
 
   // decompose
-  for (int rank = 0; rank < world.size(); ++ rank)
-  {
+  std::vector<int> my_gids;
+  assigner.local_gids(comm.rank(), my_gids);
+  ::nblocks = my_gids.size();
+  for (int i = 0; i < my_gids.size(); ++i) {
     diy::RegularDecomposer<Bounds>::BoolVector          wrap;
     diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
     diy::decompose(3, rank, domain, assigner, create, wrap, ghosts);
   }
 
-  // get local blocks
-  std::vector<int> my_gids;
-  assigner.local_gids(comm.rank(), my_gids);
-  for (unsigned i = 0; i < my_gids.size(); ++i)
-  {
-    int gid = my_gids[i];
+  // generate particles
+  master.foreach(&gen_particles);
 
-    diy::Link*    link = new diy::Link;
-    diy::BlockID  neighbor;
-
-    // TODO: no neighbors added to link as yet
-
-    // create the block, generate test particles,  and add the block to the master
-    dblock_t *b = static_cast<dblock_t*>(create_block());
-    gen_particles(b, jitter);
-    master.add(gid, b, link);
-
-    // debug: print bounds
-    std::vector<int> coords;
-    Bounds bounds;
-    diy::RegularDecomposer<Bounds>::fill_bounds(bounds, coords);
-
-  }
-    
   // compute tessellations 
-//   delaunay(nblocks, particles, num_particles, times, outfile);
-
-  // cleanup 
-//   for (i = 0; i < nblocks; i++)
-//     free(particles[i]);
-//   free(particles);
-//   free(num_particles);
+  master.foreach(&d_delaunay);
 
 }
 // --------------------------------------------------------------------------
@@ -355,8 +323,7 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
 //
 void* create_block()
 {
-  dblock_t* b = new dblock_t;
-  return b;
+  return new dblock_t;
 }
 
 void destroy_block(void* b)
@@ -374,8 +341,241 @@ void load_block(void* b, diy::BinaryBuffer& bb)
   diy::load(bb, *static_cast<dblock_t*>(b));
 }
 
-void create(int gid, const diy::ContinuousBounds& core, const diy::ContinuousBounds& bounds, const diy::Link& link)
+void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
+  int sizes[3]; // number of grid points 
+  int i, j, k;
+  int n = 0;
+  int num_particles; // theoretical num particles with duplicates at 
+		     // block boundaries 
+  float jit; // random jitter amount, 0 - MAX_JITTER 
+
+  dblock_t* b = (dblock_t*)b_;
+
+  // allocate particles 
+  sizes[0] = (int)(b->maxs[0] - b->mins[0] + 1);
+  sizes[1] = (int)(b->maxs[1] - b->mins[1] + 1);
+  sizes[2] = (int)(b->maxs[2] - b->mins[2] + 1);
+
+  num_particles = sizes[0] * sizes[1] * sizes[2];
+
+  b->particles = (float *)malloc(num_particles * 3 * sizeof(float));
+  float *p = b->particles;
+
+  // assign particles 
+  n = 0;
+  for (i = 0; i < sizes[0]; i++) {
+    if (b->mins[0] > 0 && i == 0) // dedup block doundary points 
+      continue;
+    for (j = 0; j < sizes[1]; j++) {
+      if (b->mins[1] > 0 && j == 0) // dedup block doundary points 
+	continue;
+      for (k = 0; k < sizes[2]; k++) {
+	if (b->mins[2] > 0 && k == 0) // dedup block doundary points 
+	  continue;
+
+	// start with particles on a grid 
+	p[3 * n] = b->mins[0] + i;
+	p[3 * n + 1] = b->mins[1] + j;
+	p[3 * n + 2] = b->mins[2] + k;
+
+	// and now jitter them 
+	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
+	if (p[3 * n] - jit >= b->mins[0] &&
+	    p[3 * n] - jit <= b->maxs[0])
+	  p[3 * n] -= jit;
+	else if (p[3 * n] + jit >= b->mins[0] &&
+		 p[3 * n] + jit <= b->maxs[0])
+	  p[3 * n] += jit;
+
+	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
+	if (p[3 * n + 1] - jit >= b->mins[1] &&
+	    p[3 * n + 1] - jit <= b->maxs[1])
+	  p[3 * n + 1] -= jit;
+	else if (p[3 * n + 1] + jit >= b->mins[1] &&
+		 p[3 * n + 1] + jit <= b->maxs[1])
+	  p[3 * n + 1] += jit;
+
+	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
+	if (p[3 * n + 2] - jit >= b->mins[2] &&
+	    p[3 * n + 2] - jit <= b->maxs[2])
+	  p[3 * n + 2] -= jit;
+	else if (p[3 * n + 2] + jit >= b->mins[2] &&
+		 p[3 * n + 2] + jit <= b->maxs[2])
+	  p[3 * n + 2] += jit;
+  
+	n++;
+
+      }
+
+    }
+
+  }
+  b->num_particles = n; // final count <= amount originally allocated
+
+  // debug
+  fprintf(stderr, "generating %d (actual %d) particles in gid %d\n", num_particles, b->num_particles, b->gid);
+}
+
+void d_delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+{
+  dblock_t* b = (dblock_t*)b_;
+
+  init_delaunay_data_structure(b);
+
+  // init timing 
+  for (int i = 0; i < TESS_MAX_TIMES; i++)
+    times[i] = 0.0;
+  timing(times, TOT_TIME, -1);
+
+  // profile
+  int dwell = 10;
+  get_mem(1, dwell);
+  timing(times, LOC1_TIME, -1);
+
+  // create local delaunay cells
+  d_local_cells(b);
+  
+  // profile
+  get_mem(2, dwell);
+  timing(times, INC1_TIME, LOC1_TIME);
+
+  // particles on the convex hull of the local points and
+  // information about particles sent to neighbors
+  vector <int> convex_hull_particles;
+  vector <set <gb_t> > sent_particles;
+
+  // determine which cells are incomplete or too close to neighbor 
+  d_incomplete_cells_initial(b, sent_particles, convex_hull_particles, cp);
+
+  // profile
+  get_mem(3, dwell);
+  timing(times, NEIGH1_TIME, INC1_TIME);
+}
+
+void d_incomplete_cells_initial(struct dblock_t *dblock, vector< set<gb_t> > &destinations,
+                                vector <int> &convex_hull_particles,
+                                const diy::Master::ProxyWithLink& cp)
+{
+  struct RemotePoint rp; // particle being sent or received 
+  struct gb_t neigh_gbs[MAX_NEIGHBORS]; // blocks to whom particle was sent
+  struct gb_t all_neigh_gbs[MAX_NEIGHBORS]; // all neighbors in neighborhood
+
+#if 0 // TODO: not done yet
+
+  // get gids of all neighbors, in case a particle needs to be
+  //   sent to all neighbors
+  //   (enumerating all gids manually (not via DIY_Enqueue_Item_all)
+  //   to be consisent with enumerating particular neighbors) 
+  int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
+  DIY_Get_neighbors(0, lid, all_neigh_gbs);
+
+  destinations.resize(dblock->num_orig_particles);
+
+  // identify and queue convex hull particles
+  for (int p = 0; p < dblock->num_orig_particles; ++p) {
+
+    if (dblock->vert_to_tet[p] == -1)
+      {
+        fprintf(stderr, "Particle %d is not in the triangulation. "
+                "Perhaps it's a duplicate? Aborting.\n", p);
+        assert(false);
+      }
+
+    // on convex hull = less than 4 neighbors
+    if (dblock->num_tets == 0 || 
+    	!complete(p, dblock->tets, dblock->num_tets, dblock->vert_to_tet[p])) {
+
+      // add to list of convex hull particles
+      convex_hull_particles.push_back(p);
+
+      // incomplete cell goes to the closest neighbor 
+      unsigned char nearest_dir = 
+    	nearest_neighbor(&(dblock->particles[3 * p]), &bounds);
+
+      // send the particle to the neighbor in direction nearest_dir
+      gb_t gb; // one global block
+      int i;
+      for (i = 0; i < num_all_neigh_gbs; i++) {
+    	if (all_neigh_gbs[i].neigh_dir != 0x00 &&
+    	    all_neigh_gbs[i].neigh_dir == nearest_dir) {
+    	  gb.gid = all_neigh_gbs[i].gid;
+    	  gb.neigh_dir = all_neigh_gbs[i].neigh_dir;
+    	  break;
+    	}
+      }
+      // save the desination so we don't duplicate later
+      if (i < num_all_neigh_gbs)
+    	destinations[p].insert(gb);
+
+    } // incomplete
+
+  }
+
+#endif
+
+  // for all tets
+  for (int t = 0; t < dblock->num_tets; t++) {
+
+    int num_gbs = 0;
+    float center[3]; // circumcenter
+    circumcenter(center, &dblock->tets[t], dblock->particles);
+
+    // radius is distance from circumcenter to any tet vertex
+    int p = dblock->tets[t].verts[0];
+    float rad = distance(center, &dblock->particles[3 * p]);
+
+    diy::Link*    l = cp.link();
+    // a little test
+    // TODO: initialize rp
+    for (unsigned i = 0; i < l->count(); ++i) {
+      fprintf(stderr, "Enqueuing gid %d to gid %d\n", cp.gid(), l->target(i).gid);
+      cp.enqueue_near(&dblock->particles[3 * p], rad, l->target(i), rp);
+    }
+
+//     DIY_Add_gbs_all_near(0, lid, neigh_gbs, &num_gbs,
+//     			 MAX_NEIGHBORS, center, rad);
+
+    // there is at least one destination block
+    if (num_gbs) {
+
+      // send all 4 verts
+      for (int v = 0; v < 4; v++) {
+
+    	int p = dblock->tets[t].verts[v];
+
+    	// select neighbors we haven't sent to yet
+    	for (int i = 0; i < num_gbs; ++i)
+    	  destinations[p].insert(neigh_gbs[i]);
+
+      } // all 4 verts
+
+    } // at least one destination block
+
+  } // for all tets
+
+  // queue the actual particles
+  for (int p = 0; p < dblock->num_orig_particles; ++p) {
+    if (!destinations[p].empty()) {
+      std::vector<gb_t>	    gbs(destinations[p].begin(),
+				destinations[p].end());
+
+//       rp.x = dblock->particles[3 * p];
+//       rp.y = dblock->particles[3 * p + 1];
+//       rp.z = dblock->particles[3 * p + 2];
+//       rp.gid = DIY_Gid(0, lid);
+//       rp.nid = p;
+//       rp.dir = 0x00;
+
+//       DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
+// 			   NULL, sizeof(struct remote_particle_t),
+// 			   &gbs[0], gbs.size(),
+// 			   &transform_particle);
+
+    } // desitinations not empty
+
+  } // for p
+
 }
 // --------------------------------------------------------------------------
 //
@@ -1281,97 +1481,6 @@ void incomplete_cells_final(struct dblock_t *dblock, int lid,
     }
 
   } // for convex hull particles
-
-#endif
-
-}
-// --------------------------------------------------------------------------
-//
-//   generates test particles for a  block
-//
-//   dblock: local block
-//   jitter: maximum amount to randomly move particles
-//
-//   side effects: allocates memory for particles in block, caller's responsibility 
-//     to free
-// 
-void gen_particles(dblock_t* dblock, float jitter)
-{
-#if 0
-
-  int sizes[3]; // number of grid points 
-  int i, j, k;
-  int n = 0;
-  int num_particles; // theoretical num particles with duplicates at 
-		     // block boundaries 
-  int act_num_particles; // actual number of particles unique across blocks 
-  float jit; // random jitter amount, 0 - MAX_JITTER 
-
-  // allocate particles 
-  struct bb_t bounds;
-  DIY_Block_bounds(0, lid, &bounds);
-  sizes[0] = (int)(bounds.max[0] - bounds.min[0] + 1);
-  sizes[1] = (int)(bounds.max[1] - bounds.min[1] + 1);
-  sizes[2] = (int)(bounds.max[2] - bounds.min[2] + 1);
-
-  num_particles = sizes[0] * sizes[1] * sizes[2];
-
-  *particles = (float *)malloc(num_particles * 3 * sizeof(float));
-
-  // assign particles 
-
-  n = 0;
-  for (i = 0; i < sizes[0]; i++) {
-    if (bounds.min[0] > 0 && i == 0) // dedup block doundary points 
-      continue;
-    for (j = 0; j < sizes[1]; j++) {
-      if (bounds.min[1] > 0 && j == 0) // dedup block doundary points 
-	continue;
-      for (k = 0; k < sizes[2]; k++) {
-	if (bounds.min[2] > 0 && k == 0) // dedup block doundary points 
-	  continue;
-
-	// start with particles on a grid 
-	(*particles)[3 * n] = bounds.min[0] + i;
-	(*particles)[3 * n + 1] = bounds.min[1] + j;
-	(*particles)[3 * n + 2] = bounds.min[2] + k;
-
-	// and now jitter them 
-	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-	if ((*particles)[3 * n] - jit >= bounds.min[0] &&
-	    (*particles)[3 * n] - jit <= bounds.max[0])
-	  (*particles)[3 * n] -= jit;
-	else if ((*particles)[3 * n] + jit >= bounds.min[0] &&
-		 (*particles)[3 * n] + jit <= bounds.max[0])
-	  (*particles)[3 * n] += jit;
-
-	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-	if ((*particles)[3 * n + 1] - jit >= bounds.min[1] &&
-	    (*particles)[3 * n + 1] - jit <= bounds.max[1])
-	  (*particles)[3 * n + 1] -= jit;
-	else if ((*particles)[3 * n + 1] + jit >= bounds.min[1] &&
-		 (*particles)[3 * n + 1] + jit <= bounds.max[1])
-	  (*particles)[3 * n + 1] += jit;
-
-	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-	if ((*particles)[3 * n + 2] - jit >= bounds.min[2] &&
-	    (*particles)[3 * n + 2] - jit <= bounds.max[2])
-	  (*particles)[3 * n + 2] -= jit;
-	else if ((*particles)[3 * n + 2] + jit >= bounds.min[2] &&
-		 (*particles)[3 * n + 2] + jit <= bounds.max[2])
-	  (*particles)[3 * n + 2] += jit;
-  
-	n++;
-
-      }
-
-    }
-
-  }
-
-  act_num_particles = n;
-
-  return act_num_particles;
 
 #endif
 

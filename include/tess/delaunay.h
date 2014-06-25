@@ -47,7 +47,7 @@
 #define OUT_TIME 8 /* file output */
 
 /* remote particle */
-struct remote_particle_t {
+struct RemotePoint {
   float x, y, z; /* coordinates */
   int gid; /* owner block global id */
   int nid; /* native index of particle in owner block */
@@ -80,7 +80,9 @@ float d;
 /* delaunay tessellation for one DIY block */
 struct dblock_t {
 
+  int gid; /* global block id */
   float mins[3]; /* block minimum corner */
+  void *Dt; /* native delaunay data structure */
 
   /* input particles */
   int num_orig_particles; /* number of original particles in this block

@@ -73,7 +73,6 @@ void tess(float **particles, int *num_particles, char *out_file);
 
 struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
 			  double *times, char *out_file);
-void gen_particles(struct dblock_t* dblock, float jitter);
 
 #ifdef __cplusplus
 extern "C"
@@ -88,7 +87,16 @@ void local_cells(int nblocks, struct dblock_t *dblocks, void *ds);
 #ifdef __cplusplus
 extern "C"
 #endif
+void d_local_cells(struct dblock_t *b);
+
+#ifdef __cplusplus
+extern "C"
+#endif
 void* init_delaunay_data_structures(int nblocks);
+#ifdef __cplusplus
+extern "C"
+#endif
+void init_delaunay_data_structure(struct dblock_t* b);
 #ifdef __cplusplus
 extern "C"
 #endif
