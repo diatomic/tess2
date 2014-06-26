@@ -524,12 +524,15 @@ void d_incomplete_cells_initial(struct dblock_t *dblock, vector< set<gb_t> > &de
     int p = dblock->tets[t].verts[0];
     float rad = distance(center, &dblock->particles[3 * p]);
 
-    diy::BoundsLink<Bounds>* l = static_cast<diy::BoundsLink<Bounds>*>(cp.link());
+    diy::BoundsLink<Bounds>* l = dynamic_cast<diy::BoundsLink<Bounds>*>(cp.link());
+    fprintf(stderr, "count = %d\n", l->count());
     // a little test
     // TODO: initialize rp
     for (unsigned i = 0; i < l->count(); ++i) {
       fprintf(stderr, "Enqueuing gid %d to gid %d\n", cp.gid(), l->target(i).gid);
-      l->near(&dblock->particles[3 * p], rad, cp.enqueuer(rp));
+      float pt[3] = {0.0, 0.0, 0.0};
+//       l->near(&dblock->particles[3 * p], rad, cp.enqueuer(rp));
+      l->near(pt, rad, cp.enqueuer(rp));
     }
 
 //     DIY_Add_gbs_all_near(0, lid, neigh_gbs, &num_gbs,

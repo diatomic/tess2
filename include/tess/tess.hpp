@@ -87,31 +87,43 @@ struct AddBlock
   diy::Master&  master;
 };
 
-// serialize a remote point
+// serialize a block
+// TODO: how to serialize Dt (do I need to), and how to serialize a pointer's contents?
 namespace diy
 {
   template<>
-  struct Serialization<RemotePoint>
+  struct Serialization<dblock_t>
   {
-    static void save(BinaryBuffer& bb, const RemotePoint& p)
+    static void save(BinaryBuffer& bb, const dblock_t& d)
     {
-      fprintf(stderr, "2:\n");
-      diy::save(bb, p.x);
-      diy::save(bb, p.y);
-      diy::save(bb, p.z);
-      diy::save(bb, p.gid);
-      diy::save(bb, p.nid);
-      diy::save(bb, p.dir);
+      diy::save(bb, d.gid);
+      diy::save(bb, d.mins);
+      diy::save(bb, d.maxs);
+      diy::save(bb, d.Dt);
+      diy::save(bb, d.num_orig_particles);
+      diy::save(bb, d.num_particles);
+      diy::save(bb, d.particles);
+      diy::save(bb, d.num_tets);
+      diy::save(bb, d.tets);
+      diy::save(bb, d.num_rem_tet_verts);
+      diy::save(bb, d.rem_tet_verts);
+      diy::save(bb, d.vert_to_tet);
     }
 
-    static void load(BinaryBuffer& bb, RemotePoint& p)
+    static void load(BinaryBuffer& bb, dblock_t& d)
     {
-      diy::save(bb, p.x);
-      diy::save(bb, p.y);
-      diy::save(bb, p.z);
-      diy::save(bb, p.gid);
-      diy::save(bb, p.nid);
-      diy::save(bb, p.dir);
+      diy::load(bb, d.gid);
+      diy::load(bb, d.mins);
+      diy::load(bb, d.maxs);
+      diy::load(bb, d.Dt);
+      diy::load(bb, d.num_orig_particles);
+      diy::load(bb, d.num_particles);
+      diy::load(bb, d.particles);
+      diy::load(bb, d.num_tets);
+      diy::load(bb, d.tets);
+      diy::load(bb, d.num_rem_tet_verts);
+      diy::load(bb, d.rem_tet_verts);
+      diy::load(bb, d.vert_to_tet);
     }
   };
 }
