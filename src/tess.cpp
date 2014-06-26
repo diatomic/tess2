@@ -305,8 +305,9 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   assigner.local_gids(comm.rank(), my_gids);
   ::nblocks = my_gids.size();
   diy::RegularDecomposer<Bounds>::BoolVector          wrap;
+  diy::RegularDecomposer<Bounds>::BoolVector          share_face;
   diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
-  diy::decompose(3, rank, domain, assigner, create, wrap, ghosts);
+  diy::decompose(3, ::rank, domain, assigner, create, share_face, wrap, ghosts);
 
   // generate particles
   master.foreach(&gen_particles);
@@ -523,13 +524,12 @@ void d_incomplete_cells_initial(struct dblock_t *dblock, vector< set<gb_t> > &de
     int p = dblock->tets[t].verts[0];
     float rad = distance(center, &dblock->particles[3 * p]);
 
-    diy::Link*    l = cp.link();
+    diy::BoundsLink<Bounds>* l = static_cast<diy::BoundsLink<Bounds>*>(cp.link());
     // a little test
     // TODO: initialize rp
     for (unsigned i = 0; i < l->count(); ++i) {
       fprintf(stderr, "Enqueuing gid %d to gid %d\n", cp.gid(), l->target(i).gid);
-      // TODO: enqueue near here using  BloundsLink::near() and an enqueue iterator
-//       cp.enqueue_near(&dblock->particles[3 * p], rad, l->target(i), rp);
+      l->near(&dblock->particles[3 * p], rad, cp.enqueuer(rp));
     }
 
 //     DIY_Add_gbs_all_near(0, lid, neigh_gbs, &num_gbs,
