@@ -253,20 +253,20 @@ struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter,
 //   jitter: maximum amount to randomly move each particle
 //   minvol, maxvol: filter range for which cells to keep
 //   pass -1.0 to skip either or both bounds
-//   wrap: whether wraparound neighbors are used
+//   wrap_: whether wraparound neighbors are used
 //   twalls_on: whether walls boundaries are used
 //   times: times for particle exchange, voronoi cells, convex hulls, and output
 //   outfile: output file name
 //   mpi_comm: MPI communicator
 //
 void tess_test(int tot_blocks, int *data_size, float jitter, 
-	       float minvol, float maxvol, int wrap, int twalls_on, 
+	       float minvol, float maxvol, int wrap_, int twalls_on, 
 	       double *times, char *outfile, MPI_Comm mpi_comm)
 {
   // globals
   ::min_vol = minvol;
   ::max_vol = maxvol;
-  ::wrap_neighbors = wrap;
+  ::wrap_neighbors = wrap_;
   ::walls_on = twalls_on;
   ::jitter = jitter;
   
@@ -304,11 +304,9 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   std::vector<int> my_gids;
   assigner.local_gids(comm.rank(), my_gids);
   ::nblocks = my_gids.size();
-  for (int i = 0; i < my_gids.size(); ++i) {
-    diy::RegularDecomposer<Bounds>::BoolVector          wrap;
-    diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
-    diy::decompose(3, rank, domain, assigner, create, wrap, ghosts);
-  }
+  diy::RegularDecomposer<Bounds>::BoolVector          wrap;
+  diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
+  diy::decompose(3, rank, domain, assigner, create, wrap, ghosts);
 
   // generate particles
   master.foreach(&gen_particles);
@@ -530,7 +528,8 @@ void d_incomplete_cells_initial(struct dblock_t *dblock, vector< set<gb_t> > &de
     // TODO: initialize rp
     for (unsigned i = 0; i < l->count(); ++i) {
       fprintf(stderr, "Enqueuing gid %d to gid %d\n", cp.gid(), l->target(i).gid);
-      cp.enqueue_near(&dblock->particles[3 * p], rad, l->target(i), rp);
+      // TODO: enqueue near here using  BloundsLink::near() and an enqueue iterator
+//       cp.enqueue_near(&dblock->particles[3 * p], rad, l->target(i), rp);
     }
 
 //     DIY_Add_gbs_all_near(0, lid, neigh_gbs, &num_gbs,
