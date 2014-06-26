@@ -514,8 +514,8 @@ void d_incomplete_cells_initial(struct dblock_t *dblock, vector< set<gb_t> > &de
 #endif
 
   // for all tets
-  for (int t = 0; t < dblock->num_tets; t++) {
-
+  for (int t = 0; t < dblock->num_tets; t++)
+  {
     int num_gbs = 0;
     float center[3]; // circumcenter
     circumcenter(center, &dblock->tets[t], dblock->particles);
@@ -525,34 +525,37 @@ void d_incomplete_cells_initial(struct dblock_t *dblock, vector< set<gb_t> > &de
     float rad = distance(center, &dblock->particles[3 * p]);
 
     diy::BoundsLink<Bounds>* l = dynamic_cast<diy::BoundsLink<Bounds>*>(cp.link());
-    fprintf(stderr, "count = %d\n", l->count());
-    // a little test
-    // TODO: initialize rp
-    for (unsigned i = 0; i < l->count(); ++i) {
-      fprintf(stderr, "Enqueuing gid %d to gid %d\n", cp.gid(), l->target(i).gid);
-      float pt[3] = {0.0, 0.0, 0.0};
+
+    // a test of near() with enqueuer
+//     for (unsigned i = 0; i < l->count(); ++i) {
+//       fprintf(stderr, "Enqueuing gid %d to gid %d\n", cp.gid(), l->target(i).gid);
 //       l->near(&dblock->particles[3 * p], rad, cp.enqueuer(rp));
-      l->near(pt, rad, cp.enqueuer(rp));
+//     }
+
+    set<diy::BlockID> dests; // destinations for this point
+    for (unsigned i = 0; i < l->count(); ++i)
+    {
+      fprintf(stderr, "Enqueuing gid %d to gid %d\n", cp.gid(), l->target(i).gid);
+      l->near(center, rad, std::inserter(dests, dests.end()));
+      fprintf(stderr, "size of dests = %d\n", dests.size());
     }
 
-//     DIY_Add_gbs_all_near(0, lid, neigh_gbs, &num_gbs,
-//     			 MAX_NEIGHBORS, center, rad);
 
-    // there is at least one destination block
-    if (num_gbs) {
+//     // there is at least one destination block
+//     if (num_gbs) {
 
-      // send all 4 verts
-      for (int v = 0; v < 4; v++) {
+//       // send all 4 verts
+//       for (int v = 0; v < 4; v++) {
 
-    	int p = dblock->tets[t].verts[v];
+//     	int p = dblock->tets[t].verts[v];
 
-    	// select neighbors we haven't sent to yet
-    	for (int i = 0; i < num_gbs; ++i)
-    	  destinations[p].insert(neigh_gbs[i]);
+//     	// select neighbors we haven't sent to yet
+//     	for (int i = 0; i < num_gbs; ++i)
+//     	  destinations[p].insert(neigh_gbs[i]);
 
-      } // all 4 verts
+//       } // all 4 verts
 
-    } // at least one destination block
+//     } // at least one destination block
 
   } // for all tets
 

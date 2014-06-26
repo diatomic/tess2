@@ -20,7 +20,8 @@
 #include <diy/serialization.hpp>
 #include <diy/master.hpp>
 
-typedef     diy::ContinuousBounds       Bounds;
+typedef  diy::ContinuousBounds       Bounds;
+typedef  diy::RegularContinuousLink  Link;
 
 using namespace std;
 
@@ -58,10 +59,10 @@ struct AddBlock
   AddBlock(diy::Master& master_):
     master(master_)           {}
 
-  void  operator()(int gid, const Bounds& core, const Bounds& bounds, const diy::Link& link) const
+  void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Link& link) const
   {
     dblock_t*      b = new dblock_t;
-    diy::Link*     l = new diy::Link(link);
+    Link*          l = new Link(link);
     diy::Master&   m = const_cast<diy::Master&>(master);
 
     int lid = m.add(gid, b, l);
