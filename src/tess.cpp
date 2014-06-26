@@ -27,6 +27,7 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#include <cstring>
 
 #include "tess/tess.h"
 #include "tess/tess.hpp"
