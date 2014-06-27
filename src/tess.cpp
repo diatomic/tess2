@@ -526,60 +526,35 @@ void d_incomplete_cells_initial(struct dblock_t *dblock, vector< set<gb_t> > &de
 
     diy::BoundsLink<Bounds>* l = dynamic_cast<diy::BoundsLink<Bounds>*>(cp.link());
 
-    // a test of near() with enqueuer
-//     for (unsigned i = 0; i < l->count(); ++i) {
-//       fprintf(stderr, "Enqueuing gid %d to gid %d\n", cp.gid(), l->target(i).gid);
-//       l->near(&dblock->particles[3 * p], rad, cp.enqueuer(rp));
-//     }
-
     set<diy::BlockID> dests; // destinations for this point
     for (unsigned i = 0; i < l->count(); ++i)
     {
-      fprintf(stderr, "Enqueuing gid %d to gid %d\n", cp.gid(), l->target(i).gid);
       l->near(center, rad, std::inserter(dests, dests.end()));
-      fprintf(stderr, "size of dests = %d\n", dests.size());
     }
 
+    // there is at least one destination block
+    if (dests.size())
+    {
+      // send all 4 verts
+      for (int v = 0; v < 4; v++)
+      {
+    	int p = dblock->tets[t].verts[v];
 
-//     // there is at least one destination block
-//     if (num_gbs) {
-
-//       // send all 4 verts
-//       for (int v = 0; v < 4; v++) {
-
-//     	int p = dblock->tets[t].verts[v];
-
-//     	// select neighbors we haven't sent to yet
-//     	for (int i = 0; i < num_gbs; ++i)
-//     	  destinations[p].insert(neigh_gbs[i]);
-
-//       } // all 4 verts
-
-//     } // at least one destination block
+    	// select neighbors we haven't sent to yet
+    	for (set<diy::BlockID>::iterator it = dests.begin(); it != dests.end(); it++)
+        {
+          rp.x = dblock->particles[3 * p];
+          rp.y = dblock->particles[3 * p + 1];
+          rp.z = dblock->particles[3 * p + 2];
+          rp.gid = dblock->gid;
+          rp.nid = p;
+          rp.dir = 0x00;
+          cp.enqueue(*it, rp);
+        }
+      } // all 4 verts
+    } // dests.size()
 
   } // for all tets
-
-  // queue the actual particles
-  for (int p = 0; p < dblock->num_orig_particles; ++p) {
-    if (!destinations[p].empty()) {
-      std::vector<gb_t>	    gbs(destinations[p].begin(),
-				destinations[p].end());
-
-//       rp.x = dblock->particles[3 * p];
-//       rp.y = dblock->particles[3 * p + 1];
-//       rp.z = dblock->particles[3 * p + 2];
-//       rp.gid = DIY_Gid(0, lid);
-//       rp.nid = p;
-//       rp.dir = 0x00;
-
-//       DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
-// 			   NULL, sizeof(struct remote_particle_t),
-// 			   &gbs[0], gbs.size(),
-// 			   &transform_particle);
-
-    } // desitinations not empty
-
-  } // for p
 
 }
 // --------------------------------------------------------------------------
