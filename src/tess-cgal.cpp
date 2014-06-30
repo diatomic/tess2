@@ -14,7 +14,7 @@ void* init_delaunay_data_structures(int nblocks)
 
 void init_delaunay_data_structure(dblock_t* b)
 {
-  b->Dt = (void*)(new Delaunay3D);
+  b->Dt = static_cast<void*>(new Delaunay3D);
 }
 
 void clean_delaunay_data_structures(void* ds)
@@ -22,55 +22,9 @@ void clean_delaunay_data_structures(void* ds)
   Delaunay3D* dds = (Delaunay3D*) ds;
   delete[] dds;
 }
-
-//----------------------------------------------------------------------------
-//
-//  creates local delaunay cells
-//
-//  nblocks: number of blocks
-//  dblocks: pointer to array of dblocks
-//  dim: number of dimensions (eg. 3)
-//  ds: the delaunay data structures
-//
-void local_cells(int nblocks, struct dblock_t *dblocks, void *ds) {
-
-  Delaunay3D* Dts = (Delaunay3D*) ds;
-
-  // for all blocks
-  for (int i = 0; i < nblocks; i++) {
-
-    // Explicit check for adjacent duplicates (debug only)
-    //for (int j = 0; j < dblocks[i].num_particles - 1; ++j) {
-    //  int k = j + 1;
-    //  if (dblocks[i].particles[3*j]     == dblocks[i].particles[3*k] &&
-    //      dblocks[i].particles[3*j + 1] == dblocks[i].particles[3*k + 1] &&
-    //      dblocks[i].particles[3*j + 2] == dblocks[i].particles[3*k + 2]) {
-    //    fprintf(stderr, "Warning in local_dcells(): identical particles %d and %d\n", j, k);
-    //  }
-    //}
-
-    Delaunay3D& Dt = Dts[i];
-    construct_delaunay(Dt, dblocks[i].num_particles, dblocks[i].particles);
-
-    // fill the tets
-    int ntets =  Dt.number_of_finite_cells();
-    dblocks[i].num_tets = ntets;
-    dblocks[i].tets = (struct tet_t*)malloc(ntets * sizeof(struct tet_t));
-    gen_tets(Dt, dblocks[i].tets);
-    
-    fill_vert_to_tet(&dblocks[i]);
-
-    // Explicit check for an uninitialized vertex (debug only)
-    //for (int p = 0; p < dblocks[i].num_particles; ++p)
-    //  if (dblocks[i].vert_to_tet[p] == -1) {
-    //    fprintf(stderr, "Vertex %d (%f %f %f) uninitialized in vert_to_tet\n", p,
-    //                    dblocks[i].particles[3*p],
-    //                    dblocks[i].particles[3*p + 1],
-    //                    dblocks[i].particles[3*p + 2]);
-    //  }
-
-  }
-
+void clean_delaunay_data_structure(dblock_t* b)
+{
+  delete static_cast<Delaunay3D*>(b->Dt);
 }
 //----------------------------------------------------------------------------
 //
@@ -78,7 +32,7 @@ void local_cells(int nblocks, struct dblock_t *dblocks, void *ds) {
 //
 //  b: local block
 //
-void d_local_cells(struct dblock_t *b)
+void local_cells(struct dblock_t *b)
 {
   Delaunay3D* d = (Delaunay3D*)b->Dt;
   construct_delaunay(*d, b->num_particles, b->particles);

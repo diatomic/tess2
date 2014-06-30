@@ -71,9 +71,6 @@ void tess(float **particles, int *num_particles, char *out_file);
 
 /* private */
 
-struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles,
-			  double *times, char *out_file);
-
 #ifdef __cplusplus
 extern "C"
 #endif
@@ -82,12 +79,7 @@ void destroy_blocks(int num_blocks, struct dblock_t *dblocks, int **hdrs);
 #ifdef __cplusplus
 extern "C"
 #endif
-void local_cells(int nblocks, struct dblock_t *dblocks, void *ds);
-
-#ifdef __cplusplus
-extern "C"
-#endif
-void d_local_cells(struct dblock_t *b);
+void local_cells(struct dblock_t *b);
 
 #ifdef __cplusplus
 extern "C"
@@ -101,6 +93,10 @@ void init_delaunay_data_structure(struct dblock_t* b);
 extern "C"
 #endif
 void clean_delaunay_data_structures(void* ds);
+#ifdef __cplusplus
+extern "C"
+#endif
+void clean_delaunay_data_structure(struct dblock_t* b);
 
 #ifdef __cplusplus
 extern "C"
@@ -112,13 +108,9 @@ extern "C"
 #endif
 void get_mem(int breakpoint, int dwell);
 
-void neighbor_particles(int nblocks, struct dblock_t *dblocks);
-/* void item_type(DIY_Datatype *type); */
-/* void ic_type(DIY_Datatype *dtype); */
 void collect_stats(int nblocks, struct dblock_t *dblocks, double *times);
 void print_block(struct dblock_t *dblock, int gid);
 void print_particles(float *particles, int num_particles, int gid);
-void prep_out(int nblocks, struct dblock_t *dblocks, int **hdrs);
 void transform_particle(char *p, unsigned char wrap_dir);
 int compare(const void *a, const void *b);
 void write_particles(int nblocks, float **particles, int *num_particles, 

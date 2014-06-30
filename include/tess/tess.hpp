@@ -25,13 +25,7 @@ typedef  diy::RegularContinuousLink  Link;
 
 using namespace std;
 
-void create_blocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs,
-		   float **particles, int *num_particles);
-void reset_blocks(int num_blocks, struct dblock_t* &dblocks);
 void fill_vert_to_tet(dblock_t* dblock);
-void incomplete_cells_final(struct dblock_t *dblock, int lid,
-			    vector <set <gb_t> > &sent_particles,
-			    vector <int> &convex_hull_particles);
 void wall_particles(struct dblock_t *dblock);
 void neighbor_is_complete(int nblocks, struct dblock_t *dblocks,
 			  struct remote_ic_t **rics,
@@ -46,10 +40,17 @@ void save_block(const void* b, diy::BinaryBuffer& bb);
 void load_block(void* b, diy::BinaryBuffer& bb);
 void create(int gid, const Bounds& core, const Bounds& bounds, const diy::Link& link);
 void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
-void d_delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void*);
+void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* ps);
+void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void* ps);
+void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* ps);
+void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
 void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &destinations,
                               vector <int> &convex_hull_particles,
                               const diy::Master::ProxyWithLink& cp);
+void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destinations,
+                            vector <int> &convex_hull_particles,
+                            const diy::Master::ProxyWithLink& cp);
+void reset_block(struct dblock_t* &dblock);
 
 // add blocks to a master
 struct AddBlock

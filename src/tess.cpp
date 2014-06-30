@@ -309,14 +309,60 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
   diy::decompose(3, ::rank, domain, assigner, create, share_face, wrap, ghosts);
 
+  // particles on the convex hull of the local points and
+  // information about particles sent to neighbors
+  vector <int> convex_hull_particles;
+  vector <set <int> > sent_particles; // sent_particles[particle][i] = ith neighbor (edge)
+  void *ps[2]; // pointers to convexh_hull_particles and sent_particles;
+  ps[0] = (void*)&convex_hull_particles;
+  ps[1] = (void*)&sent_particles;
+
   // generate particles
   master.foreach(&gen_particles);
 
-  // compute tessellations 
-  master.foreach(&d_delaunay);
+  // compute first stage tessellation
+  master.foreach(&delaunay1, ps);
 
+  // exchange particles
+  master.exchange();
+
+  // parse received particles
+  master.foreach(neighbor_particles);
+
+  // compute second stage tessellation
+  master.foreach(&delaunay2, ps);
+
+  // exchange particles
+  master.exchange();
+
+  // parse received particles
+  master.foreach(neighbor_particles);
+
+  // compute third stage tessellation
+  master.foreach(&delaunay3, ps);
+
+  // write output 
+  // TODO: how to get all my blocks now?
+//   if (outfile[0])
+//   {
+//     char out_ncfile[256];
+//     strncpy(out_ncfile, outfile, sizeof(out_ncfile));
+//     strncat(out_ncfile, ".nc", sizeof(out_ncfile));
+//     pnetcdf_write(nblocks, dblocks, out_ncfile, comm);
+//     destroy_block(b);
+//   }
+
+  // profile
+//   timing(times, -1, OUT_TIME);
+//   timing(times, -1, TOT_TIME);
+//   get_mem(9, dwell);
+ 
+  // TODO: collect stats 
+//   collect_stats(nblocks, dblocks, times);
+
+  // TODO: original version had the option of returning blocks instead of writing to file
+  // (for coupling to dense and other tools)
 }
-// --------------------------------------------------------------------------
 //
 // diy::Master callback functions
 //
@@ -339,7 +385,9 @@ void load_block(void* b, diy::BinaryBuffer& bb)
 {
   diy::load(bb, *static_cast<dblock_t*>(b));
 }
-
+//
+// foreach block functions
+//
 void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   int sizes[3]; // number of grid points 
@@ -417,7 +465,7 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   fprintf(stderr, "generating %d (actual %d) particles in gid %d\n", num_particles, b->num_particles, b->gid);
 }
 
-void d_delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
 {
   dblock_t* b = (dblock_t*)b_;
 
@@ -434,7 +482,7 @@ void d_delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   timing(times, LOC1_TIME, -1);
 
   // create local delaunay cells
-  d_local_cells(b);
+  local_cells(b);
   
   // profile
   get_mem(2, dwell);
@@ -442,17 +490,98 @@ void d_delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 
   // particles on the convex hull of the local points and
   // information about particles sent to neighbors
-  vector <int> convex_hull_particles;
-  vector <set <int> > sent_particles; // sent_particles[particle][i] = ith neighbor (edge)
+  // sent_particles[particle][i] = ith neighbor (edge)
+  vector <int>* convex_hull_particles = static_cast<vector <int>*>( ((void**)ps)[0] );
+  vector <set <int> >* sent_particles = static_cast<vector <set <int> >*>( ((void**)ps)[1] ); 
 
   // determine which cells are incomplete or too close to neighbor 
-  incomplete_cells_initial(b, sent_particles, convex_hull_particles, cp);
+  incomplete_cells_initial(b, *sent_particles, *convex_hull_particles, cp);
 
   // profile
   get_mem(3, dwell);
   timing(times, NEIGH1_TIME, INC1_TIME);
+
+  // cleanup block
+  reset_block(b);
+
 }
 
+void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
+{
+  dblock_t* b = (dblock_t*)b_;
+
+  // particles on the convex hull of the local points and
+  // information about particles sent to neighbors
+  // sent_particles[particle][i] = ith neighbor (edge)
+  vector <int>* convex_hull_particles = static_cast<vector <int>*>( ((void**)ps)[0] );
+  vector <set <int> >* sent_particles = static_cast<vector <set <int> >*>( ((void**)ps)[1] ); 
+
+  // profile
+  int dwell = 10;
+  get_mem(4, dwell);
+  timing(times, LOC2_TIME, NEIGH1_TIME);
+  
+#ifdef DEBUG
+  int max_particles;
+  MPI_Reduce(&b->num_particles, &max_particles, 1, MPI_INT, MPI_MAX, 0, comm);
+  if (rank == 0)
+    fprintf(stderr, "phase 1: max_particles = %d\n", max_particles);
+#endif
+
+  // recompute local cells
+  local_cells(b);
+
+  // profile
+  get_mem(5, dwell);
+  timing(times, INC2_TIME, LOC2_TIME);
+
+  for (int i = 0; i < nblocks; i++)
+    incomplete_cells_final(b, *sent_particles, *convex_hull_particles, cp);
+
+  // cleanup sent particles
+  sent_particles->clear();
+  
+  // profile
+  get_mem(6, dwell);
+  timing(times, NEIGH2_TIME, INC2_TIME);
+  
+  // TODO, turn walls back on
+  // generate particles to create wall
+//   if (!wrap_neighbors && walls_on)
+//     for (int i = 0; i < nblocks; i++)
+//         wall_particles(&dblocks[i]);
+
+  // cleanup block
+  reset_block(b);
+}
+
+void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
+{
+  dblock_t* b = (dblock_t*)b_;
+  // particles on the convex hull of the local points
+  vector <int>* convex_hull_particles = static_cast<vector <int>*>( ((void**)ps)[0] );
+
+  // profile
+  int dwell = 10;
+  get_mem(7, dwell);
+  timing(times, LOC3_TIME, NEIGH2_TIME);
+  
+  // cleanup convex hull particles
+  convex_hull_particles->clear();
+
+  // create all final cells 
+  local_cells(b);
+  
+  // profile
+  get_mem(8, dwell);
+  timing(times, OUT_TIME, LOC3_TIME);
+
+  // cleanup delaunay data structure and sent particles
+  clean_delaunay_data_structure(b);
+}
+//
+// incomplete cells functions
+//
 void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &destinations,
                               vector <int> &convex_hull_particles,
                               const diy::Master::ProxyWithLink& cp)
@@ -519,7 +648,6 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
     }
   }
 
-
   // enqueue the particles
   for (int p = 0; p < dblock->num_orig_particles; p++)
   {
@@ -531,183 +659,220 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
     rp.dir = 0x00;
     for (set<int>::iterator it = destinations[p].begin(); it != destinations[p].end(); it++)
     {
+      // debug
+      fprintf(stderr, "gid %d sending %.1f %.1f %.1f to gid %d\n", dblock->gid, rp.x, rp.y, rp.z, 
+              cp.link()->target(*it).gid);
       cp.enqueue(cp.link()->target(*it), rp);
     }
   }                     
 
 }
-// --------------------------------------------------------------------------
-//
-//   parallel delaunay tesselation
-//
-//   nblocks: local number of blocks
-//   particles: particles[block_num][particle] 
-//   where each particle is 3 values, px, py, pz
-//   num_particles; number of particles in each block
-//   times: times for particle exchange, voronoi cells, convex hulls, and output
-//   out_file: output file name (pass null string if writing is not desired)
-//
-//   returns: array of local delaunay blocks when writing is disabled
-// 
-struct dblock_t *delaunay(int nblocks, float **particles, int *num_particles, 
-			  double *times, char *out_file) {
 
-  int rank; // MPI rank 
-  void* ds; // persistent delaunay data structures
+void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destinations,
+                            vector <int> &convex_hull_particles,
+                            const diy::Master::ProxyWithLink& cp)
+{
+  struct RemotePoint rp; // particle being sent or received 
+  diy::BoundsLink<Bounds>* l = dynamic_cast<diy::BoundsLink<Bounds>*>(cp.link()); // link
+  set<int> new_dests; // new destination neighbor edges for sending this point
 
-    // init timing 
-  for (int i = 0; i < TESS_MAX_TIMES; i++)
-    times[i] = 0.0;
-  timing(times, TOT_TIME, -1);
+  // for all convex hull particles
+  for (int j = 0; j < (int)convex_hull_particles.size(); ++j)
+  {
 
-  // initialize data structures
-  int **hdrs; // headers 
-  struct dblock_t *dblocks; // delaunay blocks 
-  ds = init_delaunay_data_structures(nblocks);
-  create_blocks(nblocks, dblocks, hdrs, particles, num_particles);
-  
-  // profile
-  int dwell = 10;
-  get_mem(1, dwell);
-  timing(times, LOC1_TIME, -1);
+    int p = convex_hull_particles[j];
 
-  // create local delaunay cells
-  local_cells(nblocks, dblocks, ds);
-  
-  // profile
-  get_mem(2, dwell);
-  timing(times, INC1_TIME, LOC1_TIME);
-
-  // particles on the convex hull of the local points and
-  // information about particles sent to neighbors
-  vector <int> *convex_hull_particles  = new vector<int>[nblocks];
-  vector <set <gb_t> > *sent_particles = new vector<set <gb_t> >[nblocks];
-
-#if 0
-
-  // determine which cells are incomplete or too close to neighbor 
-  for (int i = 0; i < nblocks; i++)
-    incomplete_cells_initial(&dblocks[i], i, sent_particles[i],
-			     convex_hull_particles[i]);
-#endif
-
-  // profile
-  get_mem(3, dwell);
-  timing(times, NEIGH1_TIME, INC1_TIME);
-
-  // cleanup local temporary blocks 
-  reset_blocks(nblocks, dblocks);
-
-  // exhcange particles
-  neighbor_particles(nblocks, dblocks);
-
-  // profile
-  get_mem(4, dwell);
-  timing(times, LOC2_TIME, NEIGH1_TIME);
-  
-#ifdef DEBUG
-  int max_particles;
-  MPI_Reduce( &dblocks[0].num_particles, &max_particles, 1, MPI_INT, MPI_MAX, 0, comm);
-  if (rank == 0)
-    fprintf(stderr, "phase 1: max_particles = %d\n", max_particles);
-#endif
-
-  // second, decisive phase 
-
-  // recompute local cells
-  local_cells(nblocks, dblocks, ds);
-
-  // profile
-  get_mem(5, dwell);
-  timing(times, INC2_TIME, LOC2_TIME);
-
-#if 0
-
-  for (int i = 0; i < nblocks; i++)
-    incomplete_cells_final(&dblocks[i], i, sent_particles[i],
-			   convex_hull_particles[i]);
-
-#endif
-
-  // cleanup sent particles
-  for (int i = 0; i < nblocks; ++i)
-    sent_particles[i].clear();
-  delete[] sent_particles;
-  
-  // profile
-  get_mem(6, dwell);
-  timing(times, NEIGH2_TIME, INC2_TIME);
-  
-  // generate particles to create wall
-  if (!wrap_neighbors && walls_on)
-    for (int i = 0; i < nblocks; i++)
-        wall_particles(&dblocks[i]);
-
-  // cleanup local temporary blocks 
-  reset_blocks(nblocks, dblocks);
-  
-  // exchange particles with neighbors 
-  neighbor_particles(nblocks, dblocks);
-    
-  // profile
-  get_mem(7, dwell);
-  timing(times, LOC3_TIME, NEIGH2_TIME);
-  
-  // cleanup convex hull particles
-  for (int i = 0; i < nblocks; ++i)
-    convex_hull_particles[i].clear();
-  delete[] convex_hull_particles;
-
-  // create all final cells 
-  local_cells(nblocks, dblocks, ds);
-  
-  // profile
-  get_mem(8, dwell);
-  timing(times, OUT_TIME, LOC3_TIME);
-
-  // cleanup delaunay data structure and sent particles
-  clean_delaunay_data_structures(ds);
-
-  // prepare for output 
-  prep_out(nblocks, dblocks, hdrs);
-
-  // write output 
-  if (out_file[0]) {
-#ifdef PNETCDF_IO
-    char out_ncfile[256];
-    strncpy(out_ncfile, out_file, sizeof(out_ncfile));
-    strncat(out_ncfile, ".nc", sizeof(out_file));
-    pnetcdf_write(nblocks, dblocks, out_ncfile, comm);
-#else
-    diy_write(nblocks, dblocks, hdrs, out_file);
-#endif
-  }
-
-  // profile
-  timing(times, -1, OUT_TIME);
-  timing(times, -1, TOT_TIME);
- 
-  // collect stats 
-  collect_stats(nblocks, dblocks, times);
-
-  // cleanup or return dblocks
-  dblock_t *ret_blocks; // array of local blocks to be returned
-  if (out_file[0]) {
-    destroy_blocks(nblocks, dblocks, hdrs);
-    ret_blocks = NULL;
-  }
-  else {
-    for (int i = 0; i < nblocks; i++) {
-      if (hdrs && hdrs[i])
-	delete[] hdrs[i];
+    if (dblock->vert_to_tet[p] == -1)
+    {
+      fprintf(stderr, "Particle %d is not in the triangulation. "
+	      "Perhaps it's a duplicate? Aborting.\n", p);
+      assert(false);
     }
-    ret_blocks = dblocks;
-  }
-  
-  // profile
-  get_mem(9, dwell);
 
-  return ret_blocks;
+    std::vector<int> nbrs;
+    bool complete = neighbor_tets(nbrs, p, dblock->tets, 
+                                  dblock->num_tets,
+    				  dblock->vert_to_tet[p]);
+
+    if (!complete)
+    {
+      // local point still on the convex hull goes to everybody it hasn't gone to yet 
+      for (int n = 0; n < l->count(); n++) // all neighbors
+      {
+      	if (destinations[p].find(n) == destinations[p].end())
+        {
+          new_dests.insert(n);
+      	}
+      }    
+    } // !complete
+
+    else // complete
+    {
+      // point not on convex hull anymore goes to all neighbbors neear enough provided it hasn't
+      // gone to them already
+      for (int j = 0; j < (int)nbrs.size(); ++j)
+      {
+    	int t = nbrs[j];
+    	float center[3];
+    	circumcenter(center, &dblock->tets[t], dblock->particles);
+
+    	// radius is distance from circumcenter to any tet vertex
+    	int p0 = dblock->tets[t].verts[0];
+    	float rad = distance(center, &dblock->particles[3 * p0]);
+
+        // find nearby blocks within radius of circumcenter
+        set<int> near_candts; // candidate destination neighbor edges for this point
+        for (unsigned i = 0; i < l->count(); ++i)
+        {
+          l->near(center, rad, std::inserter(near_candts, near_candts.end()));
+        }
+
+    	// remove the nearby neighbors we've already sent to
+        for (set<int>::iterator it = near_candts.begin(); it != near_candts.end(); it++)
+        {
+    	  if (destinations[p].find(*it) == destinations[p].end())
+          {
+    	    new_dests.insert(*it);
+    	  }
+    	}
+      } // nbrs
+    } // complete 
+
+    // enquue the particle to the new destinations
+    if (new_dests.size())
+    {
+      rp.x = dblock->particles[3 * p];
+      rp.y = dblock->particles[3 * p + 1];
+      rp.z = dblock->particles[3 * p + 2];
+      rp.gid = dblock->gid;
+      rp.nid = p;
+      rp.dir = 0x00;
+      for (set<int>::iterator it = new_dests.begin(); it != new_dests.end(); it++)
+      {
+        // debug
+        fprintf(stderr, "gid %d sending %.1f %.1f %.1f to gid %d\n", dblock->gid, rp.x, rp.y, rp.z, 
+                cp.link()->target(*it).gid);
+        cp.enqueue(cp.link()->target(*it), rp);
+      }
+    }
+
+  } // for convex hull particles
+
+}
+//
+// parse received particles
+//
+void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+{
+  dblock_t*  b = (dblock_t*)b_;
+  diy::Link* l = cp.link();
+  std::vector<int> in;
+  cp.incoming(in);
+
+  // TODO: is in.size() number of items, or number of source gids?
+  // It looks to be the latter. How to get all items from a source?
+
+  // grow space for remote tet verts
+  int n = (b->num_particles - b->num_orig_particles);
+  int new_remote_particles = in.size() + n;
+  b->num_rem_tet_verts = new_remote_particles;
+  b->rem_tet_verts = 
+    (struct remote_vert_t *)realloc(b->rem_tet_verts, 
+                                    new_remote_particles * 
+                                    sizeof(struct remote_vert_t));
+ 
+  if (in.size())
+  {
+    // grow space for particles
+    b->particles = (float *)realloc(b->particles, (b->num_particles + in.size()) *
+                                    3 * sizeof(float));
+  }
+
+  // copy received particles 
+  for (int i = 0; i < (int)in.size(); i++)
+  {
+    RemotePoint p;
+    cp.dequeue(in[i], p);
+
+    // TODO: only getting one item per sender
+
+    // debug
+    fprintf(stderr, "gid %d received %.1f %.1f %.1f from gid %d\n", b->gid, p.x, p.y, p.z, in[i]);
+
+    b->particles[3 * b->num_particles]     = p.x;
+    b->particles[3 * b->num_particles + 1] = p.y;
+    b->particles[3 * b->num_particles + 2] = p.z;
+    b->rem_tet_verts[n].gid                = p.gid;
+    b->rem_tet_verts[n].nid                = p.nid;
+    b->rem_tet_verts[n].dir                = p.dir;
+
+    b->num_particles++;
+    n++;
+  }
+
+}
+//
+// block cleanup functions
+//
+void destroy_block(struct dblock_t *dblock)
+{
+  if (dblock->particles)
+    free(dblock->particles);
+  if (dblock->tets)
+    free(dblock->tets);
+  if (dblock->rem_tet_verts)
+    free(dblock->rem_tet_verts);
+  if (dblock->vert_to_tet)
+    free(dblock->vert_to_tet);
+
+  delete dblock;
+}
+
+void reset_block(struct dblock_t* &dblock)
+{
+  // free old data
+  if (dblock->tets)
+    free(dblock->tets);
+  if (dblock->vert_to_tet)
+    free(dblock->vert_to_tet);
+
+  // initialize new data
+  dblock->num_tets = 0;
+  dblock->tets = NULL;
+  dblock->vert_to_tet = NULL;
+}
+//
+//   finds the direction of the nearest block to the given point
+//
+//   p: coordinates of the point
+//   mins, maxs: block bounds
+// 
+unsigned char nearest_neighbor(float* p, float* mins, float* maxs)
+{
+  // TODO: possibly find the 3 closest neighbors, and look at the ratio of
+  //   the distances to deal with the corners  
+
+  int		i;
+  float	        dists[6];
+  unsigned char dirs[6] = { DIY_X0, DIY_X1, DIY_Y0, DIY_Y1, DIY_Z0, DIY_Z1 };
+
+  for (i = 0; i < 3; ++i)
+  {
+    dists[2*i]     = p[i] - mins[i];
+    dists[2*i + 1] = maxs[i] - p[i];
+  }
+
+  int   smallest = 0;
+  for (i = 1; i < 6; ++i)
+  {
+    if (dists[i] < dists[smallest])
+      smallest = i;
+  }
+
+  return dirs[smallest];
+
+  // debug, need to return something for now
+  return 0;
 
 }
 // --------------------------------------------------------------------------
@@ -728,82 +893,6 @@ void fill_vert_to_tet(dblock_t* dblock) {
       dblock->vert_to_tet[p] = t;	// the last one wins
     }
   }
-
-}
-// --------------------------------------------------------------------------
-//
-//   exchanges particles with neighbors
-//
-//   nblocks: local number of blocks
-//   dblocks: local blocks
-//
-void neighbor_particles(int nblocks, dblock_t *dblocks) {
-
-#if 0
-
-  void ***recv_particles; // pointers to particles in ecah block 
-			  //   that are received from neighbors 
-  int *num_recv_particles; // number of received particles for each block 
-  int i, j;
-
-  recv_particles = (void ***)malloc(nblocks * sizeof(void **));
-  num_recv_particles = (int *)malloc(nblocks * sizeof(int));
-
-  // particles were previously enqueued by local_cells(), ready to
-  //   be exchanged 
-  DIY_Exchange_neighbors(0, recv_particles, num_recv_particles, 1.0, 
-			 &item_type);
-
-  // copy received particles to dblock
-  for (i = 0; i < nblocks; i++) {
-
-    int n = (dblocks[i].num_particles - dblocks[i].num_orig_particles);
-    int new_remote_particles = num_recv_particles[i] + n;
-    dblocks[i].num_rem_tet_verts = new_remote_particles;
-    dblocks[i].rem_tet_verts = 
-      (struct remote_vert_t *)realloc(dblocks[i].rem_tet_verts, 
-				      new_remote_particles * 
-				      sizeof(struct remote_vert_t));
- 
-    if (num_recv_particles[i]) {
-
-      // grow space 
-      dblocks[i].particles = 
-	(float *)realloc(dblocks[i].particles, 
-			 (dblocks[i].num_particles + num_recv_particles[i]) *
-			 3 * sizeof(float));
-
-      // copy received particles 
-      for (j = 0; j < num_recv_particles[i]; j++) { 
-
-	dblocks[i].particles[3 * dblocks[i].num_particles] =
-	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->x;
-	dblocks[i].particles[3 * dblocks[i].num_particles + 1] =
-	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->y;
-	dblocks[i].particles[3 * dblocks[i].num_particles + 2] =
-	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->z;
-	dblocks[i].rem_tet_verts[n].gid = 
-	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->gid;
-	dblocks[i].rem_tet_verts[n].nid = 
-	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->nid;
-	dblocks[i].rem_tet_verts[n].dir = 
-	  DIY_Exchd_item(struct remote_particle_t, recv_particles, i, j)->dir;
-
-	dblocks[i].num_particles++;
-	n++;
-
-      } // copy received particles 
-
-    } // if num_recv_particles 
-
-  } // for all blocks 
-
-  // clean up 
-  DIY_Flush_neighbors(0, recv_particles, num_recv_particles, &item_type);
-  free(num_recv_particles);
-  free(recv_particles);
-
-#endif
 
 }
 // --------------------------------------------------------------------------
@@ -931,29 +1020,6 @@ void wall_particles(struct dblock_t *dblock) {
 
 }
 // --------------------------------------------------------------------------
-
-#if 0
-
-//
-//  makes DIY datatype for sending / receiving one item
-// 
-void item_type(DIY_Datatype *dtype) {
-
-  struct map_block_t map[] = {
-    {DIY_FLOAT, OFST, 1, offsetof(struct remote_particle_t, x)         },
-    {DIY_FLOAT, OFST, 1, offsetof(struct remote_particle_t, y)         },
-    {DIY_FLOAT, OFST, 1, offsetof(struct remote_particle_t, z)         },
-    {DIY_INT,   OFST, 1, offsetof(struct remote_particle_t, gid)       },
-    {DIY_INT,   OFST, 1, offsetof(struct remote_particle_t, nid)       },
-    {DIY_BYTE,  OFST, 1, offsetof(struct remote_particle_t, dir)       },
-  };
-  DIY_Create_struct_datatype(0, 6, map, dtype);
-
-}
-
-#endif
-
-// --------------------------------------------------------------------------
 //
 //   collects statistics
 //
@@ -1017,300 +1083,7 @@ void collect_stats(int nblocks, struct dblock_t *dblocks, double *times) {
 
 }
 // --------------------------------------------------------------------------
-//
-//   prepare for delaunay output, including saving headers
-//
-//   nblocks: number of blocks
-//   dblocks: local blocks
-//   hdrs: block headers
-// 
-void prep_out(int nblocks, struct dblock_t *dblocks, int **hdrs) {
-
-#if 0
-
-  struct bb_t bounds; // block bounds 
-
-  // save extents 
-  for (int i = 0; i < nblocks; i++) {
-
-    DIY_Block_bounds(0, i, &bounds);
-
-    dblocks[i].mins[0] = bounds.min[0];
-    dblocks[i].mins[1] = bounds.min[1];
-    dblocks[i].mins[2] = bounds.min[2];
-    dblocks[i].maxs[0] = bounds.max[0];
-    dblocks[i].maxs[1] = bounds.max[1];
-    dblocks[i].maxs[2] = bounds.max[2];
-
-    hdrs[i][NUM_ORIG_PARTICLES] = dblocks[i].num_orig_particles;
-    hdrs[i][NUM_PARTICLES] = dblocks[i].num_particles;
-    hdrs[i][NUM_TETS] = dblocks[i].num_tets;
-    hdrs[i][NUM_REM_TET_VERTS] = dblocks[i].num_rem_tet_verts;
-
-  }
-
-#endif
-
-}
-// --------------------------------------------------------------------------
-//
-//   creates and initializes delaunay blocks and headers
-//   copies original particles into the blocks
-//
-//   num_blocks: number of blocks
-//   dblocks: local dblocks
-//   hdrs: block headers, pass NULL if not used
-//   particles: particles[block_num][particle] 
-//   where each particle is 3 values, px, py, pz
-//   num_particles; number of particles in each block
-//
-//   side effects: allocates memory for blocks and headers
-// 
-void create_blocks(int num_blocks, struct dblock_t* &dblocks, int** &hdrs,
-		   float **particles, int *num_particles) {
-
-#if 0
-
-  // allocate
-  dblocks = new dblock_t[num_blocks];
-  hdrs = new int*[num_blocks];
-  for (int i = 0; i < num_blocks; i++) {
-    hdrs[i] = new int[DIY_MAX_HDR_ELEMENTS];
-    memset(hdrs[i], 0, DIY_MAX_HDR_ELEMENTS * sizeof(int));
-  }
-
-  // initialize
-  for (int i = 0; i < num_blocks; i++) {
-
-    dblocks[i].num_orig_particles = num_particles[i];
-    dblocks[i].num_particles = num_particles[i];
-    // malloc instead of new so that can be realloc'ed later
-    dblocks[i].particles = (float*)malloc(num_particles[i] * 3 * sizeof(float));
-    for (int j = 0; j < num_particles[i]; j++) {
-      dblocks[i].particles[3 * j] = particles[i][3 * j];
-      dblocks[i].particles[3 * j + 1] = particles[i][3 * j + 1];
-      dblocks[i].particles[3 * j + 2] = particles[i][3 * j + 2];
-    }
-    dblocks[i].num_tets = 0;
-    dblocks[i].tets = NULL;
-    dblocks[i].num_rem_tet_verts = 0;
-    dblocks[i].rem_tet_verts = NULL;
-    dblocks[i].vert_to_tet = NULL;
-
-  }
-
-#endif
-
-}
 // ---------------------------------------------------------------------------
-//
-//   frees delaunay blocks and headers
-//
-//   num_blocks: number of blocks
-//   dblocks: array of dblocks
-//   hdrs: pointer to array of headers, pass NULL if not used
-// 
-void destroy_blocks(int num_blocks, struct dblock_t *dblocks, int **hdrs) {
-
-  for (int i = 0; i < num_blocks; i++) {
-    if (hdrs && hdrs[i])
-      delete[] hdrs[i];
-    if (dblocks[i].particles)
-      free(dblocks[i].particles);
-    if (dblocks[i].tets)
-      free(dblocks[i].tets);
-    if (dblocks[i].rem_tet_verts)
-      free(dblocks[i].rem_tet_verts);
-    if (dblocks[i].vert_to_tet)
-      free(dblocks[i].vert_to_tet);
-  }
-
-  delete[] hdrs;
-  delete[] dblocks;
-
-}
-// ---------------------------------------------------------------------------
-//
-//   resets blocks between phases
-//
-//   num_blocks: number of blocks
-//   dblocks: local dblocks
-//
-void reset_blocks(int num_blocks, struct dblock_t* &dblocks) {
-
-  // the entire data structure is listed below and commented out are the
-  // fields that don't get reset - todo: clean up eventually
-
-  // initialize
-  for (int i = 0; i < num_blocks; i++) {
-
-    // free old data
-    if (dblocks[i].tets)
-      free(dblocks[i].tets);
-    if (dblocks[i].vert_to_tet)
-      free(dblocks[i].vert_to_tet);
-
-    // initialize new data
-    dblocks[i].num_tets = 0;
-    dblocks[i].tets = NULL;
-    dblocks[i].vert_to_tet = NULL;
-
-  }
-
-}
-// ---------------------------------------------------------------------------
-//
-//   finds the direction of the nearest block to the given point
-//
-//   p: coordinates of the point
-//   mins, maxs: block bounds
-// 
-unsigned char nearest_neighbor(float* p, float* mins, float* maxs)
-{
-  // TODO: possibly find the 3 closest neighbors, and look at the ratio of
-  //   the distances to deal with the corners  
-
-  int		i;
-  float	        dists[6];
-  unsigned char dirs[6] = { DIY_X0, DIY_X1, DIY_Y0, DIY_Y1, DIY_Z0, DIY_Z1 };
-
-  for (i = 0; i < 3; ++i)
-  {
-    dists[2*i]     = p[i] - mins[i];
-    dists[2*i + 1] = maxs[i] - p[i];
-  }
-
-  int   smallest = 0;
-  for (i = 1; i < 6; ++i)
-  {
-    if (dists[i] < dists[smallest])
-      smallest = i;
-  }
-
-  return dirs[smallest];
-
-  // debug, need to return something for now
-  return 0;
-
-}
-// ---------------------------------------------------------------------------
-//
-//    Go through the original convex hull particles and enqueue any remaining
-//    incomplete cells to all neighbors
-//
-//    dblock: one delaunay voronoi block
-//    lid: local id of block
-//    destinations: neighbors to which particles have already been sent
-//    convex_hull_particles: convex hull particles to check
-// 
-void incomplete_cells_final(struct dblock_t *dblock, int lid,
-			    vector <set <gb_t> > &destinations,
-			    vector <int> &convex_hull_particles) {
-
-#if 0
-
-  struct bb_t bounds; // block bounds 
-  struct remote_particle_t rp; // particle being sent or received 
-  struct gb_t neigh_gbs[MAX_NEIGHBORS]; // blocks to whom particle was sent
-  struct gb_t all_neigh_gbs[MAX_NEIGHBORS]; // all neighbors in neighborhood
-  int num_gbs; // number of neighbors used
-
-  DIY_Block_bounds(0, lid, &bounds);
-
-  // get gids of all neighbors, in case a particle needs to be
-  //   sent to all neighbors
-  //   (enumerating all gids manually (not via DIY_Enqueue_Item_all)
-  //   to be consisent with enumerating particular neighbors) 
-  int num_all_neigh_gbs = DIY_Num_neighbors(0, lid);
-  DIY_Get_neighbors(0, lid, all_neigh_gbs);
-
-  // for all convex hull particles
-  for (int j = 0; j < (int)convex_hull_particles.size(); ++j) {
-
-    int p = convex_hull_particles[j];
-
-    if (dblock->vert_to_tet[p] == -1) {
-      fprintf(stderr, "Particle %d is not in the triangulation. "
-	      "Perhaps it's a duplicate? Aborting.\n", p);
-      assert(false);
-    }
-
-    std::vector<int> nbrs;
-    bool complete = neighbor_tets(nbrs, p, dblock->tets, 
-                                  dblock->num_tets,
-    				  dblock->vert_to_tet[p]);
-
-    if (!complete) {
-
-      // local point still on the convex hull goes to everybody
-      // it hasn't gone to yet 
-
-      num_gbs = 0;
-      for (int l = 0; l < num_all_neigh_gbs; l++) { // all neighbors
-
-	// skip self and destinations already sent
-      	if (all_neigh_gbs[l].neigh_dir != 0x00 &&
-	    destinations[p].find(all_neigh_gbs[l]) == destinations[p].end()) {
-      	    neigh_gbs[num_gbs].gid	  = all_neigh_gbs[l].gid;
-      	    neigh_gbs[num_gbs].neigh_dir  = all_neigh_gbs[l].neigh_dir;
-      	    num_gbs++;
-      	}
-
-      } // all neighbors
-    
-    } // !complete
-
-    else { // complete
-
-      num_gbs = 0;
-      for (int j = 0; j < (int)nbrs.size(); ++j) {
-    	int t = nbrs[j];
-    	float center[3];
-    	circumcenter(center, &dblock->tets[t], dblock->particles);
-
-    	// radius is distance from circumcenter to any tet vertex
-    	int p0 = dblock->tets[t].verts[0];
-    	float rad = distance(center, &dblock->particles[3 * p0]);
-    	gb_t candidates[MAX_NEIGHBORS];
-    	int num_candidates = 0;
-    	DIY_Add_gbs_all_near(0, lid, candidates, &num_candidates,
-    			     MAX_NEIGHBORS, center, rad);
-
-    	// remove the neighbors we've already sent to
-    	for (int l = 0; l < num_candidates; ++l) { // all candidates
-
-    	  if (destinations[p].find(candidates[l]) == destinations[p].end()) {
-    	    destinations[p].insert(candidates[l]);
-    	    neigh_gbs[num_gbs].gid	  = candidates[l].gid;
-    	    neigh_gbs[num_gbs].neigh_dir  = candidates[l].neigh_dir;
-    	    num_gbs++;
-    	  }
-
-    	} // all candidates
-
-      } // for t in nbrs
-
-    } // complete 
-
-    if (num_gbs) {
-      rp.x = dblock->particles[3 * p];
-      rp.y = dblock->particles[3 * p + 1];
-      rp.z = dblock->particles[3 * p + 2];
-      rp.gid = DIY_Gid(0, lid);
-      rp.nid = p;
-      rp.dir = 0x00;
-      DIY_Enqueue_item_gbs(0, lid, (void *)&rp,
-    			   NULL, sizeof(struct remote_particle_t),
-    			   neigh_gbs, num_gbs,
-    			   &transform_particle);
-    }
-
-  } // for convex hull particles
-
-#endif
-
-}
-// --------------------------------------------------------------------------
 //
 //   randomly samples a set of partidles
 //
