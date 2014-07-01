@@ -31,7 +31,7 @@ void neighbor_is_complete(int nblocks, struct dblock_t *dblocks,
 			  struct remote_ic_t **rics,
 			  vector <struct sent_t> *sent_particles);
 void sample_particles(float *particles, int &num_particles, int sample_rate);
-unsigned char nearest_neighbor(float* p, float* mins, float* maxs);
+diy::Direction nearest_neighbor(float* p, float* mins, float* maxs);
 
 // callbacks for new diy version
 void* create_block();

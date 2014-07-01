@@ -590,7 +590,7 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
   destinations.resize(dblock->num_orig_particles);
 
   // link
-  diy::BoundsLink<Bounds>* l = dynamic_cast<diy::BoundsLink<Bounds>*>(cp.link());
+  Link* l = dynamic_cast<Link*>(cp.link());
 
   // identify and enqueue convex hull particles
   for (int p = 0; p < dblock->num_orig_particles; ++p) {
@@ -610,12 +610,11 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
       convex_hull_particles.push_back(p);
 
       // incomplete cell goes to the closest neighbor 
-      unsigned char nearest_dir = 
+      diy::Direction nearest_dir = 
     	nearest_neighbor(&(dblock->particles[3 * p]), dblock->mins, dblock->maxs);
-        // TODO: how to get the neighbor in a given direction for BoundsLink? 
-        // (only defined for RegularLink)
-        // helper functions will be moved to standalone
-        // destinations[p].insert(l->direction(nearest_dir);
+      // TODO: helper functions will be moved to standalone
+      if (l->direction(nearest_dir) != -1)
+	destinations[p].insert(l->direction(nearest_dir));
     }
 
   }
@@ -847,14 +846,14 @@ void reset_block(struct dblock_t* &dblock)
 //   p: coordinates of the point
 //   mins, maxs: block bounds
 // 
-unsigned char nearest_neighbor(float* p, float* mins, float* maxs)
+diy::Direction nearest_neighbor(float* p, float* mins, float* maxs)
 {
   // TODO: possibly find the 3 closest neighbors, and look at the ratio of
   //   the distances to deal with the corners  
 
-  int		i;
-  float	        dists[6];
-  unsigned char dirs[6] = { DIY_X0, DIY_X1, DIY_Y0, DIY_Y1, DIY_Z0, DIY_Z1 };
+  int               i;
+  float             dists[6];
+  diy::Direction    dirs[6] = { DIY_X0, DIY_X1, DIY_Y0, DIY_Y1, DIY_Z0, DIY_Z1 };
 
   for (i = 0; i < 3; ++i)
   {
@@ -870,10 +869,6 @@ unsigned char nearest_neighbor(float* p, float* mins, float* maxs)
   }
 
   return dirs[smallest];
-
-  // debug, need to return something for now
-  return 0;
-
 }
 // --------------------------------------------------------------------------
 //
