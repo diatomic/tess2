@@ -593,8 +593,8 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
   Link* l = dynamic_cast<Link*>(cp.link());
 
   // identify and enqueue convex hull particles
-  for (int p = 0; p < dblock->num_orig_particles; ++p) {
-
+  for (int p = 0; p < dblock->num_orig_particles; ++p)
+  {
     if (dblock->vert_to_tet[p] == -1)
     {
       fprintf(stderr, "Particle %d is not in the triangulation. "
