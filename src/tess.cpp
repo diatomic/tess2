@@ -40,6 +40,7 @@
 #include <diy/assigner.hpp>
 #include <diy/serialization.hpp>
 #include <diy/decomposition.hpp>
+#include <diy/pick.hpp>
 
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>
@@ -632,7 +633,7 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
     set<int> dests; // destination neighbor edges for this point
     for (unsigned i = 0; i < l->count(); ++i)
     {
-      l->near(center, rad, std::inserter(dests, dests.end()));
+      near(*l, center, rad, std::inserter(dests, dests.end()));
     }
 
     // all 4 verts go these dests
@@ -723,7 +724,7 @@ void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destina
         set<int> near_candts; // candidate destination neighbor edges for this point
         for (unsigned i = 0; i < l->count(); ++i)
         {
-          l->near(center, rad, std::inserter(near_candts, near_candts.end()));
+          near(*l, center, rad, std::inserter(near_candts, near_candts.end()));
         }
 
     	// remove the nearby neighbors we've already sent to
