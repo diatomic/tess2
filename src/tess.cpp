@@ -27,6 +27,7 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#include <cstring>
 
 #include "tess/tess.h"
 #include "tess/tess.hpp"
@@ -40,6 +41,7 @@
 #include <diy/assigner.hpp>
 #include <diy/serialization.hpp>
 #include <diy/decomposition.hpp>
+#include <diy/pick.hpp>
 
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>
@@ -632,7 +634,7 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
     set<int> dests; // destination neighbor edges for this point
     for (unsigned i = 0; i < l->count(); ++i)
     {
-      l->near(center, rad, std::inserter(dests, dests.end()));
+      near(*l, center, rad, std::inserter(dests, dests.end()));
     }
 
     // all 4 verts go these dests
@@ -723,7 +725,7 @@ void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destina
         set<int> near_candts; // candidate destination neighbor edges for this point
         for (unsigned i = 0; i < l->count(); ++i)
         {
-          l->near(center, rad, std::inserter(near_candts, near_candts.end()));
+          near(*l, center, rad, std::inserter(near_candts, near_candts.end()));
         }
 
     	// remove the nearby neighbors we've already sent to
@@ -768,9 +770,6 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   std::vector<int> in;
   cp.incoming(in);
 
-  // TODO: is in.size() number of items, or number of source gids?
-  // It looks to be the latter. How to get all items from a source?
-
   // grow space for remote tet verts
   int n = (b->num_particles - b->num_orig_particles);
   int new_remote_particles = in.size() + n;
@@ -779,36 +778,46 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
     (struct remote_vert_t *)realloc(b->rem_tet_verts, 
                                     new_remote_particles * 
                                     sizeof(struct remote_vert_t));
- 
-  if (in.size())
+
+  // count total number of incoming points
+  int numpts = 0;
+  for (int i = 0; i < (int)in.size(); i++)
   {
-    // grow space for particles
-    b->particles = (float *)realloc(b->particles, (b->num_particles + in.size()) *
-                                    3 * sizeof(float));
+    numpts += cp.incoming(in[i]).buffer.size() / sizeof(RemotePoint);
+  }
+
+  // grow space for particles
+  if (numpts)
+  {
+    b->particles = (float *)realloc(b->particles, (b->num_particles + numpts) * 3 * sizeof(float));
   }
 
   // copy received particles 
   for (int i = 0; i < (int)in.size(); i++)
   {
-    RemotePoint p;
-    cp.dequeue(in[i], p);
-
-    // TODO: only getting one item per sender
-
+    numpts = cp.incoming(in[i]).buffer.size() / sizeof(RemotePoint);
     // debug
-    fprintf(stderr, "gid %d received %.1f %.1f %.1f from gid %d\n", b->gid, p.x, p.y, p.z, in[i]);
+    fprintf(stderr, "gid %d received %d points from gid %d\n", b->gid, numpts, in[i]);
+    vector<RemotePoint> pts;
+    pts.reserve(numpts);
+    cp.dequeue(in[i], pts);
 
-    b->particles[3 * b->num_particles]     = p.x;
-    b->particles[3 * b->num_particles + 1] = p.y;
-    b->particles[3 * b->num_particles + 2] = p.z;
-    b->rem_tet_verts[n].gid                = p.gid;
-    b->rem_tet_verts[n].nid                = p.nid;
-    b->rem_tet_verts[n].dir                = p.dir;
+    for (int j = 0; j < numpts; j++)
+    {
+      // debug
+      fprintf(stderr, "gid %d received %.1f %.1f %.1f from gid %d\n", 
+              b->gid, pts[j].x, pts[j].y, pts[j].z, in[i]);
+      b->particles[3 * b->num_particles]     = pts[j].x;
+      b->particles[3 * b->num_particles + 1] = pts[j].y;
+      b->particles[3 * b->num_particles + 2] = pts[j].z;
+      b->rem_tet_verts[n].gid                = pts[j].gid;
+      b->rem_tet_verts[n].nid                = pts[j].nid;
+      b->rem_tet_verts[n].dir                = pts[j].dir;
 
-    b->num_particles++;
-    n++;
+      b->num_particles++;
+      n++;
+    }
   }
-
 }
 //
 // block cleanup functions
