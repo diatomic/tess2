@@ -818,6 +818,7 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
       n++;
     }
   }
+
 }
 //
 // block cleanup functions
