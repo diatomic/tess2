@@ -61,7 +61,7 @@ static int wrap_neighbors; // whether wraparound neighbors are used
 // CLP - if wrap_neighbors is 0 then check this condition. 
 static int walls_on;
 static int rank; // my MPI rank
-static MPI_Comm comm = MPI_COMM_WORLD; // MPI communicator TODO: get from diy?
+static MPI_Comm comm = MPI_COMM_WORLD; // MPI communicator
 static float jitter; // amount to randomly jitter synthetic particles off grid positions
 
 #if 0
@@ -271,6 +271,7 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   ::wrap_neighbors = wrap_;
   ::walls_on = twalls_on;
   ::jitter = jitter;
+  ::comm = mpi_comm;
   
   // data extents 
   typedef     diy::ContinuousBounds         Bounds;
@@ -343,22 +344,59 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   // compute third stage tessellation
   master.foreach(&delaunay3, ps);
 
+  // All the foreach block functions are done. We now make a very
+  // dangerous assumption that all blocks fit in memory because the
+  // remaining functions are done on all blocks (a la the old style)
+
+  // array of pointers to all my local blocks
+  dblock_t** dblocks = new dblock_t*[master.size()];
+  for (int i = 0; i < (int)master.size(); i++)
+  {
+    dblocks[i] = master.block<dblock_t>(i);
+  }
+
   // write output 
-  // TODO: how to get all my blocks now?
-//   if (outfile[0])
-//   {
-//     char out_ncfile[256];
-//     strncpy(out_ncfile, outfile, sizeof(out_ncfile));
-//     strncat(out_ncfile, ".nc", sizeof(out_ncfile));
-//     pnetcdf_write(nblocks, dblocks, out_ncfile, comm);
-//     destroy_block(b);
-//   }
+  if (outfile[0])
+  {
+    char out_ncfile[256];
+    int *num_nbrs = new int[master.size()];
+    gb_t **nbrs = new gb_t*[master.size()];
+    const diy::Master& m = master;
+    for (int i = 0; i < (int)master.size(); i++)
+    {
+      diy::Link* l = m.link(i);
+      num_nbrs[i] = l->count();
+      nbrs[i] = new gb_t[num_nbrs[i]];
+      for (int j = 0; j < num_nbrs[i]; j++)
+      {
+        nbrs[i][j] = l->target(j);
+      }
+    }
+    strncpy(out_ncfile, outfile, sizeof(out_ncfile));
+    strncat(out_ncfile, ".nc", sizeof(out_ncfile));
+    pnetcdf_write(nblocks, dblocks, out_ncfile, mpi_comm, num_nbrs, nbrs);
+    for (int i = 0; i < (int)master.size(); i++)
+    {
+      delete[] nbrs[i];
+    }
+    delete[] nbrs;
+    delete[] num_nbrs;
+  }
 
   // profile
-//   timing(times, -1, OUT_TIME);
-//   timing(times, -1, TOT_TIME);
-//   get_mem(9, dwell);
+  int dwell = 10;
+  timing(times, -1, OUT_TIME);
+  timing(times, -1, TOT_TIME);
+  get_mem(9, dwell);
  
+  // clean up local blocks
+  // TODO: appears to be not necessary, master cleans them up?
+//   for (int i = 0; i < (int)master.size(); i++)
+//   {
+//     destroy_block(master.block<dblock_t>(i));
+//   }
+  delete[] dblocks;
+
   // TODO: collect stats 
 //   collect_stats(nblocks, dblocks, times);
 
@@ -799,9 +837,8 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
     // debug
 //     fprintf(stderr, "gid %d received %d points from gid %d\n", b->gid, numpts, in[i]);
     vector<RemotePoint> pts;
-    pts.reserve(numpts);
-    // NB ProxyWithLink::dequeue is for only one object, must use diy::load instead
-    diy::load(cp.incoming(in[i]), &pts[0], numpts);
+    pts.resize(numpts);
+    cp.dequeue(in[i], &pts[0], numpts);
 
     for (int j = 0; j < numpts; j++)
     {

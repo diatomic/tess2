@@ -57,15 +57,15 @@
   writes output in pnetcdf format
 
   nblocks: local number of blocks
-  dblocks: pointer to array of dblocks
+  dblocks: array of pointers to dblocks
   out_file: output file name
   comm: MPI communicator
+  num_nbrs: number of neighbors for each local block
+  nbrs: neighbors of each local block
 */
-void pnetcdf_write(int nblocks, struct dblock_t *dblocks, 
-		   char *out_file, MPI_Comm comm) {
-
-#if 0
-
+void pnetcdf_write(int nblocks, struct dblock_t **dblocks, 
+		   char *out_file, MPI_Comm comm, int *num_nbrs, struct gb_t **nbrs)
+{
   int err;
   int ncid, cmode, varids[41], dimids[14], dimids_2D[2];
   MPI_Offset start[2], count[2];
@@ -85,11 +85,11 @@ void pnetcdf_write(int nblocks, struct dblock_t *dblocks,
   /* sum quantities over local blocks */
   int b;
   for (b = 0; b < nblocks; b++) {
-    proc_quants[NUM_PARTS] += dblocks[b].num_particles;
-    proc_quants[NUM_NEIGHBORS] += DIY_Num_neighbors(0, b);
+    proc_quants[NUM_PARTS] += dblocks[b]->num_particles;
+    proc_quants[NUM_NEIGHBORS] += num_nbrs[b];
     /* 2x because I converted array of structs to array of ints */
-    proc_quants[NUM_LOC_TETRAS] += 2 * dblocks[b].num_tets;
-    proc_quants[NUM_REM_TETRAS] += dblocks[b].num_rem_tet_verts;
+    proc_quants[NUM_LOC_TETRAS] += 2 * dblocks[b]->num_tets;
+    proc_quants[NUM_REM_TETRAS] += dblocks[b]->num_rem_tet_verts;
   }
   proc_quants[NUM_BLOCKS] = nblocks;
 
@@ -180,7 +180,7 @@ void pnetcdf_write(int nblocks, struct dblock_t *dblocks,
 
   for (b = 0; b < nblocks; b++) {
 
-    struct dblock_t *d = &dblocks[b];
+    struct dblock_t *d = dblocks[b];
 
     /* quantities */
     start[0] = block_ofsts[NUM_BLOCKS];
@@ -223,33 +223,30 @@ void pnetcdf_write(int nblocks, struct dblock_t *dblocks,
 				   d->particles); ERR;
 
     /* num_neighbors, neighbors, neigh_procs */
-    int num_neighbors = DIY_Num_neighbors(0, b);
     struct gb_t *neigh_gbs =
-      (struct gb_t *)malloc(num_neighbors * sizeof(struct gb_t));
-    int *neighbors = (int*)malloc(num_neighbors * sizeof(int));
-    int *neigh_procs = (int*)malloc(num_neighbors * sizeof(int));
-    DIY_Get_neighbors(0, b, neigh_gbs);
-    for (i = 0; i < num_neighbors; i++) {
-      neighbors[i] = neigh_gbs[i].gid;
-      neigh_procs[i] = neigh_gbs[i].proc;
+      (struct gb_t *)malloc(num_nbrs[b] * sizeof(struct gb_t));
+    int *neighbors = (int*)malloc(num_nbrs[b] * sizeof(int));
+    int *neigh_procs = (int*)malloc(num_nbrs[b] * sizeof(int));
+    for (i = 0; i < num_nbrs[b]; i++) {
+      neighbors[i] = nbrs[b][i].gid;
+      neigh_procs[i] = nbrs[b][i].proc;
     }
     start[0] = block_ofsts[NUM_BLOCKS];
     count[0] = 1;
     err = ncmpi_put_vara_int_all(ncid, varids[24], start, count, 
-				 &num_neighbors); ERR;
+				 &num_nbrs[b]); ERR;
     start[0] = block_ofsts[NUM_NEIGHBORS];
-    count[0] = num_neighbors;
+    count[0] = num_nbrs[b];
     err = ncmpi_put_vara_int_all(ncid, varids[21], start, count, neighbors);
     ERR;
     err = ncmpi_put_vara_int_all(ncid, varids[22], start, count, neigh_procs);
     ERR;
 
     /* gids */
-    int gid = DIY_Gid(0, b);
     start[0] = block_ofsts[NUM_BLOCKS];
     count[0] = 1;
     err = ncmpi_put_vara_int_all(ncid, varids[23], start, count, 
-				 &gid); ERR;
+				 &d->gid); ERR;
 
     /* tets */
 
@@ -293,7 +290,7 @@ void pnetcdf_write(int nblocks, struct dblock_t *dblocks,
 
     /* update block offsets */
     block_ofsts[NUM_PARTS] += d->num_particles;
-    block_ofsts[NUM_NEIGHBORS] += num_neighbors;
+    block_ofsts[NUM_NEIGHBORS] += num_nbrs[b];
     block_ofsts[NUM_BLOCKS]++;
     /* 2x because I converted array of structs to array of ints */
     block_ofsts[NUM_LOC_TETRAS] += 2 * d->num_tets;
@@ -307,8 +304,6 @@ void pnetcdf_write(int nblocks, struct dblock_t *dblocks,
   }
 
   err = ncmpi_close(ncid); ERR;
-
-#endif
 
 }
 /*--------------------------------------------------------------------------*/

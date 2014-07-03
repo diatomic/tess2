@@ -17,6 +17,7 @@
 #define _IO_H
 
 #include "delaunay.h"
+#include <diy/types.h>
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
@@ -38,21 +39,20 @@
 #ifdef __cplusplus
 extern "C"
 #endif
-void diy_write(int nblocks, struct dblock_t *dblocks, int **hdrs,
-	       char *out_file);
+void diy_write(int nblocks, struct dblock_t *dblocks, int **hdrs, char *out_file);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-void pnetcdf_write(int nblocks, struct dblock_t *dblocks, 
-		     char *out_file, MPI_Comm comm);
+void pnetcdf_write(int nblocks, struct dblock_t **dblocks, 
+		   char *out_file, MPI_Comm comm, int *num_nbrs, struct gb_t **nbrs);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks, 
-		    char *in_file, MPI_Comm comm, int **gids, 
-		    int **num_neighbors, int ***neighbors, int ***neigh_procs);
+void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks, char *in_file, 
+                  MPI_Comm comm, int **gids, int **num_neighbors, int ***neighbors, 
+                  int ***neigh_procs);
 
 /* #ifdef __cplusplus */
 /* extern "C" */
