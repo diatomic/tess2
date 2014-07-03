@@ -661,8 +661,8 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
     for (set<int>::iterator it = destinations[p].begin(); it != destinations[p].end(); it++)
     {
       // debug
-      fprintf(stderr, "gid %d sending %.1f %.1f %.1f to gid %d\n", dblock->gid, rp.x, rp.y, rp.z, 
-              cp.link()->target(*it).gid);
+//       fprintf(stderr, "gid %d sending %.1f %.1f %.1f to gid %d\n", 
+//               dblock->gid, rp.x, rp.y, rp.z, cp.link()->target(*it).gid);
       cp.enqueue(cp.link()->target(*it), rp);
     }
   }                     
@@ -751,8 +751,8 @@ void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destina
       for (set<int>::iterator it = new_dests.begin(); it != new_dests.end(); it++)
       {
         // debug
-        fprintf(stderr, "gid %d sending %.1f %.1f %.1f to gid %d\n", dblock->gid, rp.x, rp.y, rp.z, 
-                cp.link()->target(*it).gid);
+//         fprintf(stderr, "gid %d sending %.1f %.1f %.1f to gid %d\n", 
+//                 dblock->gid, rp.x, rp.y, rp.z, cp.link()->target(*it).gid);
         cp.enqueue(cp.link()->target(*it), rp);
       }
     }
@@ -770,21 +770,21 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   std::vector<int> in;
   cp.incoming(in);
 
-  // grow space for remote tet verts
-  int n = (b->num_particles - b->num_orig_particles);
-  int new_remote_particles = in.size() + n;
-  b->num_rem_tet_verts = new_remote_particles;
-  b->rem_tet_verts = 
-    (struct remote_vert_t *)realloc(b->rem_tet_verts, 
-                                    new_remote_particles * 
-                                    sizeof(struct remote_vert_t));
-
   // count total number of incoming points
   int numpts = 0;
   for (int i = 0; i < (int)in.size(); i++)
   {
     numpts += cp.incoming(in[i]).buffer.size() / sizeof(RemotePoint);
   }
+
+  // grow space for remote tet verts
+  int n = (b->num_particles - b->num_orig_particles);
+  int new_remote_particles = numpts + n;
+  b->num_rem_tet_verts = new_remote_particles;
+  b->rem_tet_verts = 
+    (struct remote_vert_t *)realloc(b->rem_tet_verts, 
+                                    new_remote_particles * 
+                                    sizeof(struct remote_vert_t));
 
   // grow space for particles
   if (numpts)
@@ -797,16 +797,17 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   {
     numpts = cp.incoming(in[i]).buffer.size() / sizeof(RemotePoint);
     // debug
-    fprintf(stderr, "gid %d received %d points from gid %d\n", b->gid, numpts, in[i]);
+//     fprintf(stderr, "gid %d received %d points from gid %d\n", b->gid, numpts, in[i]);
     vector<RemotePoint> pts;
     pts.reserve(numpts);
-    cp.dequeue(in[i], pts);
+    // NB ProxyWithLink::dequeue is for only one object, must use diy::load instead
+    diy::load(cp.incoming(in[i]), &pts[0], numpts);
 
     for (int j = 0; j < numpts; j++)
     {
       // debug
-      fprintf(stderr, "gid %d received %.1f %.1f %.1f from gid %d\n", 
-              b->gid, pts[j].x, pts[j].y, pts[j].z, in[i]);
+//       fprintf(stderr, "gid %d received %.1f %.1f %.1f from gid %d\n", 
+//               b->gid, pts[j].x, pts[j].y, pts[j].z, in[i]);
       b->particles[3 * b->num_particles]     = pts[j].x;
       b->particles[3 * b->num_particles + 1] = pts[j].y;
       b->particles[3 * b->num_particles + 2] = pts[j].z;
