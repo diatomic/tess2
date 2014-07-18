@@ -89,7 +89,6 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
     proc_quants[NUM_NEIGHBORS] += num_nbrs[b];
     /* 2x because I converted array of structs to array of ints */
     proc_quants[NUM_LOC_TETRAS] += 2 * dblocks[b]->num_tets;
-    proc_quants[NUM_REM_TETRAS] += dblocks[b]->num_rem_tet_verts;
   }
   proc_quants[NUM_BLOCKS] = nblocks;
 
@@ -115,8 +114,6 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
   err = ncmpi_def_dim(ncid, "num_g_tets", tot_quants[NUM_LOC_TETRAS],
 		      &dimids[8]); ERR;
   err = ncmpi_def_dim(ncid, "V0V1V2V3", 4, &dimids[9]); ERR;
-  err = ncmpi_def_dim(ncid, "num_g_rem_tet_verts", 
-		      tot_quants[NUM_REM_TETRAS], &dimids[10]); ERR;
 
   /* --- define variables --- */
 
@@ -127,8 +124,6 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
 		      &varids[5]); ERR;
   err = ncmpi_def_var(ncid, "num_tets", NC_INT, 1, &dimids[0], 
 		      &varids[25]); ERR;
-  err = ncmpi_def_var(ncid, "num_rem_tet_verts", NC_INT, 1, &dimids[0], 
-		      &varids[28]); ERR;
 
   /* block offsets
      encode the offset in the full array of each variable wheree the first
@@ -163,12 +158,6 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
   dimids_2D[1] = dimids[9];
   err = ncmpi_def_var(ncid, "tets", NC_INT, 2, dimids_2D, 
 		      &varids[27]); ERR;
-  err = ncmpi_def_var(ncid, "rem_tet_vert_gids", NC_INT, 1, &dimids[10],
-		      &varids[30]); ERR;
-  err = ncmpi_def_var(ncid, "rem_tet_vert_nids", NC_INT, 1, &dimids[10], 
-		      &varids[31]); ERR;
-  err = ncmpi_def_var(ncid, "rem_tet_vert_dirs", NC_UBYTE, 1, &dimids[10], 
-		      &varids[32]); ERR;
   err = ncmpi_def_var(ncid, "vert_to_tet", NC_INT, 1, &dimids[6], 
 		      &varids[33]); ERR;
 
@@ -191,16 +180,12 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
 				 &d->num_particles); ERR;
     err = ncmpi_put_vara_int_all(ncid, varids[25], start, count, 
 				 &d->num_tets); ERR;
-    err = ncmpi_put_vara_int_all(ncid, varids[28], start, count, 
-				 &d->num_rem_tet_verts); ERR;
 
     /* block offsets */
     err = ncmpi_put_vara_longlong_all(ncid, varids[9], start, count, 
 				      &block_ofsts[NUM_PARTS]); ERR;
     err = ncmpi_put_vara_longlong_all(ncid, varids[26], start, count, 
 				      &block_ofsts[NUM_LOC_TETRAS]); ERR;
-    err = ncmpi_put_vara_longlong_all(ncid, varids[29], start, count, 
-				      &block_ofsts[NUM_REM_TETRAS]); ERR;
     err = ncmpi_put_vara_longlong_all(ncid, varids[40], start, count,
 				      &block_ofsts[NUM_NEIGHBORS]); ERR;
 
@@ -249,8 +234,6 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
 				 &d->gid); ERR;
 
     /* tets */
-
-    /* local */
     count[0] = d->num_tets * 2; /* verts and neighbors combined */
     count[1] = (count[0] ? 4 : 0);
     start[0] = (count[0] ? block_ofsts[NUM_LOC_TETRAS] : 0);
@@ -259,28 +242,6 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
        because pnetcdf likes arrays */
     err = ncmpi_put_vara_int_all(ncid, varids[27], start, count,
 				 (int *)(d->tets)); ERR;
-    /* remote
-       an extra memory copy is needed because pnetcdf does not like structs
-       with different field types */
-    count[0] = d->num_rem_tet_verts;
-    start[0] = (count[0] ? block_ofsts[NUM_REM_TETRAS] : 0);
-    /* copy individual fields of struct into separate temp. arrays */
-    int *ids = (int *)malloc(d->num_rem_tet_verts * sizeof(int));
-    for (i = 0; i < d->num_rem_tet_verts; i++)
-      ids[i] = d->rem_tet_verts[i].gid;
-    err = ncmpi_put_vara_int_all(ncid, varids[30], start, count,
-				 ids); ERR;
-    for (i = 0; i < d->num_rem_tet_verts; i++)
-      ids[i] = d->rem_tet_verts[i].nid;
-    err = ncmpi_put_vara_int_all(ncid, varids[31], start, count,
-				 ids); ERR;
-    free(ids);
-    unsigned char *dirs = (unsigned char *)malloc(d->num_rem_tet_verts);
-    for (i = 0; i < d->num_rem_tet_verts; i++)
-      dirs[i] = d->rem_tet_verts[i].dir;
-    err = ncmpi_put_vara_uchar_all(ncid, varids[32], start, count,
-				   dirs); ERR;
-    free(dirs);
 
     /* vert_to_tet */
     start[0] = block_ofsts[NUM_PARTS];
@@ -294,7 +255,8 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
     block_ofsts[NUM_BLOCKS]++;
     /* 2x because I converted array of structs to array of ints */
     block_ofsts[NUM_LOC_TETRAS] += 2 * d->num_tets;
-    block_ofsts[NUM_REM_TETRAS] += d->num_rem_tet_verts;
+    /* local (all tets are local) */
+/*     block_ofsts[NUM_REM_TETRAS] += d->num_rem_tet_verts; */
 
     /* cleanup */
     free(neighbors);
@@ -405,8 +367,6 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks,
     err = ncmpi_get_vara_int_all(ncid, varids[25], start, count, 
 				 &(d->num_tets)); ERR;
     err = ncmpi_inq_varid(ncid, "num_rem_tet_verts", &varids[28]); ERR;
-    err = ncmpi_get_vara_int_all(ncid, varids[28], start, count, 
-				 &(d->num_rem_tet_verts)); ERR;
 
     /* block bounds */
     start[0] = start_block_ofst + b;
@@ -469,7 +429,6 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks,
     (*gids)[b] = all_gids[start_block_ofst + b];
 
     /* tets */
-    /* local */
     start[0] = 0;
     count[0] = *tot_blocks;
     err = ncmpi_get_vara_longlong_all(ncid, varids[26], start, count, 
@@ -484,45 +443,6 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks,
     err = ncmpi_inq_varid(ncid, "tets", &varids[27]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[27], start, count, 
 				 (int *)d->tets); ERR;
-    /* remote
-       an extra memory copy is needed because pnetcdf does not like structs
-       with different field types */
-    start[0] = 0;
-    count[0] = *tot_blocks;
-    err = ncmpi_get_vara_longlong_all(ncid, varids[29], start, count,
-				      (long long *) block_ofsts); ERR;
-    if (d->num_rem_tet_verts)
-      d->rem_tet_verts =
-	(struct remote_vert_t *)malloc(d->num_rem_tet_verts *
-				       sizeof(struct remote_vert_t));
-    count[0] = d->num_rem_tet_verts;
-    start[0] = (count[0] ? block_ofsts[start_block_ofst + b] : 0);
-    /* copy individual fields of struct into seaparate temp. arrays */
-    int *ids =  NULL;
-    if (d->num_rem_tet_verts)
-      ids = (int *)malloc(d->num_rem_tet_verts * sizeof(int));
-    err = ncmpi_inq_varid(ncid, "rem_tet_vert_gids", &varids[30]); ERR;
-    err = ncmpi_get_vara_int_all(ncid, varids[30], start, count,
-				 ids); ERR;
-    for (i = 0; i < d->num_rem_tet_verts; i++)
-      d->rem_tet_verts[i].gid = ids[i];
-    err = ncmpi_inq_varid(ncid, "rem_tet_vert_nids", &varids[31]); ERR;
-    err = ncmpi_get_vara_int_all(ncid, varids[31], start, count,
-				 ids); ERR;
-    for (i = 0; i < d->num_rem_tet_verts; i++)
-      d->rem_tet_verts[i].nid = ids[i];
-    if (d->num_rem_tet_verts)
-      free(ids);
-    unsigned char *dirs = NULL;
-    if (d->num_rem_tet_verts)
-      dirs = (unsigned char *)malloc(d->num_rem_tet_verts);
-    err = ncmpi_inq_varid(ncid, "rem_tet_vert_dirs", &varids[32]); ERR;
-    err = ncmpi_get_vara_uchar_all(ncid, varids[32], start, count,
-				   dirs); ERR;
-    for (i = 0; i < d->num_rem_tet_verts; i++)
-      d->rem_tet_verts[i].dir = dirs[i];
-    if (d->num_rem_tet_verts)
-      free(dirs);
     
     /* vert_to_tet */
     start[0] = 0;

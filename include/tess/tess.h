@@ -116,8 +116,6 @@ int compare(const void *a, const void *b);
 void write_particles(int nblocks, float **particles, int *num_particles, 
 		     char *outfile);
 void handle_error(int errcode, MPI_Comm comm, char *str);
-void gen_tets(struct dblock_t *dblock,
-	      struct remote_ic_t *rics, int lid, int num_recvd);
 void create_walls(int *num_walls, struct wall_t **walls);
 void destroy_walls(int num_walls, struct wall_t *walls);
 int test_outside(const float * pt, const struct wall_t *wall);

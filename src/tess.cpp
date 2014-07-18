@@ -502,7 +502,8 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   b->num_orig_particles = n;
 
   // debug
-  fprintf(stderr, "generating %d (actual %d) particles in gid %d\n", num_particles, b->num_particles, b->gid);
+  //   fprintf(stderr, "generating %d (actual %d) particles in gid %d\n", 
+  //           num_particles, b->num_particles, b->gid);
 }
 
 void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
@@ -524,6 +525,10 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
   // create local delaunay cells
   local_cells(b);
   
+  // debug
+//   fprintf(stderr, "phase 1 gid %d num_tets %d num_particles %d \n", 
+//           b->gid, b->num_tets, b->num_particles);
+
   // profile
   get_mem(2, dwell);
   timing(times, INC1_TIME, LOC1_TIME);
@@ -571,6 +576,10 @@ void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
   // recompute local cells
   local_cells(b);
 
+  // debug
+//   fprintf(stderr, "phase 2 gid %d num_tets %d num_particles %d \n", 
+//           b->gid, b->num_tets, b->num_particles);
+
   // profile
   get_mem(5, dwell);
   timing(times, INC2_TIME, LOC2_TIME);
@@ -612,6 +621,10 @@ void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
   // create all final cells 
   local_cells(b);
   
+  // debug
+//   fprintf(stderr, "phase 3 gid %d num_tets %d num_particles %d \n", 
+//           b->gid, b->num_tets, b->num_particles);
+
   // profile
   get_mem(8, dwell);
   timing(times, OUT_TIME, LOC3_TIME);
@@ -713,12 +726,12 @@ void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destina
 {
   struct RemotePoint rp; // particle being sent or received 
   diy::BoundsLink<Bounds>* l = dynamic_cast<diy::BoundsLink<Bounds>*>(cp.link()); // link
-  set<int> new_dests; // new destination neighbor edges for sending this point
 
   // for all convex hull particles
   for (int j = 0; j < (int)convex_hull_particles.size(); ++j)
   {
 
+    set<int> new_dests; // new destination neighbor edges for sending this point
     int p = convex_hull_particles[j];
 
     if (dblock->vert_to_tet[p] == -1)
@@ -788,9 +801,6 @@ void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destina
       rp.dir = 0x00;
       for (set<int>::iterator it = new_dests.begin(); it != new_dests.end(); it++)
       {
-        // debug
-//         fprintf(stderr, "gid %d sending %.1f %.1f %.1f to gid %d\n", 
-//                 dblock->gid, rp.x, rp.y, rp.z, cp.link()->target(*it).gid);
         cp.enqueue(cp.link()->target(*it), rp);
       }
     }
@@ -818,11 +828,6 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   // grow space for remote tet verts
   int n = (b->num_particles - b->num_orig_particles);
   int new_remote_particles = numpts + n;
-  b->num_rem_tet_verts = new_remote_particles;
-  b->rem_tet_verts = 
-    (struct remote_vert_t *)realloc(b->rem_tet_verts, 
-                                    new_remote_particles * 
-                                    sizeof(struct remote_vert_t));
 
   // grow space for particles
   if (numpts)
@@ -834,8 +839,6 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   for (int i = 0; i < (int)in.size(); i++)
   {
     numpts = cp.incoming(in[i]).buffer.size() / sizeof(RemotePoint);
-    // debug
-//     fprintf(stderr, "gid %d received %d points from gid %d\n", b->gid, numpts, in[i]);
     vector<RemotePoint> pts;
     pts.resize(numpts);
     cp.dequeue(in[i], &pts[0], numpts);
@@ -848,9 +851,6 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
       b->particles[3 * b->num_particles]     = pts[j].x;
       b->particles[3 * b->num_particles + 1] = pts[j].y;
       b->particles[3 * b->num_particles + 2] = pts[j].z;
-      b->rem_tet_verts[n].gid                = pts[j].gid;
-      b->rem_tet_verts[n].nid                = pts[j].nid;
-      b->rem_tet_verts[n].dir                = pts[j].dir;
 
       b->num_particles++;
       n++;
@@ -867,8 +867,6 @@ void destroy_block(struct dblock_t *dblock)
     free(dblock->particles);
   if (dblock->tets)
     free(dblock->tets);
-  if (dblock->rem_tet_verts)
-    free(dblock->rem_tet_verts);
   if (dblock->vert_to_tet)
     free(dblock->vert_to_tet);
 
@@ -1032,12 +1030,6 @@ void wall_particles(struct dblock_t *dblock) {
     int n = (dblock->num_particles - dblock->num_orig_particles);
     int new_remote_particles = new_points.size()/3 + n;
           
-    dblock->num_rem_tet_verts = new_remote_particles;
-    dblock->rem_tet_verts =  
-      (struct remote_vert_t *)realloc(dblock->rem_tet_verts,
-				      new_remote_particles * 
-				      sizeof(struct remote_vert_t));
- 
     // grow space 
     dblock->particles = 
       (float *)realloc(dblock->particles,
@@ -1049,9 +1041,6 @@ void wall_particles(struct dblock_t *dblock) {
       dblock->particles[3 * dblock->num_particles    ] = new_points[j    ];
       dblock->particles[3 * dblock->num_particles + 1] = new_points[j + 1];
       dblock->particles[3 * dblock->num_particles + 2] = new_points[j + 2];
-      dblock->rem_tet_verts[n].gid = -1;
-      dblock->rem_tet_verts[n].nid = -1;
-      dblock->rem_tet_verts[n].dir = 0x00;
       dblock->num_particles++;
       n++;
     }
@@ -1084,7 +1073,6 @@ void collect_stats(int nblocks, struct dblock_t *dblocks, double *times) {
   quants[0] = dblocks[0].num_orig_particles;
   quants[1] = dblocks[0].num_particles;
   quants[2] = dblocks[0].num_tets;
-  quants[3] = dblocks[0].num_rem_tet_verts;
   MPI_Reduce( quants, min_quants, MAX_QUANTS, MPI_INT, MPI_MIN, 0, comm);
   MPI_Reduce( quants, max_quants, MAX_QUANTS, MPI_INT, MPI_MAX, 0, comm);
 

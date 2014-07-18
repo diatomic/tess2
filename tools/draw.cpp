@@ -16,8 +16,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <assert.h>
 #include "tess/delaunay.h"
-#include "tess/ser_io.hpp"
 #include "tess/tet-neighbors.h"
 #include "tess/tet.h"
 #include <math.h>
@@ -186,9 +186,6 @@ int main(int argc, char** argv) {
   }
 
   // read the file
-
-#ifdef PNETCDF_IO
-
   int tot_blocks; // total number of blocks
   int *gids; // block global ids (unused)
   int *num_neighbors; // number of neighbors for each local block (unused)
@@ -201,6 +198,7 @@ int main(int argc, char** argv) {
 	       &gids, &num_neighbors, &neighbors, &neigh_procs);
 
   MPI_Finalize();
+
   // mapping of gid to lid
   int gid2lid[nblocks]; 
   for (int b = 0; b < nblocks; b++) {
@@ -212,18 +210,6 @@ int main(int argc, char** argv) {
       assert(g < nblocks); // sanity
     }
   }
-
-#else
-
-  SER_IO *io = new SER_IO(0); // io object
-  nblocks = io->ReadAllBlocks(argv[1], blocks, false);
-
-  // mapping of gid to lid
-  int gid2lid[nblocks]; 
-  for (int b = 0; b < nblocks; b++)
-    gid2lid[b] = b;
-
-#endif
 
   // get overall data extent
   for (int i = 0; i < nblocks; i++) {
@@ -1247,7 +1233,7 @@ void PrepCellRendering(int &num_vis_cells) {
 void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
 
   num_loc_tets = 0;
-  num_rem_tets = 0;
+  num_rem_tets = 0; // unused
 
   for (int b = 0; b < nblocks; b++) { // blocks
 
@@ -1276,43 +1262,9 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
 	int s = blocks[b].tets[t].verts[v]; // index pf particle
 	vec3d p; // coordinates for tet vertices
 
-	if (s < blocks[b].num_orig_particles) { // local
-
-	  p.x = blocks[b].particles[3 * s];
-	  p.y = blocks[b].particles[3 * s + 1];
-	  p.z = blocks[b].particles[3 * s + 2];
-
-	}
-	else { // remote
-
-	  int r = s - blocks[b].num_orig_particles; //index into rem_tet_verts
-	  int g = blocks[b].rem_tet_verts[r].gid; // gid of remote block
-	  int n = blocks[b].rem_tet_verts[r].nid; // nid of remote particle
-      
-	  if (g < 0) {
-	    //fprintf(stderr, "Using fake point\n");
-	    continue;}
-      
-
-	  p.x = blocks[gid2lid[g]].particles[3 * n];
-	  p.y = blocks[gid2lid[g]].particles[3 * n + 1];
-	  p.z = blocks[gid2lid[g]].particles[3 * n + 2];
-
-	  // wraparound transform
-	  if ((blocks[b].rem_tet_verts[r].dir & DIY_X0) == DIY_X0)
-	    p.x += (data_max.x - data_min.x);
-	  if ((blocks[b].rem_tet_verts[r].dir & DIY_X1) == DIY_X1)
-	    p.x -= (data_max.x - data_min.x);
-	  if ((blocks[b].rem_tet_verts[r].dir & DIY_Y0) == DIY_Y0)
-	    p.y += (data_max.y - data_min.y);
-	  if ((blocks[b].rem_tet_verts[r].dir & DIY_Y1) == DIY_Y1)
-	    p.y -= (data_max.y - data_min.y);
-	  if ((blocks[b].rem_tet_verts[r].dir & DIY_Z0) == DIY_Z0)
-	    p.z += (data_max.z - data_min.z);
-	  if ((blocks[b].rem_tet_verts[r].dir & DIY_Z1) == DIY_Z1)
-	    p.z -= (data_max.z - data_min.z);
-
-	}
+        p.x = blocks[b].particles[3 * s];
+        p.y = blocks[b].particles[3 * s + 1];
+        p.z = blocks[b].particles[3 * s + 2];
 
 	tet_verts.push_back(p);
 
@@ -1321,9 +1273,6 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
       num_loc_tets++;
 
     } // local tets
-
-    num_rem_tets = 0; // all tets are covered above, rem_tets not used anymore
-
 
     // tet face normals
 

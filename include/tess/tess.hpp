@@ -74,13 +74,11 @@ struct AddBlock
     b->num_particles = 0;
     b->num_tets = 0;
     b->tets = NULL;
-    b->num_rem_tet_verts = 0;
-    b->rem_tet_verts = NULL;
     b->vert_to_tet = NULL;
 
     // debug
-    fprintf(stderr, "creating gid %d mins[%.1f %.1f %.1f] maxs[%.1f %.1f %.1f]\n", b->gid,
-            b->mins[0], b->mins[1], b->mins[2], b->maxs[0], b->maxs[1], b->maxs[2]);
+//     fprintf(stderr, "creating gid %d mins[%.1f %.1f %.1f] maxs[%.1f %.1f %.1f]\n", b->gid,
+//             b->mins[0], b->mins[1], b->mins[2], b->maxs[0], b->maxs[1], b->maxs[2]);
 
   }
 
@@ -88,7 +86,7 @@ struct AddBlock
 };
 
 // serialize a block
-// TODO: how to serialize Dt (do I need to), and how to serialize a pointer's contents?
+// TODO: not serializing Dt for now, recomputing in load() instead
 namespace diy
 {
   template<>
@@ -99,15 +97,12 @@ namespace diy
       diy::save(bb, d.gid);
       diy::save(bb, d.mins);
       diy::save(bb, d.maxs);
-      diy::save(bb, d.Dt);
       diy::save(bb, d.num_orig_particles);
       diy::save(bb, d.num_particles);
-      diy::save(bb, d.particles);
+      diy::save(bb, d.particles, d.num_particles);
       diy::save(bb, d.num_tets);
-      diy::save(bb, d.tets);
-      diy::save(bb, d.num_rem_tet_verts);
-      diy::save(bb, d.rem_tet_verts);
-      diy::save(bb, d.vert_to_tet);
+      diy::save(bb, d.tets, d.num_tets);
+      diy::save(bb, d.vert_to_tet, d.num_particles);
     }
 
     static void load(BinaryBuffer& bb, dblock_t& d)
@@ -115,15 +110,22 @@ namespace diy
       diy::load(bb, d.gid);
       diy::load(bb, d.mins);
       diy::load(bb, d.maxs);
-      diy::load(bb, d.Dt);
       diy::load(bb, d.num_orig_particles);
       diy::load(bb, d.num_particles);
-      diy::load(bb, d.particles);
+      d.particles = (float*)malloc(d.num_particles * 3 * sizeof(float));
+      diy::load(bb, d.particles, d.num_particles);
       diy::load(bb, d.num_tets);
-      diy::load(bb, d.tets);
-      diy::load(bb, d.num_rem_tet_verts);
-      diy::load(bb, d.rem_tet_verts);
-      diy::load(bb, d.vert_to_tet);
+      d.tets = (struct tet_t*)malloc(d.num_tets * sizeof(struct tet_t));
+      diy::load(bb, d.tets, d.num_tets);
+      // DEPRECATED
+      //       diy::load(bb, d.num_rem_tet_verts);
+      //       d.rem_tet_verts = (struct remote_vert_t*)malloc(d.num_rem_tet_verts * 
+      //                                                        sizeof(struct remote_vert_t));
+      //       diy::load(bb, d.rem_tet_verts, d.num_rem_tet_verts);
+      d.vert_to_tet = (int*)malloc(d.num_particles * sizeof(int));
+      diy::load(bb, d.vert_to_tet, d.num_particles);
+      // TODO: re-initializing Dt instead of saving/loading it for now
+      init_delaunay_data_structure(&d);
     }
   };
 }
