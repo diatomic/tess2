@@ -44,12 +44,8 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* ps);
 void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void* ps);
 void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* ps);
 void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
-void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &destinations,
-                              vector <int> &convex_hull_particles,
-                              const diy::Master::ProxyWithLink& cp);
-void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destinations,
-                            vector <int> &convex_hull_particles,
-                            const diy::Master::ProxyWithLink& cp);
+void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp);
+void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp);
 void reset_block(struct dblock_t* &dblock);
 
 // add blocks to a master
@@ -75,6 +71,8 @@ struct AddBlock
     b->num_tets = 0;
     b->tets = NULL;
     b->vert_to_tet = NULL;
+    b->sent_particles = (void *)(new vector<set<int> >);
+    b->convex_hull_particles = (void *)(new vector<int>);
 
     // debug
 //     fprintf(stderr, "creating gid %d mins[%.1f %.1f %.1f] maxs[%.1f %.1f %.1f]\n", b->gid,
@@ -103,6 +101,12 @@ namespace diy
       diy::save(bb, d.num_tets);
       diy::save(bb, d.tets, d.num_tets);
       diy::save(bb, d.vert_to_tet, d.num_particles);
+      vector <int> *convex_hull_particles = 
+        static_cast<vector <int>*>(d.convex_hull_particles);
+      diy::save(bb, *convex_hull_particles);
+      vector <set <int> > *sent_particles = 
+        static_cast<vector <set <int> >*>(d.sent_particles);
+      diy::save(bb, *sent_particles);
     }
 
     static void load(BinaryBuffer& bb, dblock_t& d)
@@ -117,13 +121,11 @@ namespace diy
       diy::load(bb, d.num_tets);
       d.tets = (struct tet_t*)malloc(d.num_tets * sizeof(struct tet_t));
       diy::load(bb, d.tets, d.num_tets);
-      // DEPRECATED
-      //       diy::load(bb, d.num_rem_tet_verts);
-      //       d.rem_tet_verts = (struct remote_vert_t*)malloc(d.num_rem_tet_verts * 
-      //                                                        sizeof(struct remote_vert_t));
-      //       diy::load(bb, d.rem_tet_verts, d.num_rem_tet_verts);
       d.vert_to_tet = (int*)malloc(d.num_particles * sizeof(int));
       diy::load(bb, d.vert_to_tet, d.num_particles);
+      // TODO: are the next two lines correct?
+      diy::load(bb, *(static_cast<vector <int>*>(d.convex_hull_particles)));
+      diy::load(bb, *(static_cast<vector <set <int> >*>(d.sent_particles)));
       // TODO: re-initializing Dt instead of saving/loading it for now
       init_delaunay_data_structure(&d);
     }

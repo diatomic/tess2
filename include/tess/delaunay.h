@@ -70,6 +70,12 @@ struct dblock_t {
   struct tet_t *tets; /* delaunay tets */
   int* vert_to_tet; /* a tet that contains the vertex */
 
+  /* sent particles and convex hull particles
+     these persist between phases of the algorithm but ar not saved in the final output
+     using void* for each so that C files tess-qhull.c and io.c can see them */
+  void* convex_hull_particles;
+  void* sent_particles;
+
 };
 
 #endif

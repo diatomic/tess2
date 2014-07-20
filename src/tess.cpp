@@ -312,19 +312,11 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
   diy::decompose(3, ::rank, domain, assigner, create, share_face, wrap, ghosts);
 
-  // particles on the convex hull of the local points and
-  // information about particles sent to neighbors
-  vector <int> convex_hull_particles;
-  vector <set <int> > sent_particles; // sent_particles[particle][i] = ith neighbor (edge)
-  void *ps[2]; // pointers to convexh_hull_particles and sent_particles;
-  ps[0] = (void*)&convex_hull_particles;
-  ps[1] = (void*)&sent_particles;
-
   // generate particles
   master.foreach(&gen_particles);
 
   // compute first stage tessellation
-  master.foreach(&delaunay1, ps);
+  master.foreach(&delaunay1);
 
   // exchange particles
   master.exchange();
@@ -333,7 +325,7 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   master.foreach(neighbor_particles);
 
   // compute second stage tessellation
-  master.foreach(&delaunay2, ps);
+  master.foreach(&delaunay2);
 
   // exchange particles
   master.exchange();
@@ -342,7 +334,7 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   master.foreach(neighbor_particles);
 
   // compute third stage tessellation
-  master.foreach(&delaunay3, ps);
+  master.foreach(&delaunay3);
 
   // All the foreach block functions are done. We now make a very
   // dangerous assumption that all blocks fit in memory because the
@@ -411,9 +403,33 @@ void* create_block()
   return new dblock_t;
 }
 
-void destroy_block(void* b)
+void destroy_block(void* b_)
 {
-  delete static_cast<dblock_t*>(b);
+  dblock_t* b = static_cast<dblock_t*>(b_);
+
+  // particles and tets
+  if (b->particles)
+    free(b->particles);
+  if (b->tets)
+    free(b->tets);
+  if (b->vert_to_tet)
+    free(b->vert_to_tet);
+
+  // convex hull particles and sent particles
+  vector <int> *convex_hull_particles = 
+    static_cast<vector <int>*>(b->convex_hull_particles);
+  vector <set <int> > *sent_particles   = 
+    static_cast<vector <set <int> >*>(b->sent_particles);
+  for (int i = 0; i < (int)sent_particles->size(); i++)
+    sent_particles[i].clear();
+  sent_particles->clear();
+  convex_hull_particles->clear();
+  delete sent_particles;
+  delete convex_hull_particles;
+
+  clean_delaunay_data_structure(b);
+
+  delete b;
 }
 
 void save_block(const void* b, diy::BinaryBuffer& bb)
@@ -506,7 +522,7 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   //           num_particles, b->num_particles, b->gid);
 }
 
-void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
+void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   dblock_t* b = (dblock_t*)b_;
 
@@ -533,14 +549,8 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
   get_mem(2, dwell);
   timing(times, INC1_TIME, LOC1_TIME);
 
-  // particles on the convex hull of the local points and
-  // information about particles sent to neighbors
-  // sent_particles[particle][i] = ith neighbor (edge)
-  vector <int>* convex_hull_particles = static_cast<vector <int>*>( ((void**)ps)[0] );
-  vector <set <int> >* sent_particles = static_cast<vector <set <int> >*>( ((void**)ps)[1] ); 
-
   // determine which cells are incomplete or too close to neighbor 
-  incomplete_cells_initial(b, *sent_particles, *convex_hull_particles, cp);
+  incomplete_cells_initial(b, cp);
 
   // profile
   get_mem(3, dwell);
@@ -551,15 +561,9 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
 
 }
 
-void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
+void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   dblock_t* b = (dblock_t*)b_;
-
-  // particles on the convex hull of the local points and
-  // information about particles sent to neighbors
-  // sent_particles[particle][i] = ith neighbor (edge)
-  vector <int>* convex_hull_particles = static_cast<vector <int>*>( ((void**)ps)[0] );
-  vector <set <int> >* sent_particles = static_cast<vector <set <int> >*>( ((void**)ps)[1] ); 
 
   // profile
   int dwell = 10;
@@ -584,12 +588,8 @@ void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
   get_mem(5, dwell);
   timing(times, INC2_TIME, LOC2_TIME);
 
-  for (int i = 0; i < nblocks; i++)
-    incomplete_cells_final(b, *sent_particles, *convex_hull_particles, cp);
+  incomplete_cells_final(b, cp);
 
-  // cleanup sent particles
-  sent_particles->clear();
-  
   // profile
   get_mem(6, dwell);
   timing(times, NEIGH2_TIME, INC2_TIME);
@@ -604,43 +604,41 @@ void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
   reset_block(b);
 }
 
-void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* ps)
+void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   dblock_t* b = (dblock_t*)b_;
-  // particles on the convex hull of the local points
-  vector <int>* convex_hull_particles = static_cast<vector <int>*>( ((void**)ps)[0] );
 
   // profile
   int dwell = 10;
   get_mem(7, dwell);
   timing(times, LOC3_TIME, NEIGH2_TIME);
   
-  // cleanup convex hull particles
-  convex_hull_particles->clear();
-
   // create all final cells 
   local_cells(b);
   
   // debug
-//   fprintf(stderr, "phase 3 gid %d num_tets %d num_particles %d \n", 
-//           b->gid, b->num_tets, b->num_particles);
+  fprintf(stderr, "phase 3 gid %d num_tets %d num_particles %d \n", 
+          b->gid, b->num_tets, b->num_particles);
 
   // profile
   get_mem(8, dwell);
   timing(times, OUT_TIME, LOC3_TIME);
-
-  // cleanup delaunay data structure and sent particles
-  clean_delaunay_data_structure(b);
 }
 //
 // incomplete cells functions
 //
-void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &destinations,
-                              vector <int> &convex_hull_particles,
-                              const diy::Master::ProxyWithLink& cp)
+void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp)
 {
+  // particles on the convex hull of the local points and
+  // information about particles sent to neighbors
+  // sent_particles[particle][i] = ith neighbor (edge)
+  vector <int> *convex_hull_particles = 
+    static_cast<vector <int>*>(dblock->convex_hull_particles);
+  vector <set <int> > *sent_particles = 
+    static_cast<vector <set <int> >*>(dblock->sent_particles);
+
   struct RemotePoint rp; // particle being sent or received 
-  destinations.resize(dblock->num_orig_particles);
+  sent_particles->resize(dblock->num_orig_particles);
 
   // link
   Link* l = dynamic_cast<Link*>(cp.link());
@@ -660,14 +658,14 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
     	!complete(p, dblock->tets, dblock->num_tets, dblock->vert_to_tet[p]))
     {
       // add to list of convex hull particles
-      convex_hull_particles.push_back(p);
+      convex_hull_particles->push_back(p);
 
       // incomplete cell goes to the closest neighbor 
       diy::Direction nearest_dir = 
     	nearest_neighbor(&(dblock->particles[3 * p]), dblock->mins, dblock->maxs);
       // TODO: helper functions will be moved to standalone
       if (l->direction(nearest_dir) != -1)
-	destinations[p].insert(l->direction(nearest_dir));
+	(*sent_particles)[p].insert(l->direction(nearest_dir));
     }
 
   }
@@ -692,10 +690,9 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
     for (int v = 0; v < 4; v++)
     {
       int p = dblock->tets[t].verts[v];
-      // destinations is a set; neighbors will be unique
       for (set<int>::iterator it = dests.begin(); it != dests.end(); it++)
       {
-        destinations[p].insert(*it);
+        (*sent_particles)[p].insert(*it);
       }
     }
   }
@@ -709,7 +706,8 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
     rp.gid = dblock->gid;
     rp.nid = p;
     rp.dir = 0x00;
-    for (set<int>::iterator it = destinations[p].begin(); it != destinations[p].end(); it++)
+    for (set<int>::iterator it = (*sent_particles)[p].begin(); it != (*sent_particles)[p].end(); 
+         it++)
     {
       // debug
 //       fprintf(stderr, "gid %d sending %.1f %.1f %.1f to gid %d\n", 
@@ -720,19 +718,25 @@ void incomplete_cells_initial(struct dblock_t *dblock, vector< set<int> > &desti
 
 }
 
-void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destinations,
-                            vector <int> &convex_hull_particles,
-                            const diy::Master::ProxyWithLink& cp)
+void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp)
 {
+  // particles on the convex hull of the local points and
+  // information about particles sent to neighbors
+  // sent_particles[particle][i] = ith neighbor (edge)
+  vector <int> *convex_hull_particles = 
+    static_cast<vector <int>*>(dblock->convex_hull_particles);
+  vector <set <int> > *sent_particles = 
+    static_cast<vector <set <int> >*>(dblock->sent_particles);
+
   struct RemotePoint rp; // particle being sent or received 
   diy::BoundsLink<Bounds>* l = dynamic_cast<diy::BoundsLink<Bounds>*>(cp.link()); // link
 
   // for all convex hull particles
-  for (int j = 0; j < (int)convex_hull_particles.size(); ++j)
+  for (int j = 0; j < (int)convex_hull_particles->size(); ++j)
   {
 
     set<int> new_dests; // new destination neighbor edges for sending this point
-    int p = convex_hull_particles[j];
+    int p = (*convex_hull_particles)[j];
 
     if (dblock->vert_to_tet[p] == -1)
     {
@@ -751,7 +755,7 @@ void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destina
       // local point still on the convex hull goes to everybody it hasn't gone to yet 
       for (int n = 0; n < l->count(); n++) // all neighbors
       {
-      	if (destinations[p].find(n) == destinations[p].end())
+      	if ((*sent_particles)[p].find(n) == (*sent_particles)[p].end())
         {
           new_dests.insert(n);
       	}
@@ -782,7 +786,7 @@ void incomplete_cells_final(struct dblock_t *dblock, vector< set<int> > &destina
     	// remove the nearby neighbors we've already sent to
         for (set<int>::iterator it = near_candts.begin(); it != near_candts.end(); it++)
         {
-    	  if (destinations[p].find(*it) == destinations[p].end())
+    	  if ((*sent_particles)[p].find(*it) == (*sent_particles)[p].end())
           {
     	    new_dests.insert(*it);
     	  }
@@ -859,20 +863,9 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 
 }
 //
-// block cleanup functions
+// cleans a blocks in between phases 
+// (deletes tets but keeps delauany data structure and convex hull particles, sent particles)
 //
-void destroy_block(struct dblock_t *dblock)
-{
-  if (dblock->particles)
-    free(dblock->particles);
-  if (dblock->tets)
-    free(dblock->tets);
-  if (dblock->vert_to_tet)
-    free(dblock->vert_to_tet);
-
-  delete dblock;
-}
-
 void reset_block(struct dblock_t* &dblock)
 {
   // free old data

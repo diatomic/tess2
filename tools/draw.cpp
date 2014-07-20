@@ -174,7 +174,7 @@ void PrepRenderingData(int *gid2lid);
 void PrepSiteRendering(int &num_sites);
 void PrepCellRendering(int &num_visible_cells);
 void PrepCellVertRendering();
-void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int* gid2lid);
+void PrepTetRendering(int &num_tets, int* gid2lid);
 
 //--------------------------------------------------------------------------
 
@@ -1055,8 +1055,7 @@ void PrepRenderingData(int *gid2lid) {
   // number of sites, cells and tets
   int num_sites;
   int num_vis_cells;
-  int num_loc_tets;
-  int num_rem_tets;
+  int num_tets;
 
   // sites
   PrepSiteRendering(num_sites);
@@ -1065,13 +1064,12 @@ void PrepRenderingData(int *gid2lid) {
   PrepCellRendering(num_vis_cells);
 
   // delauany tets
-  PrepTetRendering(num_loc_tets, num_rem_tets, gid2lid);
+  PrepTetRendering(num_tets, gid2lid);
 
   fprintf(stderr, "Number of particles = %d\n"
 	  "Number of visible cells = %d\n"
-	  "Number of tets = %d (%d local + %d remote)\n",
-	  (int)sites.size(), num_vis_cells, 
-	  num_loc_tets + num_rem_tets, num_loc_tets, num_rem_tets);
+	  "Number of tets = %d\n",
+	  (int)sites.size(), num_vis_cells, num_tets);
 
 }
 //--------------------------------------------------------------------------
@@ -1226,14 +1224,12 @@ void PrepCellRendering(int &num_vis_cells) {
 //
 // package tets for rendering
 //
-// num_loc_tets: (output) number of local tets
-// num_rem_tets: (output) number of remote tets
+// num_tets: (output) number of tets
 // gid2lid: mapping of gids to lids
 //
-void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
+void PrepTetRendering(int &num_tets, int *gid2lid) {
 
-  num_loc_tets = 0;
-  num_rem_tets = 0; // unused
+  num_tets = 0;
 
   for (int b = 0; b < nblocks; b++) { // blocks
 
@@ -1270,7 +1266,7 @@ void PrepTetRendering(int &num_loc_tets, int &num_rem_tets, int *gid2lid) {
 
       }
 
-      num_loc_tets++;
+      num_tets++;
 
     } // local tets
 

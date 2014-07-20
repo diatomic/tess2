@@ -366,7 +366,6 @@ void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks,
     err = ncmpi_inq_varid(ncid, "num_tets", &varids[25]); ERR;
     err = ncmpi_get_vara_int_all(ncid, varids[25], start, count, 
 				 &(d->num_tets)); ERR;
-    err = ncmpi_inq_varid(ncid, "num_rem_tet_verts", &varids[28]); ERR;
 
     /* block bounds */
     start[0] = start_block_ofst + b;
