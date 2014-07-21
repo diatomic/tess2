@@ -285,8 +285,8 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   }
 
   // max number of blocks in memory
-  // pretend all fit for now; TODO, experiment with fewer
-  int max_blocks_mem = tot_blocks;
+//   int max_blocks_mem = -1; // no limit
+  int max_blocks_mem = 1;
 
   // init diy
   diy::mpi::communicator    world(mpi_comm);
@@ -336,9 +336,9 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   // compute third stage tessellation
   master.foreach(&delaunay3);
 
-  // All the foreach block functions are done. We now make a very
-  // dangerous assumption that all blocks fit in memory because the
-  // remaining functions are done on all blocks (a la the old style)
+  // All the foreach block functions are done. We now make a very dangerous assumption 
+  // that all blocks fit in memory because the remaining functions are done on all blocks
+  // turn off output if all blocks are not resident in core
 
   // array of pointers to all my local blocks
   dblock_t** dblocks = new dblock_t*[master.size()];
@@ -381,13 +381,9 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
   timing(times, -1, TOT_TIME);
   get_mem(9, dwell);
  
-  // clean up local blocks
-  // TODO: appears to be not necessary, master cleans them up?
-//   for (int i = 0; i < (int)master.size(); i++)
-//   {
-//     destroy_block(master.block<dblock_t>(i));
-//   }
-  delete[] dblocks;
+  // cleanup array of block points only used for writing all blocks using existing writer
+  // actual blocks cleaned up with the destroy_block() callback function
+  delete[] dblocks; 
 
   // TODO: collect stats 
 //   collect_stats(nblocks, dblocks, times);
@@ -400,7 +396,11 @@ void tess_test(int tot_blocks, int *data_size, float jitter,
 //
 void* create_block()
 {
-  return new dblock_t;
+  dblock_t* b = new dblock_t;
+  b->sent_particles = new std::vector<int>;
+  b->convex_hull_particles = new std::vector< std::set<int> >;
+  init_delaunay_data_structure(b);
+  return b;
 }
 
 void destroy_block(void* b_)
@@ -464,6 +464,7 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 
   b->particles = (float *)malloc(num_particles * 3 * sizeof(float));
   float *p = b->particles;
+  b->vert_to_tet = (int *)malloc(num_particles * sizeof(int));
 
   // assign particles 
   n = 0;
@@ -573,7 +574,7 @@ void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 #ifdef DEBUG
   int max_particles;
   MPI_Reduce(&b->num_particles, &max_particles, 1, MPI_INT, MPI_MAX, 0, comm);
-  if (rank == 0)
+  if (::rank == 0)
     fprintf(stderr, "phase 1: max_particles = %d\n", max_particles);
 #endif
 
@@ -641,7 +642,7 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
   sent_particles->resize(dblock->num_orig_particles);
 
   // link
-  Link* l = dynamic_cast<Link*>(cp.link());
+  RCLink* l = dynamic_cast<RCLink*>(cp.link());
 
   // identify and enqueue convex hull particles
   for (int p = 0; p < dblock->num_orig_particles; ++p)
