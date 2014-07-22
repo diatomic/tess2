@@ -21,18 +21,6 @@
 #define MAX_HIST_BINS 256 /* maximum number of bins in cell volume histogram */
 #define MAX_NEIGHBORS 27 /* maximum number of neighbor blocks */
 
-/* timing info */
-#define TESS_MAX_TIMES 9 /* max number of timing components */
-#define TOT_TIME 0 /* total time */
-#define LOC1_TIME 1 /* first local delaunay */
-#define LOC2_TIME 2 /* second local delaunay */
-#define LOC3_TIME  3 /* third local delaunay*/
-#define NEIGH1_TIME  4 /* first neighbor exchange */
-#define NEIGH2_TIME  5 /* second neighbor exchange */
-#define INC1_TIME 6 /* incomplete_cells_initial */
-#define INC2_TIME 7 /* incomplete_cells_final */
-#define OUT_TIME 8 /* file output */
-
 /* remote particle */
 struct RemotePoint {
   float x, y, z; /* coordinates */

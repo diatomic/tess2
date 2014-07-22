@@ -25,15 +25,6 @@ typedef  diy::RegularContinuousLink  RCLink;
 
 using namespace std;
 
-void fill_vert_to_tet(dblock_t* dblock);
-void wall_particles(struct dblock_t *dblock);
-void neighbor_is_complete(int nblocks, struct dblock_t *dblocks,
-			  struct remote_ic_t **rics,
-			  vector <struct sent_t> *sent_particles);
-void sample_particles(float *particles, int &num_particles, int sample_rate);
-diy::Direction nearest_neighbor(float* p, float* mins, float* maxs);
-
-// callbacks for new diy version
 void* create_block();
 void destroy_block(void* b);
 void save_block(const void* b, diy::BinaryBuffer& bb);
@@ -47,6 +38,10 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
 void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp);
 void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp);
 void reset_block(struct dblock_t* &dblock);
+void fill_vert_to_tet(dblock_t* dblock);
+void wall_particles(struct dblock_t *dblock);
+void sample_particles(float *particles, int &num_particles, int sample_rate);
+diy::Direction nearest_neighbor(float* p, float* mins, float* maxs);
 
 // add blocks to a master
 struct AddBlock
