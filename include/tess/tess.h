@@ -22,7 +22,16 @@
 #include "utils.h"
 
 /* timing and quantity stats */
-enum {TOT_TIME, DEL1_TIME, DEL2_TIME, DEL3_TIME, NEIGH1_TIME, NEIGH2_TIME, OUT_TIME, MAX_TIMES};
+enum {TOT_TIME, 
+      LOC1_TIME, 
+      INC1_TIME, 
+      DEL1_TIME,
+      DEL2_TIME, 
+      DEL3_TIME, 
+      NEIGH1_TIME, 
+      NEIGH2_TIME, 
+      OUT_TIME, 
+      MAX_TIMES};
 enum {NUM_ORIG_PTS, NUM_FINAL_PTS, NUM_TETS, MAX_QUANTS};
 
 /* public */

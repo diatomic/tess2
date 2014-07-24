@@ -339,11 +339,10 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   dblock_t* b = (dblock_t*)b_;
 
-  // TODO: remove?
-  init_delaunay_data_structure(b);
-
   // create local delaunay cells
+  timing(LOC1_TIME, -1);
   local_cells(b);
+  timing(INC1_TIME, LOC1_TIME);
   
   // debug
 //   fprintf(stderr, "phase 1 gid %d num_tets %d num_particles %d \n", 
@@ -351,6 +350,7 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 
   // determine which cells are incomplete or too close to neighbor 
   incomplete_cells_initial(b, cp);
+  timing(-1, INC1_TIME);
 
   // cleanup block
   reset_block(b);
@@ -679,6 +679,8 @@ void collect_stats()
     fprintf(stderr, "----------------- global stats ------------------\n");
     fprintf(stderr, "first delaunay time           = %.3lf s\n",
 	    times[DEL1_TIME]);
+    fprintf(stderr, "  (%.3lf s local cell + %.3lf s incomplete cell)\n",
+            times[LOC1_TIME], times[INC1_TIME]);
     fprintf(stderr, "first particle exchange time  = %.3lf s\n", 
 	    times[NEIGH1_TIME]);
     fprintf(stderr, "second delaunay time          = %.3lf s\n",
