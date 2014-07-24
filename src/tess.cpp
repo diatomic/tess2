@@ -466,8 +466,7 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
 
     // find nearby blocks within radius of circumcenter
     set<int> dests; // destination neighbor edges for this point
-    for (unsigned i = 0; i < l->count(); ++i)
-      near(*l, center, rad, std::inserter(dests, dests.end()));
+    near(*l, center, rad, std::inserter(dests, dests.end()));
 
     // all 4 verts go these dests
     for (int v = 0; v < 4; v++)
@@ -550,8 +549,7 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
 
         // find nearby blocks within radius of circumcenter
         set<int> near_candts; // candidate destination neighbor edges for this point
-        for (unsigned i = 0; i < l->count(); ++i)
-          near(*l, center, rad, std::inserter(near_candts, near_candts.end()));
+        near(*l, center, rad, std::inserter(near_candts, near_candts.end()));
 
     	// remove the nearby neighbors we've already sent to
         for (set<int>::iterator it = near_candts.begin(); it != near_candts.end(); it++)
