@@ -84,7 +84,7 @@ namespace diy
     static void save(BinaryBuffer& bb, const dblock_t& d)
     {
       // debug
-      //       fprintf(stderr, "Saving block gid %d\n", d.gid);
+      //             fprintf(stderr, "Saving block gid %d\n", d.gid);
       diy::save(bb, d.gid);
       diy::save(bb, d.mins);
       diy::save(bb, d.maxs);
@@ -108,7 +108,7 @@ namespace diy
     {
       diy::load(bb, d.gid);
       // debug
-      //       fprintf(stderr, "Loading block gid %d\n", d.gid);
+      //             fprintf(stderr, "Loading block gid %d\n", d.gid);
       diy::load(bb, d.mins);
       diy::load(bb, d.maxs);
       diy::load(bb, d.num_orig_particles);
