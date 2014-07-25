@@ -30,11 +30,11 @@ void destroy_block(void* b);
 void save_block(const void* b, diy::BinaryBuffer& bb);
 void load_block(void* b, diy::BinaryBuffer& bb);
 void create(int gid, const Bounds& core, const Bounds& bounds, const diy::Link& link);
-void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
-void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* ps);
-void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void* ps);
-void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* ps);
-void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
+void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp);
+void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*);
+void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*);
+void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void*);
+void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp);
 void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp);
 void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp);
 void reset_block(struct dblock_t* &dblock);
@@ -98,7 +98,7 @@ namespace diy
       vector <set <int> > *sent_particles = 
         static_cast<vector <set <int> >*>(d.sent_particles);
       diy::save(bb, *sent_particles);
-      // TODO: not savint Dt for now, recomputing upon loading instead
+      // TODO: not saving Dt for now, recomputing upon loading instead
 
       // debug
       //       fprintf(stderr, "Done saving block gid %d\n", d.gid);
@@ -126,8 +126,8 @@ namespace diy
       diy::load(bb, *(static_cast<vector <int>*>(d.convex_hull_particles)));
       diy::load(bb, *(static_cast<vector <set <int> >*>(d.sent_particles)));
       // TODO: re-initializing Dt instead of loading it here;
-      // allocated in create_block and recomputed here
-      local_cells(&d);
+      // allocated in create_block
+
       // debug
       //       fprintf(stderr, "Done loading block gid %d\n", d.gid);
     }

@@ -129,9 +129,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
   diy::decompose(3, ::rank, domain, assigner, create, share_face, wrap, ghosts);
 
-  // generate particles
   timing(-1, -1);
-  master.foreach(&gen_particles);
 
   // compute first stage tessellation
   timing(TOT_TIME, -1);
@@ -142,9 +140,6 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   timing(NEIGH1_TIME, DEL1_TIME);
   master.exchange();
 
-  // parse received particles
-  master.foreach(neighbor_particles);
-
   // compute second stage tessellation
   timing(DEL2_TIME, NEIGH1_TIME);
   master.foreach(&delaunay2);
@@ -152,9 +147,6 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   // exchange particles
   timing(NEIGH2_TIME, DEL2_TIME);
   master.exchange();
-
-  // parse received particles
-  master.foreach(neighbor_particles);
 
   // compute third stage tessellation
   timing(DEL3_TIME, NEIGH2_TIME);
@@ -260,7 +252,7 @@ void load_block(void* b, diy::BinaryBuffer& bb)
 //
 // foreach block functions
 //
-void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp)
 {
   int sizes[3]; // number of grid points 
   int i, j, k;
@@ -280,7 +272,6 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 
   b->particles = (float *)malloc(num_particles * 3 * sizeof(float));
   float *p = b->particles;
-  b->vert_to_tet = (int *)malloc(num_particles * sizeof(int));
 
   // assign particles 
   n = 0;
@@ -339,6 +330,9 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   dblock_t* b = (dblock_t*)b_;
 
+  // generate particles
+  gen_particles(b_, cp);
+
   // create local delaunay cells
   timing(LOC1_TIME, -1);
   local_cells(b);
@@ -360,6 +354,9 @@ void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   dblock_t* b = (dblock_t*)b_;
   
+  // parse received particles
+  neighbor_particles(b, cp);
+
   // recompute local cells
   local_cells(b);
 
@@ -384,6 +381,9 @@ void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   dblock_t* b = (dblock_t*)b_;
   static bool first_time = true;
   
+  // parse received particles
+  neighbor_particles(b_, cp);
+
   // create all final cells 
   local_cells(b);
   
@@ -404,7 +404,6 @@ void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void*)
     max_quants[NUM_TETS] = b->num_tets;
 
   first_time = false;
-
 
   // debug
 //   fprintf(stderr, "phase 3 gid %d num_tets %d num_particles %d \n", 
@@ -577,7 +576,7 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
 //
 // parse received particles
 //
-void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
 {
   dblock_t*  b = (dblock_t*)b_;
   diy::Link* l = cp.link();
