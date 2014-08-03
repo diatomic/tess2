@@ -1,29 +1,28 @@
 #include "tess/tess.h"
 #include "tess/tess-qhull.h"
+#include <assert.h>
 
 /*--------------------------------------------------------------------------*/
 /* Initialization and destruction of Delaunay data structures is not used with
  * qhull, since it doesn't support incremental updates.
  */
-void* init_delaunay_data_structures(int nblocks) {
-  nblocks = nblocks; /* quiet compiler warning about unused parameter */
-  return 0;
+void init_delaunay_data_structure(struct dblock_t* b)
+{
+  b->Dt = NULL;
 }
 
-void clean_delaunay_data_structures(void* ds) {
-  ds = ds; /* quiet compiler warning about unused parameter */
+void clean_delaunay_data_structure(struct dblock_t* b)
+{
+  b->Dt = NULL;
 }
-
 /*--------------------------------------------------------------------------*/
 /*
   creates local delaunay cells
 
-  nblocks: number of blocks
-  dblocks: pointer to array of dblocks
-  ds: the delaunay data structures; unused in qhull
+  dblock: local block
 */
-void local_cells(int nblocks, struct dblock_t *dblocks, void* ds) {
-
+void local_cells(struct dblock_t *dblock) 
+{
   boolT ismalloc = False;    /* True if qhull should free points in
 				qh_freeqhull() or reallocation */
   char flags[250];          /* option flags for qhull, see qh-quick.htm */
@@ -33,54 +32,47 @@ void local_cells(int nblocks, struct dblock_t *dblocks, void* ds) {
   int i, j;
   int dim = 3; /* 3d */
 
-  ds = ds; /* quiet compiler warning about unused parameter */
-
   dev_null = fopen("/dev/null", "w");
   assert(dev_null != NULL);
 
-  /* for all blocks */
-  for (i = 0; i < nblocks; i++) {
+  /* deep copy from float to double (qhull API is double) */
+  double *pts = 
+    (double *)malloc(dblock->num_particles * 3 * sizeof(double));
+  for (j = 0; j < 3 * dblock->num_particles; j++)
+    pts[j] = dblock->particles[j];
 
-    /* deep copy from float to double (qhull API is double) */
-    double *pts = 
-      (double *)malloc(dblocks[i].num_particles * 3 * sizeof(double));
-    for (j = 0; j < 3 * dblocks[i].num_particles; j++)
-      pts[j] = dblocks[i].particles[j];
+  /* compute delaunay */
+  /*     sprintf(flags, "qhull v d o Fv Fo"); /\* Fv prints voronoi faces *\/ */
+  sprintf (flags, "qhull d Qt"); /* print delaunay cells */
 
-    /* compute delaunay */
-/*     sprintf(flags, "qhull v d o Fv Fo"); /\* Fv prints voronoi faces *\/ */
-    sprintf (flags, "qhull d Qt"); /* print delaunay cells */
+  /* eat qhull output by sending it to dev/null */
+  exitcode = qh_new_qhull(dim, dblock->num_particles, pts, ismalloc,
+                          flags, dev_null, stderr);
 
-    /* eat qhull output by sending it to dev/null */
-    exitcode = qh_new_qhull(dim, dblocks[i].num_particles, pts, ismalloc,
-			    flags, dev_null, stderr);
+  free(pts);
 
-    free(pts);
+  /* process delaunay output */
+  if (!exitcode)
+    gen_delaunay_output(qh facet_list, dblock);
 
-    /* process delaunay output */
-    if (!exitcode)
-      gen_delaunay_output(qh facet_list, &dblocks[i]);
+  /* qhull does not order verts and neighbor tets such that the ith
+     neighbor is opposite the ith vertex; so need to reorder neighbors */
+  reorder_neighbors(dblock);
 
-    /* qhull does not order verts and neighbor tets such that the ith
-       neighbor is opposite the ith vertex; so need to reorder neighbors */
-    reorder_neighbors(&dblocks[i]);
+  fill_vert_to_tet(dblock);
 
-    fill_vert_to_tet(&dblocks[i]);
-
-    /* mem check */
+  /* mem check */
 #ifdef MEM
-    int dwell = 10;
-    get_mem(-1, dwell);
+  int dwell = 10;
+  get_mem(-1, dwell);
 #endif
 
-    /* clean up qhull */
-    qh_freeqhull(!qh_ALL);                 /* free long memory */
-    qh_memfreeshort(&curlong, &totlong);  /* free short memory */
-    if (curlong || totlong)
-      fprintf (stderr, "qhull internal warning: did not free %d bytes of "
-	       "long memory (%d pieces)\n", totlong, curlong);
-
-  } /* for all blocks */
+  /* clean up qhull */
+  qh_freeqhull(!qh_ALL);                 /* free long memory */
+  qh_memfreeshort(&curlong, &totlong);  /* free short memory */
+  if (curlong || totlong)
+    fprintf (stderr, "qhull internal warning: did not free %d bytes of "
+             "long memory (%d pieces)\n", totlong, curlong);
 
   fclose(dev_null);
 

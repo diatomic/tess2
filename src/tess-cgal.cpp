@@ -7,21 +7,23 @@
 // Initialize and destroy Delaunay data structures used by CGAL.
 // We keep them persistent for later incremental insertion of additional points.
 // 
-void* init_delaunay_data_structures(int nblocks)
-{
-  return new Delaunay3D[nblocks];
-}
+
+// DEPRECATED
+// void* init_delaunay_data_structures(int nblocks)
+// {
+//   return new Delaunay3D[nblocks];
+// }
+// void clean_delaunay_data_structures(void* ds)
+// {
+//   Delaunay3D* dds = (Delaunay3D*) ds;
+//   delete[] dds;
+// }
 
 void init_delaunay_data_structure(dblock_t* b)
 {
   b->Dt = static_cast<void*>(new Delaunay3D);
 }
 
-void clean_delaunay_data_structures(void* ds)
-{
-  Delaunay3D* dds = (Delaunay3D*) ds;
-  delete[] dds;
-}
 void clean_delaunay_data_structure(dblock_t* b)
 {
   delete static_cast<Delaunay3D*>(b->Dt);
