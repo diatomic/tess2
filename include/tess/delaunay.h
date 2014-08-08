@@ -17,16 +17,14 @@
 
 #include "tet.h"
 #include <stddef.h>
+#include "diy/types.h"
 
 #define MAX_HIST_BINS 256 /* maximum number of bins in cell volume histogram */
 #define MAX_NEIGHBORS 27 /* maximum number of neighbor blocks */
 
 /* remote particle */
-struct RemotePoint {
+struct point_t {
   float x, y, z; /* coordinates */
-  int gid; /* owner block global id */
-  int nid; /* native index of particle in owner block */
-  unsigned char dir; /*wrapping direction */
 };
 
 /* CLP  - struct walls - using general equation of plane 
@@ -43,6 +41,7 @@ struct dblock_t {
 
   int gid; /* global block id */
   float mins[3], maxs[3]; /* block extents */
+  struct bb_c_t data_bounds; /* global data extents */
   void *Dt; /* native delaunay data structure */
 
   /* input particles */

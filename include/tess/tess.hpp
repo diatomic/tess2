@@ -42,6 +42,8 @@ void fill_vert_to_tet(dblock_t* dblock);
 void wall_particles(struct dblock_t *dblock);
 void sample_particles(float *particles, int &num_particles, int sample_rate);
 diy::Direction nearest_neighbor(float* p, float* mins, float* maxs);
+void wrap_pt(point_t& rp, int wrap_dir, Bounds& domain);
+int compare(const void *a, const void *b);
 
 // add blocks to a master
 struct AddBlock
@@ -49,7 +51,8 @@ struct AddBlock
   AddBlock(diy::Master& master_):
     master(master_)           {}
 
-  void  operator()(int gid, const Bounds& core, const Bounds& bounds, const RCLink& link) const
+  void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
+                   const RCLink& link) const
   {
     dblock_t*      b = static_cast<dblock_t*>(create_block());
     RCLink*        l = new RCLink(link);
@@ -61,6 +64,7 @@ struct AddBlock
     b->gid = gid;
     b->mins[0] = core.min[0]; b->mins[1] = core.min[1]; b->mins[2] = core.min[2];
     b->maxs[0] = core.max[0]; b->maxs[1] = core.max[1]; b->maxs[2] = core.max[2];
+    b->data_bounds = domain;
     b->num_orig_particles = 0;
     b->num_particles = 0;
     b->particles = NULL;

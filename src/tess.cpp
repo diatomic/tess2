@@ -89,7 +89,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   // globals
   ::min_vol = minvol;
   ::max_vol = maxvol;
-  ::wrap_neighbors = wrap_;
+  ::wrap_neighbors = wrap_; // TODO: is global necessary?
   ::walls_on = twalls_on;
   ::jitter = jitter;
   ::comm = mpi_comm;
@@ -127,6 +127,8 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   diy::RegularDecomposer<Bounds>::BoolVector          wrap;
   diy::RegularDecomposer<Bounds>::BoolVector          share_face;
   diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
+  if (wrap_)
+    wrap.assign(3, true);
   diy::decompose(3, ::rank, domain, assigner, create, share_face, wrap, ghosts);
 
   timing(-1, -1);
@@ -422,10 +424,8 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
   vector <set <int> > *sent_particles = 
     static_cast<vector <set <int> >*>(dblock->sent_particles);
 
-  struct RemotePoint rp; // particle being sent or received 
+  struct point_t rp; // particle being sent or received 
   sent_particles->resize(dblock->num_orig_particles);
-
-  // link
   RCLink* l = dynamic_cast<RCLink*>(cp.link());
 
   // identify and enqueue convex hull particles
@@ -465,7 +465,7 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
 
     // find nearby blocks within radius of circumcenter
     set<int> dests; // destination neighbor edges for this point
-    near(*l, center, rad, std::inserter(dests, dests.end()));
+    near(*l, center, rad, std::inserter(dests, dests.end()), dblock->data_bounds);
 
     // all 4 verts go these dests
     for (int v = 0; v < 4; v++)
@@ -479,15 +479,16 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
   // enqueue the particles
   for (int p = 0; p < dblock->num_orig_particles; p++)
   {
-    rp.x   = dblock->particles[3 * p];
-    rp.y   = dblock->particles[3 * p + 1];
-    rp.z   = dblock->particles[3 * p + 2];
-    rp.gid = dblock->gid;
-    rp.nid = p;
-    rp.dir = 0x00;
     for (set<int>::iterator it = (*sent_particles)[p].begin(); it != (*sent_particles)[p].end(); 
          it++)
-      cp.enqueue(cp.link()->target(*it), rp);
+    {
+      rp.x   = dblock->particles[3 * p];
+      rp.y   = dblock->particles[3 * p + 1];
+      rp.z   = dblock->particles[3 * p + 2];
+      if ((l->wrap() & l->direction(*it)) == l->direction(*it))
+        wrap_pt(rp, l->direction(*it), dblock->data_bounds);
+      cp.enqueue(l->target(*it), rp);
+    }
   }                     
 }
 
@@ -501,8 +502,8 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
   vector <set <int> > *sent_particles = 
     static_cast<vector <set <int> >*>(dblock->sent_particles);
 
-  struct RemotePoint rp; // particle being sent or received 
-  diy::BoundsLink<Bounds>* l = dynamic_cast<diy::BoundsLink<Bounds>*>(cp.link()); // link
+  struct point_t rp; // particle being sent or received 
+  RCLink* l = dynamic_cast<RCLink*>(cp.link());
 
   // for all convex hull particles
   for (int j = 0; j < (int)convex_hull_particles->size(); ++j)
@@ -548,7 +549,7 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
 
         // find nearby blocks within radius of circumcenter
         set<int> near_candts; // candidate destination neighbor edges for this point
-        near(*l, center, rad, std::inserter(near_candts, near_candts.end()));
+        near(*l, center, rad, std::inserter(near_candts, near_candts.end()), dblock->data_bounds);
 
     	// remove the nearby neighbors we've already sent to
         for (set<int>::iterator it = near_candts.begin(); it != near_candts.end(); it++)
@@ -562,14 +563,15 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
     // enquue the particle to the new destinations
     if (new_dests.size())
     {
-      rp.x = dblock->particles[3 * p];
-      rp.y = dblock->particles[3 * p + 1];
-      rp.z = dblock->particles[3 * p + 2];
-      rp.gid = dblock->gid;
-      rp.nid = p;
-      rp.dir = 0x00;
       for (set<int>::iterator it = new_dests.begin(); it != new_dests.end(); it++)
+      {
+        rp.x = dblock->particles[3 * p];
+        rp.y = dblock->particles[3 * p + 1];
+        rp.z = dblock->particles[3 * p + 2];
+        if ((l->wrap() & l->direction(*it)) == l->direction(*it))
+          wrap_pt(rp, l->direction(*it), dblock->data_bounds);
         cp.enqueue(cp.link()->target(*it), rp);
+      }
     }
   } // for convex hull particles
 }
@@ -586,7 +588,7 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
   // count total number of incoming points
   int numpts = 0;
   for (int i = 0; i < (int)in.size(); i++)
-    numpts += cp.incoming(in[i]).buffer.size() / sizeof(RemotePoint);
+    numpts += cp.incoming(in[i]).buffer.size() / sizeof(point_t);
 
   // grow space for remote tet verts
   int n = (b->num_particles - b->num_orig_particles);
@@ -599,14 +601,14 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
   // copy received particles 
   for (int i = 0; i < (int)in.size(); i++)
   {
-    numpts = cp.incoming(in[i]).buffer.size() / sizeof(RemotePoint);
-    vector<RemotePoint> pts;
+    numpts = cp.incoming(in[i]).buffer.size() / sizeof(point_t);
+    vector<point_t> pts;
     pts.resize(numpts);
     cp.dequeue(in[i], &pts[0], numpts);
 
     for (int j = 0; j < numpts; j++)
     {
-      b->particles[3 * b->num_particles]     = pts[j].x;
+      b->particles[3 * b->num_particles    ] = pts[j].x;
       b->particles[3 * b->num_particles + 1] = pts[j].y;
       b->particles[3 * b->num_particles + 2] = pts[j].z;
 
@@ -661,6 +663,30 @@ diy::Direction nearest_neighbor(float* p, float* mins, float* maxs)
   }
 
   return dirs[smallest];
+}
+//
+// wraps point coordinates
+//
+// wrap dir:wrapping direction from original block to wrapped neighbor block
+// domain: overall domain bounds
+//
+void wrap_pt(point_t& rp, int wrap_dir, Bounds& domain)
+{
+  // wrapping toward the left transforms the point to the right, and vice versa
+  if ((wrap_dir & DIY_X0) == DIY_X0)
+    rp.x += (domain.max[0] - domain.min[0]);
+  if ((wrap_dir & DIY_X1) == DIY_X1)
+    rp.x -= (domain.max[0] - domain.min[0]);
+
+  if ((wrap_dir & DIY_Y0) == DIY_Y0)
+    rp.y += (domain.max[1] - domain.min[1]);
+  if ((wrap_dir & DIY_Y1) == DIY_Y1)
+    rp.y -= (domain.max[1] - domain.min[1]);
+
+  if ((wrap_dir & DIY_Z0) == DIY_Z0)
+    rp.z += (domain.max[2] - domain.min[2]);
+  if ((wrap_dir & DIY_Z1) == DIY_Z1)
+    rp.z -= (domain.max[2] - domain.min[2]);
 }
 //
 //   collects statistics
@@ -1130,58 +1156,6 @@ void print_particles(float *particles, int num_particles, int gid) {
     fprintf(stderr, "block = %d particle[%d] = [%.1lf %.1lf %.1lf]\n",
 	    gid, n, particles[3 * n], particles[3 * n + 1],
 	    particles[3 * n + 2]);
-
-}
-// --------------------------------------------------------------------------
-//
-//   transforms particles for enqueueing to wraparound neighbors
-//   p: pointer to particle
-//   wrap_dir: wrapping direcion
-// 
-void transform_particle(char *p, unsigned char wrap_dir) {
-
-#if 0
-
-  // debug 
-  float particle[3]; // original particle 
-  particle[0] = ((struct remote_particle_t*)p)->x;
-  particle[1] = ((struct remote_particle_t*)p)->y;
-  particle[2] = ((struct remote_particle_t*)p)->z;
-
-  // wrapping toward the left transforms to the right 
-  if ((wrap_dir & DIY_X0) == DIY_X0) {
-    ((struct remote_particle_t*)p)->x += (data_maxs[0] - data_mins[0]);
-    ((struct remote_particle_t*)p)->dir |= DIY_X0;
-  }
-
-  // and vice versa 
-  if ((wrap_dir & DIY_X1) == DIY_X1) {
-    ((struct remote_particle_t*)p)->x -= (data_maxs[0] - data_mins[0]);
-    ((struct remote_particle_t*)p)->dir |= DIY_X1;
-  }
-
-  // similar for y, z 
-  if ((wrap_dir & DIY_Y0) == DIY_Y0) {
-    ((struct remote_particle_t*)p)->y += (data_maxs[1] - data_mins[1]);
-    ((struct remote_particle_t*)p)->dir |= DIY_Y0;
-  }
-
-  if ((wrap_dir & DIY_Y1) == DIY_Y1) {
-    ((struct remote_particle_t*)p)->y -= (data_maxs[1] - data_mins[1]);
-    ((struct remote_particle_t*)p)->dir |= DIY_Y1;
-  }
-
-  if ((wrap_dir & DIY_Z0) == DIY_Z0) {
-    ((struct remote_particle_t*)p)->z += (data_maxs[2] - data_mins[2]);
-    ((struct remote_particle_t*)p)->dir |= DIY_Z0;
-  }
-
-  if ((wrap_dir & DIY_Z1) == DIY_Z1) {
-    ((struct remote_particle_t*)p)->z -= (data_maxs[2] - data_mins[2]);
-    ((struct remote_particle_t*)p)->dir |= DIY_Z1;
-  }
-
-#endif
 
 }
 // --------------------------------------------------------------------------

@@ -115,8 +115,6 @@ void get_mem(int breakpoint, int dwell);
 void collect_stats();
 void print_block(struct dblock_t *dblock, int gid);
 void print_particles(float *particles, int num_particles, int gid);
-void transform_particle(char *p, unsigned char wrap_dir);
-int compare(const void *a, const void *b);
 void write_particles(int nblocks, float **particles, int *num_particles, char *outfile);
 void handle_error(int errcode, MPI_Comm comm, char *str);
 void create_walls(int *num_walls, struct wall_t **walls);
