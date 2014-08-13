@@ -485,8 +485,7 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
       rp.x   = dblock->particles[3 * p];
       rp.y   = dblock->particles[3 * p + 1];
       rp.z   = dblock->particles[3 * p + 2];
-      if ((l->wrap() & l->direction(*it)) == l->direction(*it))
-        wrap_pt(rp, l->direction(*it), dblock->data_bounds);
+      wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
       cp.enqueue(l->target(*it), rp);
     }
   }                     
@@ -568,8 +567,7 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
         rp.x = dblock->particles[3 * p];
         rp.y = dblock->particles[3 * p + 1];
         rp.z = dblock->particles[3 * p + 2];
-        if ((l->wrap() & l->direction(*it)) == l->direction(*it))
-          wrap_pt(rp, l->direction(*it), dblock->data_bounds);
+        wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
         cp.enqueue(cp.link()->target(*it), rp);
       }
     }
