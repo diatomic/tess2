@@ -635,6 +635,11 @@ void CellBounds(dblock_t *dblock, int cell, float *cell_min, float *cell_max,
   // a tet containing the cell site
   int t = dblock->vert_to_tet[cell];
 
+  // TODO: skip tets with missing neighbors?
+//   if (block->tets[t].tets[0] == -1 || block->tets[t].tets[1] == -1 ||
+//       block->tets[t].tets[2] == -1 || block->tets[t].tets[3] == -1)
+//     return -1; // TODO: need to change signature and check for return  value
+
   // neighbor edges is a vector of (vertex u, tet of vertex u) pairs 
   // that neighbor vertex v
   vector< pair<int, int> > nbrs;

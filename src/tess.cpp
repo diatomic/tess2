@@ -1,20 +1,20 @@
 // ---------------------------------------------------------------------------
-//  
+//
 //   parallel voronoi and delaunay tesselation
-//  
+//
 //   Tom Peterka
 //   Argonne National Laboratory
 //   9700 S. Cass Ave.
 //   Argonne, IL 60439
 //   tpeterka@mcs.anl.gov
-//  
+//
 //   (C) 2013 by Argonne National Laboratory.
 //   See COPYRIGHT in top-level directory.
-//  
+//
 // --------------------------------------------------------------------------
 
-// MEMORY PROFILING 
-// #define MEMORY 
+// MEMORY PROFILING
+// #define MEMORY
 
 #include "mpi.h"
 
@@ -52,15 +52,15 @@
 
 using namespace std;
 
-static int dim = 3; // everything 3D 
-static float data_mins[3], data_maxs[3]; // extents of overall domain 
-static float min_vol, max_vol; // cell volume range 
-static int nblocks; // number of blocks per process 
-static double times[MAX_TIMES]; // timing info 
+static int dim = 3; // everything 3D
+static float data_mins[3], data_maxs[3]; // extents of overall domain
+static float min_vol, max_vol; // cell volume range
+static int nblocks; // number of blocks per process
+static double times[MAX_TIMES]; // timing info
 static int min_quants[MAX_QUANTS]; // quantity stats per process
-static int max_quants[MAX_QUANTS]; 
-static int wrap_neighbors; // whether wraparound neighbors are used 
-// CLP - if wrap_neighbors is 0 then check this condition. 
+static int max_quants[MAX_QUANTS];
+static int wrap_neighbors; // whether wraparound neighbors are used
+// CLP - if wrap_neighbors is 0 then check this condition.
 static int walls_on;
 static int rank; // my MPI rank
 static MPI_Comm comm = MPI_COMM_WORLD; // MPI communicator
@@ -82,8 +82,8 @@ static float jitter; // amount to randomly jitter synthetic particles off grid p
 //   outfile: output file name
 //   mpi_comm: MPI communicator
 //
-void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter, 
-	       float minvol, float maxvol, int wrap_, int twalls_on, 
+void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
+	       float minvol, float maxvol, int wrap_, int twalls_on,
 	       double *times, char *outfile, MPI_Comm mpi_comm)
 {
   // globals
@@ -93,8 +93,8 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   ::walls_on = twalls_on;
   ::jitter = jitter;
   ::comm = mpi_comm;
-  
-  // data extents 
+
+  // data extents
   typedef     diy::ContinuousBounds         Bounds;
   Bounds domain;
   for(int i = 0; i < 3; i++) {
@@ -164,7 +164,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   for (int i = 0; i < (int)master.size(); i++)
     dblocks[i] = master.block<dblock_t>(i);
 
-  // write output 
+  // write output
   timing(OUT_TIME, -1);
   if (outfile[0])
   {
@@ -194,7 +194,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
 
   // cleanup array of block points only used for writing all blocks using existing writer
   // actual blocks cleaned up with the destroy_block() callback function
-  delete[] dblocks; 
+  delete[] dblocks;
 
   collect_stats();
 
@@ -226,9 +226,9 @@ void destroy_block(void* b_)
     free(b->vert_to_tet);
 
   // convex hull particles and sent particles
-  vector <int> *convex_hull_particles = 
+  vector <int> *convex_hull_particles =
     static_cast<vector <int>*>(b->convex_hull_particles);
-  vector <set <int> > *sent_particles   = 
+  vector <set <int> > *sent_particles =
     static_cast<vector <set <int> >*>(b->sent_particles);
   for (int i = 0; i < (int)sent_particles->size(); i++)
     sent_particles[i].clear();
@@ -256,16 +256,16 @@ void load_block(void* b, diy::BinaryBuffer& bb)
 //
 void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp)
 {
-  int sizes[3]; // number of grid points 
+  int sizes[3]; // number of grid points
   int i, j, k;
   int n = 0;
-  int num_particles; // theoretical num particles with duplicates at 
-		     // block boundaries 
-  float jit; // random jitter amount, 0 - MAX_JITTER 
+  int num_particles; // theoretical num particles with duplicates at
+		     // block boundaries
+  float jit; // random jitter amount, 0 - MAX_JITTER
 
   dblock_t* b = (dblock_t*)b_;
 
-  // allocate particles 
+  // allocate particles
   sizes[0] = (int)(b->maxs[0] - b->mins[0] + 1);
   sizes[1] = (int)(b->maxs[1] - b->mins[1] + 1);
   sizes[2] = (int)(b->maxs[2] - b->mins[2] + 1);
@@ -275,27 +275,27 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp)
   b->particles = (float *)malloc(num_particles * 3 * sizeof(float));
   float *p = b->particles;
 
-  // assign particles 
+  // assign particles
   n = 0;
   for (i = 0; i < sizes[0]; i++)
   {
-    if (b->mins[0] > 0 && i == 0) // dedup block doundary points 
+    if (b->mins[0] > 0 && i == 0) // dedup block doundary points
       continue;
     for (j = 0; j < sizes[1]; j++)
     {
-      if (b->mins[1] > 0 && j == 0) // dedup block doundary points 
+      if (b->mins[1] > 0 && j == 0) // dedup block doundary points
 	continue;
       for (k = 0; k < sizes[2]; k++)
       {
-	if (b->mins[2] > 0 && k == 0) // dedup block doundary points 
+	if (b->mins[2] > 0 && k == 0) // dedup block doundary points
 	  continue;
 
-	// start with particles on a grid 
+	// start with particles on a grid
 	p[3 * n] = b->mins[0] + i;
 	p[3 * n + 1] = b->mins[1] + j;
 	p[3 * n + 2] = b->mins[2] + k;
 
-	// and now jitter them 
+	// and now jitter them
 	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
 	if (p[3 * n] - jit >= b->mins[0] &&
 	    p[3 * n] - jit <= b->maxs[0])
@@ -319,7 +319,7 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp)
 	else if (p[3 * n + 2] + jit >= b->mins[2] &&
 		 p[3 * n + 2] + jit <= b->maxs[2])
 	  p[3 * n + 2] += jit;
-  
+
 	n++;
       }
     }
@@ -339,12 +339,12 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   timing(LOC1_TIME, -1);
   local_cells(b);
   timing(INC1_TIME, LOC1_TIME);
-  
+
   // debug
-//   fprintf(stderr, "phase 1 gid %d num_tets %d num_particles %d \n", 
+//   fprintf(stderr, "phase 1 gid %d num_tets %d num_particles %d \n",
 //           b->gid, b->num_tets, b->num_particles);
 
-  // determine which cells are incomplete or too close to neighbor 
+  // determine which cells are incomplete or too close to neighbor
   incomplete_cells_initial(b, cp);
   timing(-1, INC1_TIME);
 
@@ -355,7 +355,7 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   dblock_t* b = (dblock_t*)b_;
-  
+
   // parse received particles
   neighbor_particles(b, cp);
 
@@ -363,11 +363,11 @@ void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   local_cells(b);
 
   // debug
-//   fprintf(stderr, "phase 2 gid %d num_tets %d num_particles %d \n", 
+//   fprintf(stderr, "phase 2 gid %d num_tets %d num_particles %d \n",
 //           b->gid, b->num_tets, b->num_particles);
 
   incomplete_cells_final(b, cp);
-  
+
   // TODO, turn walls back on
   // generate particles to create wall
 //   if (!wrap_neighbors && walls_on)
@@ -382,13 +382,13 @@ void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   dblock_t* b = (dblock_t*)b_;
   static bool first_time = true;
-  
+
   // parse received particles
   neighbor_particles(b_, cp);
 
-  // create all final cells 
+  // create all final cells
   local_cells(b);
-  
+
   // collect quantities
   if (first_time || b->num_orig_particles < min_quants[NUM_ORIG_PTS])
     min_quants[NUM_ORIG_PTS] = b->num_orig_particles;
@@ -408,7 +408,7 @@ void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   first_time = false;
 
   // debug
-//   fprintf(stderr, "phase 3 gid %d num_tets %d num_particles %d \n", 
+//   fprintf(stderr, "phase 3 gid %d num_tets %d num_particles %d \n",
 //           b->gid, b->num_tets, b->num_particles);
 }
 //
@@ -419,12 +419,12 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
   // particles on the convex hull of the local points and
   // information about particles sent to neighbors
   // sent_particles[particle][i] = ith neighbor (edge)
-  vector <int> *convex_hull_particles = 
+  vector <int> *convex_hull_particles =
     static_cast<vector <int>*>(dblock->convex_hull_particles);
-  vector <set <int> > *sent_particles = 
+  vector <set <int> > *sent_particles =
     static_cast<vector <set <int> >*>(dblock->sent_particles);
 
-  struct point_t rp; // particle being sent or received 
+  struct point_t rp; // particle being sent or received
   sent_particles->resize(dblock->num_orig_particles);
   RCLink* l = dynamic_cast<RCLink*>(cp.link());
 
@@ -439,14 +439,14 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
     }
 
     // on convex hull = less than 4 neighbors
-    if (dblock->num_tets == 0 || 
+    if (dblock->num_tets == 0 ||
     	!complete(p, dblock->tets, dblock->num_tets, dblock->vert_to_tet[p]))
     {
       // add to list of convex hull particles
       convex_hull_particles->push_back(p);
 
-      // incomplete cell goes to the closest neighbor 
-      diy::Direction nearest_dir = 
+      // incomplete cell goes to the closest neighbor
+      diy::Direction nearest_dir =
     	nearest_neighbor(&(dblock->particles[3 * p]), dblock->mins, dblock->maxs);
       // TODO: helper functions will be moved to standalone
       if (l->direction(nearest_dir) != -1)
@@ -488,7 +488,7 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
       wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
       cp.enqueue(l->target(*it), rp);
     }
-  }                     
+  }
 }
 
 void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp)
@@ -496,12 +496,12 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
   // particles on the convex hull of the local points and
   // information about particles sent to neighbors
   // sent_particles[particle][i] = ith neighbor (edge)
-  vector <int> *convex_hull_particles = 
+  vector <int> *convex_hull_particles =
     static_cast<vector <int>*>(dblock->convex_hull_particles);
-  vector <set <int> > *sent_particles = 
+  vector <set <int> > *sent_particles =
     static_cast<vector <set <int> >*>(dblock->sent_particles);
 
-  struct point_t rp; // particle being sent or received 
+  struct point_t rp; // particle being sent or received
   RCLink* l = dynamic_cast<RCLink*>(cp.link());
 
   // for all convex hull particles
@@ -518,18 +518,18 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
     }
 
     std::vector<int> nbrs;
-    bool complete = neighbor_tets(nbrs, p, dblock->tets, 
+    bool complete = neighbor_tets(nbrs, p, dblock->tets,
                                   dblock->num_tets,
     				  dblock->vert_to_tet[p]);
 
     if (!complete)
     {
-      // local point still on the convex hull goes to everybody it hasn't gone to yet 
+      // local point still on the convex hull goes to everybody it hasn't gone to yet
       for (int n = 0; n < l->count(); n++) // all neighbors
       {
       	if ((*sent_particles)[p].find(n) == (*sent_particles)[p].end())
           new_dests.insert(n);
-      }    
+      }
     } // !complete
 
     else // complete
@@ -557,7 +557,7 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
     	    new_dests.insert(*it);
     	}
       } // nbrs
-    } // complete 
+    } // complete
 
     // enquue the particle to the new destinations
     if (new_dests.size())
@@ -580,7 +580,7 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
 {
   dblock_t*  b = (dblock_t*)b_;
   diy::Link* l = cp.link();
-  std::vector<int> in;
+  std::vector<int> in; // gids of sources
   cp.incoming(in);
 
   // count total number of incoming points
@@ -588,15 +588,13 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
   for (int i = 0; i < (int)in.size(); i++)
     numpts += cp.incoming(in[i]).buffer.size() / sizeof(point_t);
 
-  // grow space for remote tet verts
+  // grow space for remote particles
   int n = (b->num_particles - b->num_orig_particles);
   int new_remote_particles = numpts + n;
-
-  // grow space for particles
   if (numpts)
     b->particles = (float *)realloc(b->particles, (b->num_particles + numpts) * 3 * sizeof(float));
 
-  // copy received particles 
+  // copy received particles
   for (int i = 0; i < (int)in.size(); i++)
   {
     numpts = cp.incoming(in[i]).buffer.size() / sizeof(point_t);
@@ -616,7 +614,7 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
   }
 }
 //
-// cleans a blocks in between phases 
+// cleans a blocks in between phases
 // (deletes tets but keeps delauany data structure and convex hull particles, sent particles)
 //
 void reset_block(struct dblock_t* &dblock)
@@ -637,11 +635,11 @@ void reset_block(struct dblock_t* &dblock)
 //
 //   p: coordinates of the point
 //   mins, maxs: block bounds
-// 
+//
 diy::Direction nearest_neighbor(float* p, float* mins, float* maxs)
 {
   // TODO: possibly find the 3 closest neighbors, and look at the ratio of
-  //   the distances to deal with the corners  
+  //   the distances to deal with the corners
 
   int               i;
   float             dists[6];
@@ -702,26 +700,26 @@ void collect_stats()
 	    times[DEL1_TIME]);
     fprintf(stderr, "  (%.3lf s local cell + %.3lf s incomplete cell)\n",
             times[LOC1_TIME], times[INC1_TIME]);
-    fprintf(stderr, "first particle exchange time  = %.3lf s\n", 
+    fprintf(stderr, "first particle exchange time  = %.3lf s\n",
 	    times[NEIGH1_TIME]);
     fprintf(stderr, "second delaunay time          = %.3lf s\n",
 	    times[DEL2_TIME]);
-    fprintf(stderr, "second particle exchange time = %.3lf s\n", 
+    fprintf(stderr, "second particle exchange time = %.3lf s\n",
 	    times[NEIGH2_TIME]);
     fprintf(stderr, "third delaunay time           = %.3lf s\n",
 	    times[DEL3_TIME]);
-    fprintf(stderr, "output time                   = %.3lf s\n", 
+    fprintf(stderr, "output time                   = %.3lf s\n",
 	    times[OUT_TIME]);
-    fprintf(stderr, "total time                    = %.3lf s\n", 
+    fprintf(stderr, "total time                    = %.3lf s\n",
 	    times[TOT_TIME]);
     fprintf(stderr, "All times printed in one row:\n");
     fprintf(stderr, "%.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
 	    times[DEL1_TIME], times[NEIGH1_TIME], times[DEL2_TIME], times[NEIGH2_TIME],
 	    times[DEL3_TIME], times[OUT_TIME], times[TOT_TIME]);
     fprintf(stderr, "-------------------------------------------------\n");
-    fprintf(stderr, "original particles = [%d, %d]\n", global_min_quants[NUM_ORIG_PTS], 
+    fprintf(stderr, "original particles = [%d, %d]\n", global_min_quants[NUM_ORIG_PTS],
             global_max_quants[NUM_ORIG_PTS]);
-    fprintf(stderr, "with ghosts        = [%d, %d]\n", global_min_quants[NUM_FINAL_PTS], 
+    fprintf(stderr, "with ghosts        = [%d, %d]\n", global_min_quants[NUM_FINAL_PTS],
             global_max_quants[NUM_FINAL_PTS]);
     fprintf(stderr, "tets               = [%d, %d]\n", global_min_quants[NUM_TETS],
             global_max_quants[NUM_TETS]);
@@ -733,7 +731,7 @@ void collect_stats()
 //
 void fill_vert_to_tet(dblock_t* dblock)
 {
-  dblock->vert_to_tet = 
+  dblock->vert_to_tet =
     (int*)realloc(dblock->vert_to_tet, sizeof(int) * dblock->num_particles);
 
   for (int p = 0; p < dblock->num_particles; ++p)
@@ -800,18 +798,18 @@ void timing(int start, int stop) {
 //   minvol, maxvol: filter range for which cells to keep
 //   pass -1.0 to skip either or both bounds
 //   mpi_comm: MPI communicator
-//   all_times: times for particle exchange, voronoi cells, convex hulls, 
+//   all_times: times for particle exchange, voronoi cells, convex hulls,
 //     and output
 //
-void tess_init(int num_blocks, int *gids, 
-	       struct bb_t *bounds, struct gb_t **neighbors, 
-	       int *num_neighbors, float *global_mins, float *global_maxs, 
-	       int wrap, int twalls_on, float minvol, float maxvol, 
+void tess_init(int num_blocks, int *gids,
+	       struct bb_t *bounds, struct gb_t **neighbors,
+	       int *num_neighbors, float *global_mins, float *global_maxs,
+	       int wrap, int twalls_on, float minvol, float maxvol,
 	       MPI_Comm mpi_comm, double *all_times) {
 
   int i;
 
-  // save globals 
+  // save globals
   comm = mpi_comm;
   nblocks = num_blocks;
   min_vol = minvol;
@@ -820,19 +818,19 @@ void tess_init(int num_blocks, int *gids,
   wrap_neighbors = wrap;
   walls_on = twalls_on;
 
-  // data extents 
+  // data extents
   for(i = 0; i < 3; i++) {
     data_mins[i] = global_mins[i];
     data_maxs[i] = global_maxs[i];
   }
 
-  // init times 
+  // init times
   for (i = 0; i < TESS_MAX_TIMES; i++)
     times[i] = 0.0;
 
-  // init DIY 
+  // init DIY
   DIY_Init(dim, 1, comm);
-  DIY_Decomposed(num_blocks, gids, bounds, NULL, NULL, NULL, NULL, neighbors, 
+  DIY_Decomposed(num_blocks, gids, bounds, NULL, NULL, NULL, NULL, neighbors,
 		 num_neighbors, wrap);
 
 }
@@ -848,16 +846,16 @@ void tess_init(int num_blocks, int *gids,
 //   minvol, maxvol: filter range for which cells to keep
 //   pass -1.0 to skip either or both bounds
 //   mpi_comm: MPI communicator
-//   all_times: times for particle exchange, voronoi cells, 
+//   all_times: times for particle exchange, voronoi cells,
 //    convex hulls, and output
-void tess_init_diy_exist(int num_blocks, float *global_mins, 
-			 float *global_maxs, int wrap, int twalls_on, 
-			 float minvol, float maxvol, MPI_Comm mpi_comm, 
+void tess_init_diy_exist(int num_blocks, float *global_mins,
+			 float *global_maxs, int wrap, int twalls_on,
+			 float minvol, float maxvol, MPI_Comm mpi_comm,
 			 double *all_times) {
 
   int i;
 
-  // save globals 
+  // save globals
   comm = mpi_comm;
   nblocks = num_blocks;
   min_vol = minvol;
@@ -866,13 +864,13 @@ void tess_init_diy_exist(int num_blocks, float *global_mins,
   wrap_neighbors = wrap;
   walls_on = twalls_on;
 
-  // data extents 
+  // data extents
   for(i = 0; i < 3; i++) {
     data_mins[i] = global_mins[i];
     data_maxs[i] = global_maxs[i];
   }
 
-  // init times 
+  // init times
   for (i = 0; i < TESS_MAX_TIMES; i++)
     times[i] = 0.0;
 
@@ -890,7 +888,7 @@ void tess_finalize() {
 //
 //   parallel tessellation
 //
-//   particles: particles[block_num][particle] 
+//   particles: particles[block_num][particle]
 //   where each particle is 3 values, px, py, pz
 //   num_particles; number of particles in each block
 //   out_file: output file name
@@ -918,14 +916,14 @@ void tess(float **particles, int *num_particles, char *out_file) {
 //
 //   returns: array of local delaunay blocks
 //
-struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter, 
+struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter,
 				     float minvol, float maxvol, int wrap,
 				     int twalls_on, double *times,
 				     MPI_Comm mpi_comm) {
 
-  float **particles; // particles[block_num][particle] 
-		     // where each particle is 3 values, px, py, pz 
-  int *num_particles; // number of particles in each block 
+  float **particles; // particles[block_num][particle]
+		     // where each particle is 3 values, px, py, pz
+  int *num_particles; // number of particles in each block
   struct dblock_t *ret_blocks; // returned delaunay blocks
 
   comm = mpi_comm;
@@ -933,23 +931,23 @@ struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter,
   max_vol = maxvol;
   wrap_neighbors = wrap;
   walls_on = twalls_on;
-  
-  // data extents 
+
+  // data extents
   for(int i = 0; i < 3; i++) {
     data_mins[i] = 0.0;
     data_maxs[i] = data_size[i] - 1.0;
   }
 
-  // generate test points in each block 
+  // generate test points in each block
   particles = (float **)malloc(nblocks * sizeof(float *));
   num_particles = (int *)malloc(nblocks * sizeof(int));
   for (int i = 0; i < nblocks; i++)
     num_particles[i] = gen_particles(i, &particles[i], jitter);
 
-  // compute tessellations 
+  // compute tessellations
   ret_blocks = delaunay(nblocks, particles, num_particles, times, (char *)"");
 
-  // cleanup 
+  // cleanup
   for (int i = 0; i < nblocks; i++)
     free(particles[i]);
   free(particles);
@@ -971,20 +969,20 @@ struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter,
 void wall_particles(struct dblock_t *dblock)
 {
   //   using data_mins and data_maxs
-  //   Currently assuimg walls on all sides, but format can easily be 
-  //   modified to be ANY set of walls 
+  //   Currently assuimg walls on all sides, but format can easily be
+  //   modified to be ANY set of walls
   struct wall_t *walls = NULL;
   int num_walls = 0;
 
   create_walls(&num_walls,&walls);
-  
+
   int* wall_cut = (int *)malloc(num_walls * sizeof(int));
- 
+
   std::vector<double> new_points;
 
   // Find all particles that need to be mirrored.
   for (int p = 0; p < dblock->num_orig_particles; ++p)
-  {  
+  {
     //  zero generate-wall-point array (length of number of walls)
     for (int wi = 0; wi < num_walls; wi++) wall_cut[wi] = 0;
 
@@ -1001,12 +999,12 @@ void wall_particles(struct dblock_t *dblock)
     }
     else
     {
-      // loop throug the list of all the Voronoi cell vertices of the point.  
+      // loop throug the list of all the Voronoi cell vertices of the point.
       // See if any are outside a wall.
-        
+
       // neighbor edges a vector of (vertex u, tet of vertex u) pairs
       // that neighbor vertex v
-        
+
       // the following loop is the equivalent of
       // for all faces in a voronoi cell
       for (int i = 0; i < (int)nbrs.size(); ++i)
@@ -1028,7 +1026,7 @@ void wall_particles(struct dblock_t *dblock)
 	}
       }
     }
-      
+
     // Make the mirrored particles
     //   For each mirror-generate index that is 1,
     //   generate the mirror point given site rp and the wall
@@ -1049,18 +1047,18 @@ void wall_particles(struct dblock_t *dblock)
       }
     }
   }
-  
+
   // Add all the new points to the dblock.
 
   if (new_points.size())
   {
     int n = (dblock->num_particles - dblock->num_orig_particles);
     int new_remote_particles = new_points.size()/3 + n;
-          
-    // grow space 
-    dblock->particles = 
+
+    // grow space
+    dblock->particles =
       (float *)realloc(dblock->particles,
-		       (dblock->num_particles*3 + 
+		       (dblock->num_particles*3 +
 			new_points.size())*sizeof(float));
 
     // copy new particles
@@ -1073,8 +1071,8 @@ void wall_particles(struct dblock_t *dblock)
       n++;
     }
   }
-  
-  // cleanup 
+
+  // cleanup
   free(wall_cut);
   destroy_walls(num_walls, walls);
 
@@ -1086,7 +1084,7 @@ void wall_particles(struct dblock_t *dblock)
 //   particles: pointer to particles (input and output)
 //   num_particles: number of particles (input and output)
 //   sample_rate: 1 out of every sample_rate particles will be kept
-// 
+//
 //   overwrites the old particles with the new but does not shrink memory
 //
 void sample_particles(float *particles, int &num_particles, int sample_rate) {
@@ -1119,10 +1117,10 @@ void sample_particles(float *particles, int &num_particles, int sample_rate) {
 //
 //   dblock: current delaunay block
 //   gid: global block id
-// 
+//
 void print_block(struct dblock_t *dblock, int gid) {
 
-  fprintf(stderr, "block gid = %d has %d tets:\n", 
+  fprintf(stderr, "block gid = %d has %d tets:\n",
 	  gid, dblock->num_tets);
   for (int i = 0; i < dblock->num_tets; i++) {
     int sort_verts[4], sort_tets[4]; // sorted verts and tets
@@ -1132,7 +1130,7 @@ void print_block(struct dblock_t *dblock, int gid) {
     }
     qsort(sort_verts, 4, sizeof(int), &compare);
     qsort(sort_tets, 4, sizeof(int), &compare);
-    fprintf(stderr, "tet %d verts [%d %d %d %d] neigh_tets [%d %d %d %d]\n", 
+    fprintf(stderr, "tet %d verts [%d %d %d %d] neigh_tets [%d %d %d %d]\n",
 	    i, sort_verts[0], sort_verts[1], sort_verts[2], sort_verts[3],
 	    sort_tets[0], sort_tets[1], sort_tets[2], sort_tets[3]);
   }
@@ -1145,7 +1143,7 @@ void print_block(struct dblock_t *dblock, int gid) {
 //   prticles: particle array
 //   num_particles: number of particles
 //   gid: block global id
-// 
+//
 void print_particles(float *particles, int num_particles, int gid) {
 
   int n;
@@ -1159,7 +1157,7 @@ void print_particles(float *particles, int num_particles, int gid) {
 // --------------------------------------------------------------------------
 //
 //    comparison function for qsort
-// 
+//
 int compare(const void *a, const void *b) {
 
   if (*((int*)a) < *((int*)b))
@@ -1178,53 +1176,53 @@ int compare(const void *a, const void *b) {
 //  particles: particles in each local block
 //  num_particles: number of particles in each local block
 //  outfile: output file name
-// 
-void write_particles(int nblocks, float **particles, int *num_particles, 
+//
+void write_particles(int nblocks, float **particles, int *num_particles,
 		     char *outfile) {
 
   int i;
-  float *all_particles; // particles from all local blocks merged 
-  MPI_Offset my_size; // size of my particles 
-  MPI_Offset ofst; // offset in file where I write my particles 
+  float *all_particles; // particles from all local blocks merged
+  MPI_Offset my_size; // size of my particles
+  MPI_Offset ofst; // offset in file where I write my particles
   MPI_File fd;
   MPI_Status status;
 
-  // merge all blocks together into one 
+  // merge all blocks together into one
   int tot_particles = 0;
   for (i = 0; i < nblocks; i++)
     tot_particles += num_particles[i];
   all_particles = (float *)malloc(tot_particles * 3 * sizeof(float));
   int n = 0;
   for (i = 0; i < nblocks; i++) {
-    memcpy(&all_particles[n], &particles[i][0], 
+    memcpy(&all_particles[n], &particles[i][0],
 	   num_particles[i] * 3 * sizeof(float));
     n += num_particles[i] * 3;
   }
 
-  // compute my offset 
+  // compute my offset
   my_size = tot_particles * 3 * sizeof(float);
   // in MPI 2.2, should use MPI_OFFSET datatype, but
-  //    using MPI_LONG_LONG for backwards portability 
+  //    using MPI_LONG_LONG for backwards portability
   MPI_Exscan(&my_size, &ofst, 1, MPI_LONG_LONG, MPI_SUM, comm);
   int rank;
   MPI_Comm_rank(comm, &rank);
   if (rank == 0)
     ofst = 0;
 
-  // open 
+  // open
   int retval = MPI_File_open(comm, (char *)outfile,
 			     MPI_MODE_WRONLY | MPI_MODE_CREATE,
 			     MPI_INFO_NULL, &fd);
   assert(retval == MPI_SUCCESS);
   MPI_File_set_size(fd, 0); // start with an empty file every time
 
-  // write 
-  retval = MPI_File_write_at_all(fd, ofst, all_particles, tot_particles * 3, 
+  // write
+  retval = MPI_File_write_at_all(fd, ofst, all_particles, tot_particles * 3,
 				 MPI_FLOAT, &status);
   if (retval != MPI_SUCCESS)
     handle_error(retval, comm, (char *)"MPI_File_write_at_all");
 
-  // cleanup 
+  // cleanup
   free(all_particles);
   MPI_File_close(&fd);
 
@@ -1233,7 +1231,7 @@ void write_particles(int nblocks, float **particles, int *num_particles,
 //
 //   MPI error handler
 //   decodes and prints MPI error messages
-// 
+//
 void handle_error(int errcode, MPI_Comm comm, char *str) {
 
   char msg[MPI_MAX_ERROR_STRING];
@@ -1248,53 +1246,53 @@ void handle_error(int errcode, MPI_Comm comm, char *str) {
 //   creates and initializes walls
 //
 //   walls: pointer to array of walls
-//   
+//
 //   Important!  [a,b,c] must be a unit length vector!
 //
 //    allocate blocks and headers
 //
-// 
+//
 void create_walls(int *num_walls, struct wall_t **walls) {
 
   (*num_walls) = 6;
   *walls = (struct wall_t*)malloc(sizeof(struct wall_t) * (*num_walls));
-  
+
   // bottom xy wall
   (*walls)[0].a = 0;
   (*walls)[0].b = 0;
   (*walls)[0].c = 1;
   (*walls)[0].d = -data_mins[2];
-  
+
   // forward xz wall
   (*walls)[1].a = 0;
   (*walls)[1].b = 1;
   (*walls)[1].c = 0;
   (*walls)[1].d = -data_mins[1];
-  
+
   // left yz wall
   (*walls)[2].a = 1;
   (*walls)[2].b = 0;
   (*walls)[2].c = 0;
   (*walls)[2].d = -data_mins[0];
-  
+
   // top xy wall
   (*walls)[3].a = 0;
   (*walls)[3].b = 0;
   (*walls)[3].c = -1;
   (*walls)[3].d = data_maxs[2];
-  
+
   // back xz wall
   (*walls)[4].a = 0;
   (*walls)[4].b = -1;
   (*walls)[4].c = 0;
   (*walls)[4].d = data_maxs[1];
-  
+
   // right yz wall
   (*walls)[5].a = -1;
   (*walls)[5].b = 0;
   (*walls)[5].c = 0;
   (*walls)[5].d = data_maxs[0];
-  
+
 }
 // ---------------------------------------------------------------------------
 // CLP
@@ -1302,7 +1300,7 @@ void create_walls(int *num_walls, struct wall_t **walls) {
 //
 //   num_walls: number of walls
 //   walls: array of walls
-// 
+//
 void destroy_walls(int num_walls, struct wall_t *walls) {
 
   if (num_walls)
@@ -1312,24 +1310,24 @@ void destroy_walls(int num_walls, struct wall_t *walls) {
 // ---------------------------------------------------------------------------
 // CLP
 //   determines if point is inside or outside wall
-//   http://mathworld.wolfram.com/Plane.html Equation (24) 
+//   http://mathworld.wolfram.com/Plane.html Equation (24)
 //   Signed point-plane distance, ignoring positive denominator
 //   pt: point
 //   wall: wall
-// 
+//
 int test_outside(const float *pt,const struct wall_t *wall) {
 
   float D = pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + wall->d;
   if (D > 0)
     return 0;
-  else 
+  else
     return 1;
 
 }
 // ---------------------------------------------------------------------------
 // CLP
 //   returns point reflected across wall
-//   http://mathworld.wolfram.com/Plane.html Equation (24) 
+//   http://mathworld.wolfram.com/Plane.html Equation (24)
 //   Signed point-plane distance, including denominator
 //   rpt
 //   pt: site-point
@@ -1337,11 +1335,11 @@ int test_outside(const float *pt,const struct wall_t *wall) {
 //
 void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall) {
 
-  // signed distance from wall to site point 
-  float D = (pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c + 
-	     wall->d)/sqrt(wall->a*wall->a + wall->b*wall->b + 
+  // signed distance from wall to site point
+  float D = (pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c +
+	     wall->d)/sqrt(wall->a*wall->a + wall->b*wall->b +
 			   wall->c*wall->c);
-    
+
   rpt[0] = pt[0] - 2*D*wall->a;
   rpt[1] = pt[1] - 2*D*wall->b;
   rpt[2] = pt[2] - 2*D*wall->c;
@@ -1350,15 +1348,15 @@ void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall) {
 // ---------------------------------------------------------------------------
 // CLP
 //  Adds mirror particles to list
-// 
-void add_mirror_particles(int nblocks, float **mirror_particles, 
+//
+void add_mirror_particles(int nblocks, float **mirror_particles,
 			  int *num_mirror_particles, float **particles,
 			  int *num_particles, int *num_orig_particles,
 			  int **gids, int **nids, unsigned char **dirs) {
 
   int i,j;
-    
-  // copy mirror particles to particles 
+
+  // copy mirror particles to particles
   for (i = 0; i < nblocks; i++) {
 
     int n = (num_particles[i] - num_orig_particles[i]);
@@ -1369,13 +1367,13 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
     dirs[i] = (unsigned char *)realloc(dirs[i], new_remote_particles);
     if (num_mirror_particles[i]) {
 
-      // grow space 
-      particles[i] = 
-	(float *)realloc(particles[i], 
+      // grow space
+      particles[i] =
+	(float *)realloc(particles[i],
 			 (num_particles[i] + num_mirror_particles[i]) *
 			 3 * sizeof(float));
 
-      // copy mirror particles 
+      // copy mirror particles
       for (j = 0; j < num_mirror_particles[i]; j++) {
 
             particles[i][3 * num_particles[i]] = mirror_particles[i][3*j];
@@ -1388,9 +1386,9 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
             num_particles[i]++;
             n++;
 
-      } // copy mirror particles 
+      } // copy mirror particles
 
-    } // if num_mirror_particles 
+    } // if num_mirror_particles
 
   }
 
@@ -1418,8 +1416,8 @@ void get_mem(int breakpoint, int dwell) {
 
   uint64_t shared, persist, heapavail, stackavail,
     stack, heap, heapmax, guard, mmap;
-	
-  // we're only interested in max heap size 
+
+  // we're only interested in max heap size
   // (same as max resident size, high water mark)
   Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPMAX, &heapmax);
 
@@ -1433,14 +1431,14 @@ void get_mem(int breakpoint, int dwell) {
   Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heap);
   Kernel_GetMemorySize(KERNEL_MEMSIZE_GUARD, &guard);
   Kernel_GetMemorySize(KERNEL_MEMSIZE_MMAP, &mmap);
-	
+
   int to_mb = 1024 * 1024;
   double heap_mem = double(heapmax) / to_mb;
   double max_heap_mem;
-  MPI_Reduce(&heap_mem, &max_heap_mem, 1, MPI_DOUBLE, MPI_MAX, 0, 
+  MPI_Reduce(&heap_mem, &max_heap_mem, 1, MPI_DOUBLE, MPI_MAX, 0,
 	     MPI_COMM_WORLD);
   if (rank == 0)
-    fprintf(stderr, "%d: BGQ max memory = %.0lf MB\n", 
+    fprintf(stderr, "%d: BGQ max memory = %.0lf MB\n",
 	    breakpoint, max_heap_mem);
 
 #else

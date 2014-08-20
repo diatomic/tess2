@@ -23,15 +23,15 @@
 #include <math.h>
 
 #if defined(MAC_OSX)
-#include <GLUT/glut.h> 
+#include <GLUT/glut.h>
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
 #else
-#include <GL/glut.h> 
+#include <GL/glut.h>
 #include <GL/gl.h>
 #endif
 
-#define SPHERE_RAD_FACTOR .002 // used to compute sphere radius
+#define SPHERE_RAD_FACTOR .004 // used to compute sphere radius
 // #define PAPER // color scheme for paper (white backgound)
 
 
@@ -58,15 +58,15 @@ struct rgba {
 };
 
 // mouse button state
-int press_x, press_y; 
-int release_x, release_y; 
+int press_x, press_y;
+int release_x, release_y;
 
 // rotate
 vec2d rot = {0.0, 0.0};
 float rot_rate = 0.2;
 
 // scale
-float scale = 1.0; 
+float scale = 1.0;
 float scale_rate = 0.01;
 vec2d aspect; // scaling due to window aspect ratio
 
@@ -89,11 +89,11 @@ vec2d trans = {0.0, 0.0};
 float trans_rate = 0.01;
 
 // transform mode
-int xform_mode = 0; 
+int xform_mode = 0;
 bool block_mode = false;
-#define XFORM_NONE    0 
+#define XFORM_NONE    0
 #define XFORM_ROTATE  1
-#define XFORM_SCALE   2 
+#define XFORM_SCALE   2
 #define XFORM_TRANS   3
 
 // rendering mode
@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
   MPI_Finalize();
 
   // mapping of gid to lid
-  int gid2lid[nblocks]; 
+  int gid2lid[nblocks];
   for (int b = 0; b < nblocks; b++) {
     for (int g = 0; g < nblocks; g++) {
       if (gids[g] == b) {
@@ -237,24 +237,24 @@ int main(int argc, char** argv) {
 
   // debug
   fprintf(stderr, "data sizes mins[%.3f %.3f %.3f] maxs[%.3f %.3f %.3f]\n",
-	  data_min.x, data_min.y, data_min.z, 
+	  data_min.x, data_min.y, data_min.z,
 	  data_max.x, data_max.y, data_max.z);
 
   // package rendering data
   PrepRenderingData(gid2lid);
 
   // start glut
-  glutInit(&argc, argv); 
-  glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH); 
-  glutInitWindowSize(win_size.x, win_size.y); 
-  glutCreateWindow("Voronoi"); 
-  glutDisplayFunc(display); 
-  glutTimerFunc(10, timer, 0); 
-  glutMouseFunc(mouse); 
+  glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
+  glutInitWindowSize(win_size.x, win_size.y);
+  glutCreateWindow("Voronoi");
+  glutDisplayFunc(display);
+  glutTimerFunc(10, timer, 0);
+  glutMouseFunc(mouse);
   glutMotionFunc(motion);
-  glutKeyboardFunc(key); 
+  glutKeyboardFunc(key);
   glutReshapeFunc(reshape);
-  glutMainLoop(); 
+  glutMainLoop();
 
 }
 //--------------------------------------------------------------------------
@@ -273,20 +273,20 @@ void display() {
   // set the headlight
   headlight();
 
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glMatrixMode(GL_PROJECTION);
-  glLoadIdentity(); 
-  gluPerspective(60.0, 1.0, near, 100.0); 
+  glLoadIdentity();
+  gluPerspective(60.0, 1.0, near, 100.0);
 
-  glMatrixMode(GL_MODELVIEW); 
-  glLoadIdentity(); 
-  gluLookAt(0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0); 
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  gluLookAt(0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 
   // mouse interactions: pan, rotate, zoom
   glTranslatef(trans.x, trans.y, 0.0);
-  glRotatef(rot.x, 0.0, 1.0, 0.0); 
-  glRotatef(rot.y, 1.0, 0.0, 0.0); 
+  glRotatef(rot.x, 0.0, 1.0, 0.0);
+  glRotatef(rot.y, 1.0, 0.0, 0.0);
   glScalef(scale, scale, scale);
 
   // center the data in the window
@@ -381,7 +381,7 @@ void display() {
 	if (clip == 0.0 || sites[i].z < z_clip)
 	  glVertex3f(sites[i].x, sites[i].y, sites[i].z);
       }
-      
+
       glEnd();
     }
     glDisable(GL_COLOR_MATERIAL);
@@ -499,9 +499,9 @@ void init_display() {
 
   // background
 #ifdef PAPER
-  glClearColor(1.0, 1.0, 1.0, 1.0); 
+  glClearColor(1.0, 1.0, 1.0, 1.0);
 #else
-  glClearColor(0.0, 0.0, 0.0, 1.0); 
+  glClearColor(0.0, 0.0, 0.0, 1.0);
 #endif
 
   // gl state
@@ -537,7 +537,7 @@ void init_display() {
   glBindTexture(GL_TEXTURE_2D, tex);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 5, 5, 0, GL_RGBA, 
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 5, 5, 0, GL_RGBA,
 	       GL_UNSIGNED_BYTE, sprite_rgba);
 
 }
@@ -636,16 +636,16 @@ void draw_tets() {
       glBegin(GL_TRIANGLE_STRIP);
       glVertex3f(tet_verts[n + 2].x, tet_verts[n + 2].y, tet_verts[n + 2].z);
       glVertex3f(tet_verts[n + 1].x, tet_verts[n + 1].y, tet_verts[n + 1].z);
-      glNormal3f(tet_normals[n].x, tet_normals[n].y, 
+      glNormal3f(tet_normals[n].x, tet_normals[n].y,
 		 tet_normals[n].z);
       glVertex3f(tet_verts[n].x, tet_verts[n].y, tet_verts[n].z);
-      glNormal3f(tet_normals[n + 1].x, tet_normals[n + 1].y, 
+      glNormal3f(tet_normals[n + 1].x, tet_normals[n + 1].y,
 		 tet_normals[n + 1].z);
       glVertex3f(tet_verts[n + 3].x, tet_verts[n + 3].y, tet_verts[n + 3].z);
-      glNormal3f(tet_normals[n + 2].x, tet_normals[n + 2].y, 
+      glNormal3f(tet_normals[n + 2].x, tet_normals[n + 2].y,
 		 tet_normals[n + 2].z);
       glVertex3f(tet_verts[n + 2].x, tet_verts[n + 2].y, tet_verts[n + 2].z);
-      glNormal3f(tet_normals[n + 3].x, tet_normals[n + 3].y, 
+      glNormal3f(tet_normals[n + 3].x, tet_normals[n + 3].y,
 		 tet_normals[n + 3].z);
       glVertex3f(tet_verts[n + 1].x, tet_verts[n + 1].y, tet_verts[n + 1].z);
       glEnd();
@@ -661,13 +661,13 @@ void draw_tets() {
 //
 void headlight() {
 
-  GLfloat light_ambient[4] = {0.1, 0.1, 0.1, 1.0};  
-  GLfloat light_diffuse[4] = {0.2, 0.2, 0.2, 1.0};  
+  GLfloat light_ambient[4] = {0.1, 0.1, 0.1, 1.0};
+  GLfloat light_diffuse[4] = {0.2, 0.2, 0.2, 1.0};
   GLfloat light_specular[4] = {0.8, 0.8, 0.8, 1.0};
 
   glPushMatrix();
-  glMatrixMode(GL_MODELVIEW); 
-  glLoadIdentity(); 
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
   glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
   glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
   glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
@@ -683,21 +683,21 @@ void headlight() {
 void draw_cube(float *mins, float *maxs, float r, float g, float b) {
 
   glPushMatrix();
-  glTranslatef((mins[0] + maxs[0]) / 2.0, (mins[1] + maxs[1]) / 2.0, 
-	       (mins[2] + maxs[2]) / 2.0); 
+  glTranslatef((mins[0] + maxs[0]) / 2.0, (mins[1] + maxs[1]) / 2.0,
+	       (mins[2] + maxs[2]) / 2.0);
   glScalef(maxs[0] - mins[0], maxs[1] - mins[1], maxs[2] - mins[2]);
-  glColor3f(r, g, b); 
+  glColor3f(r, g, b);
   glutWireCube(1.0);
   glPopMatrix();
 
 }
 //--------------------------------------------------------------------------
-// 
+//
 // sphere for rendering voronoi sites (particles)
 //
 void draw_sphere(rgba &color, vec3d &pos, float rad) {
 
-  glColor3f(color.r, color.g, color.b); 
+  glColor3f(color.r, color.g, color.b);
   glPushMatrix();
   glTranslatef(pos.x, pos.y, pos.z);
   gluSphere(q, rad, 7, 7);
@@ -705,7 +705,7 @@ void draw_sphere(rgba &color, vec3d &pos, float rad) {
 
 }
 //--------------------------------------------------------------------------
-// 
+//
 // all spheres for rendering voronoi sites (particles)
 //
 void draw_spheres(vector<vec3d> &sites, float rad) {
@@ -723,7 +723,7 @@ void draw_spheres(vector<vec3d> &sites, float rad) {
 
 }
 //--------------------------------------------------------------------------
-// 
+//
 // point sprite for rendering voronoi sites (particles)
 //
 void draw_sprites(vector<vec3d> &sites, float size) {
@@ -731,7 +731,7 @@ void draw_sprites(vector<vec3d> &sites, float size) {
   glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 //   glDisable(GL_DEPTH_TEST);
-//   glEnable (GL_BLEND); 
+//   glEnable (GL_BLEND);
 
   glColor3f(1.0, 1.0, 1.0);  // color doesn't matter, will be textured over
 
@@ -748,7 +748,7 @@ void draw_sprites(vector<vec3d> &sites, float size) {
   glEnd();
   glDisable(GL_POINT_SPRITE);
 
-//   glDisable (GL_BLEND); 
+//   glDisable (GL_BLEND);
 //   glEnable(GL_DEPTH_TEST);
 
   glPopAttrib();
@@ -763,7 +763,7 @@ void draw_axes() {
   glPushMatrix();
 
   // x
-  glColor3f(1.0, 0.0, 0.0); 
+  glColor3f(1.0, 0.0, 0.0);
   glPushMatrix();
   glRotatef(90.0, 0.0, 1.0, 0.0);
   gluCylinder(q, size * 0.007, size * 0.007, sizes.x * 1.2, 15, 1);
@@ -772,7 +772,7 @@ void draw_axes() {
   glPopMatrix();
 
   // y
-  glColor3f(0.0, 1.0, 0.0); 
+  glColor3f(0.0, 1.0, 0.0);
   glPushMatrix();
   glRotatef(-90.0, 1.0, 0.0, 0.0);
   gluCylinder(q, size * 0.007, size * 0.007, sizes.y * 1.2, 15, 1);
@@ -781,7 +781,7 @@ void draw_axes() {
   glPopMatrix();
 
   // z
-  glColor3f(0.0, 0.0, 1.0); 
+  glColor3f(0.0, 0.0, 1.0);
   glPushMatrix();
   gluCylinder(q, size * 0.007, size * 0.007, sizes.z * 1.2, 15, 1);
   glTranslatef(0.0, 0.0, sizes.z * 1.2);
@@ -800,17 +800,17 @@ void mouse(int button, int state, int x, int y) {
   if (state == GLUT_DOWN) {
 
     press_x = x;
-    press_y = y; 
+    press_y = y;
     if (button == GLUT_LEFT_BUTTON)
-      xform_mode = XFORM_ROTATE; 
-    else if (button == GLUT_RIGHT_BUTTON) 
-      xform_mode = XFORM_SCALE; 
-    else if (button == GLUT_MIDDLE_BUTTON) 
-      xform_mode = XFORM_TRANS; 
+      xform_mode = XFORM_ROTATE;
+    else if (button == GLUT_RIGHT_BUTTON)
+      xform_mode = XFORM_SCALE;
+    else if (button == GLUT_MIDDLE_BUTTON)
+      xform_mode = XFORM_TRANS;
 
   }
   else if (state == GLUT_UP)
-    xform_mode = XFORM_NONE; 
+    xform_mode = XFORM_NONE;
 
 }
 //--------------------------------------------------------------------------
@@ -821,40 +821,40 @@ void motion(int x, int y) {
 
   if (xform_mode == XFORM_ROTATE) {
 
-    rot.x += (x - press_x) * rot_rate; 
+    rot.x += (x - press_x) * rot_rate;
     if (rot.x > 180)
-      rot.x -= 360; 
+      rot.x -= 360;
     else if (rot.x < -180)
-      rot.x += 360; 
-    press_x = x; 
-	   
+      rot.x += 360;
+    press_x = x;
+
     rot.y += (y - press_y) * rot_rate;
     if (rot.y > 180)
-      rot.y -= 360; 
+      rot.y -= 360;
     else if (rot.y <-180)
-      rot.y += 360; 
-    press_y = y; 
+      rot.y += 360;
+    press_y = y;
 
   }
   else if (xform_mode == XFORM_TRANS) {
 
-    trans.x += (x - press_x) * trans_rate; 
+    trans.x += (x - press_x) * trans_rate;
     trans.y -= (y - press_y) * trans_rate;  // subtract to reverse y dir.
     press_x = x;
-    press_y = y; 
+    press_y = y;
 
   }
   else if (xform_mode == XFORM_SCALE){
 
     float old_scale = scale;
     scale /= (1 + (y - press_y) * scale_rate);  // divided to reverse y dir.
-    if (scale < 0) 
-      scale = old_scale; 
-    press_y = y; 
+    if (scale < 0)
+      scale = old_scale;
+    press_y = y;
 
   }
 
-  glutPostRedisplay(); 
+  glutPostRedisplay();
 
 }
 //--------------------------------------------------------------------------
@@ -870,7 +870,7 @@ void key(unsigned char key, int x, int y) {
 
   case 'q':  // quit
     exit(1);
-    break; 
+    break;
   case 't':  // show voronoi tessellation
     draw_tess = !draw_tess;
     draw_del = false;
@@ -889,11 +889,11 @@ void key(unsigned char key, int x, int y) {
     color_density = !color_density;
     break;
   case 'z':  // zoom mouse motion
-    xform_mode = XFORM_SCALE; 
-    break; 
+    xform_mode = XFORM_SCALE;
+    break;
   case 'a':  // panning mouse motion
-    xform_mode = XFORM_TRANS; 
-    break; 
+    xform_mode = XFORM_TRANS;
+    break;
   case 'r': // reset rotate, pan, zoom, viewport
     init_model();
     init_viewport(true);
@@ -918,7 +918,7 @@ void timer(int val) {
   val = val; // quiet compiler warning
 
   glutPostRedisplay();
-  glutTimerFunc(10, timer, 0); 
+  glutTimerFunc(10, timer, 0);
 
 }
 //--------------------------------------------------------------------------
@@ -1162,11 +1162,11 @@ void PrepCellRendering(int &num_vis_cells) {
 
 	// following is equivalent of all vertices in a face
 	for (int j = 0; j < (int)edge_link.size(); ++j) {
-    
+
 	  vec3d center;
-	  circumcenter((float *)&(center.x), 
+	  circumcenter((float *)&(center.x),
 		       &(blocks[b].tets[edge_link[j]]), blocks[b].particles);
-      
+
 	  // filter out cells far outside the overal extents
 	  if (center.x > data_max.x + (data_max.x - data_min.x) * (ds - 1) ||
 	      center.x < data_min.x - (data_max.x - data_min.x) * (ds - 1) ||
@@ -1175,17 +1175,17 @@ void PrepCellRendering(int &num_vis_cells) {
 	      center.z > data_max.z + (data_max.z - data_min.z) * (ds - 1) ||
 	      center.z < data_min.z - (data_max.z - data_min.z) * (ds - 1))
 	    keep = false;
-    
+
 	  temp_verts.push_back(center);
 
 	}
-        
+
 	temp_num_face_verts.push_back(edge_link.size());
 
 	// face normal (flat shading, one normal per face)
 	vec3d normal;
 	NewellNormal(&temp_verts[v0], edge_link.size(), normal);
-    
+
 	// check sign of dot product of normal with vector from site 
 	// to first face vertex to see if normal has correct direction
 	// want outward normal
@@ -1229,11 +1229,13 @@ void PrepCellRendering(int &num_vis_cells) {
 //
 void PrepTetRendering(int &num_tets, int *gid2lid) {
 
+  int v; // vertex (0-3)
+
   num_tets = 0;
 
   for (int b = 0; b < nblocks; b++) { // blocks
 
-    // local tets
+    // tets
     for (int t = 0; t < blocks[b].num_tets; t++) {
 
       // skip tets with missing neighbors
@@ -1244,7 +1246,7 @@ void PrepTetRendering(int &num_tets, int *gid2lid) {
 	continue;
       }
 
-      // skip tet tets with vertices corresponding to incomplete voronoi cells
+      // skip tets with vertices corresponding to incomplete voronoi cells
       vector< pair<int, int> > nbrs;
       if (!neighbor_edges(nbrs, blocks[b].tets[t].verts[0], blocks[b].tets, t) ||
 	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[1], blocks[b].tets, t) ||
@@ -1253,11 +1255,19 @@ void PrepTetRendering(int &num_tets, int *gid2lid) {
 	continue;
       }
 
+      // skip tets with no local vertices
+      // these tets are not guaranteed to be correct
+      for (v = 0; v < 4; v++) {
+        if (blocks[b].tets[t].verts[v] < blocks[b].num_orig_particles)
+          break;
+      }
+      if (v == 4)
+        continue;
+
       for (int v = 0; v < 4; v++) {
 
 	int s = blocks[b].tets[t].verts[v]; // index pf particle
 	vec3d p; // coordinates for tet vertices
-
         p.x = blocks[b].particles[3 * s];
         p.y = blocks[b].particles[3 * s + 1];
         p.z = blocks[b].particles[3 * s + 2];
@@ -1268,7 +1278,7 @@ void PrepTetRendering(int &num_tets, int *gid2lid) {
 
       num_tets++;
 
-    } // local tets
+    } // tets
 
     // tet face normals
 
@@ -1329,7 +1339,7 @@ void PrepTetRendering(int &num_tets, int *gid2lid) {
       tri[0].y = tet_verts[n    ].y;
       tri[0].z = tet_verts[n    ].z;
       tri[1].x = tet_verts[n + 3].x;
-      tri[1].y = tet_verts[n + 2].y;
+      tri[1].y = tet_verts[n + 3].y;
       tri[1].z = tet_verts[n + 3].z;
       tri[2].x = tet_verts[n + 2].x;
       tri[2].y = tet_verts[n + 2].y;

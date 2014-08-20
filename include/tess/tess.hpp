@@ -1,17 +1,17 @@
 // ---------------------------------------------------------------------------
-//  
+//
 //   functions that have C++ arguments that C source files
 //   should not see, hence they are in a separate header
-//  
+//
 //   Tom Peterka
 //   Argonne National Laboratory
 //   9700 S. Cass Ave.
 //   Argonne, IL 60439
 //   tpeterka@mcs.anl.gov
-//  
+//
 //   (C) 2013 by Argonne National Laboratory.
 //   See COPYRIGHT in top-level directory.
-//  
+//
 // --------------------------------------------------------------------------
 
 #include <vector>
@@ -96,10 +96,10 @@ namespace diy
       diy::save(bb, d.num_particles);
       diy::save(bb, d.particles, 3 * d.num_particles);
       // NB tets and vert_to_tet get recreated in each phase; not saved and reloaded
-      vector <int> *convex_hull_particles = 
+      vector <int> *convex_hull_particles =
         static_cast<vector <int>*>(d.convex_hull_particles);
       diy::save(bb, *convex_hull_particles);
-      vector <set <int> > *sent_particles = 
+      vector <set <int> > *sent_particles =
         static_cast<vector <set <int> >*>(d.sent_particles);
       diy::save(bb, *sent_particles);
       // TODO: not saving Dt for now, recomputing upon loading instead
