@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <algorithm>
 #include <assert.h>
 #include "tess/delaunay.h"
 #include "tess/tet-neighbors.h"
@@ -170,11 +171,12 @@ void init_viewport(bool reset);
 void headlight();
 void Centroid(vec3d *verts, int num_verts, vec3d &centroid);
 void NewellNormal(vec3d *verts, int num_verts, vec3d &normal);
-void PrepRenderingData(int *gid2lid);
+void PrepRenderingData();
 void PrepSiteRendering(int &num_sites);
 void PrepCellRendering(int &num_visible_cells);
 void PrepCellVertRendering();
-void PrepTetRendering(int &num_tets, int* gid2lid);
+void PrepTetRendering(int &num_tets);
+bool my_tet(dblock_t& dblock, int t);
 
 //--------------------------------------------------------------------------
 
@@ -187,7 +189,6 @@ int main(int argc, char** argv) {
 
   // read the file
   int tot_blocks; // total number of blocks
-  int *gids; // block global ids (unused)
   int *num_neighbors; // number of neighbors for each local block (unused)
   int **neighbors; // neighbors of each local block (unused)
   int **neigh_procs; // procs of neighbors of each local block (unused)
@@ -195,21 +196,9 @@ int main(int argc, char** argv) {
   MPI_Init(&argc, &argv);
 
   pnetcdf_read(&nblocks, &tot_blocks, &blocks, argv[1], MPI_COMM_WORLD,
-	       &gids, &num_neighbors, &neighbors, &neigh_procs);
+	       &num_neighbors, &neighbors, &neigh_procs);
 
   MPI_Finalize();
-
-  // mapping of gid to lid
-  int gid2lid[nblocks];
-  for (int b = 0; b < nblocks; b++) {
-    for (int g = 0; g < nblocks; g++) {
-      if (gids[g] == b) {
-	gid2lid[b] = g;
-	break;
-      }
-      assert(g < nblocks); // sanity
-    }
-  }
 
   // get overall data extent
   for (int i = 0; i < nblocks; i++) {
@@ -241,7 +230,7 @@ int main(int argc, char** argv) {
 	  data_max.x, data_max.y, data_max.z);
 
   // package rendering data
-  PrepRenderingData(gid2lid);
+  PrepRenderingData();
 
   // start glut
   glutInit(&argc, argv);
@@ -1048,9 +1037,8 @@ void NewellNormal(vec3d *verts, int num_verts, vec3d &normal) {
 //--------------------------------------------------------------------------
 //
 // package rendering data
-// gid2lid: mapping of gids to lids
 //
-void PrepRenderingData(int *gid2lid) {
+void PrepRenderingData() {
 
   // number of sites, cells and tets
   int num_sites;
@@ -1064,7 +1052,7 @@ void PrepRenderingData(int *gid2lid) {
   PrepCellRendering(num_vis_cells);
 
   // delauany tets
-  PrepTetRendering(num_tets, gid2lid);
+  PrepTetRendering(num_tets);
 
   fprintf(stderr, "Number of particles = %d\n"
 	  "Number of visible cells = %d\n"
@@ -1225,9 +1213,8 @@ void PrepCellRendering(int &num_vis_cells) {
 // package tets for rendering
 //
 // num_tets: (output) number of tets
-// gid2lid: mapping of gids to lids
 //
-void PrepTetRendering(int &num_tets, int *gid2lid) {
+void PrepTetRendering(int &num_tets) {
 
   int v; // vertex (0-3)
 
@@ -1238,14 +1225,6 @@ void PrepTetRendering(int &num_tets, int *gid2lid) {
     // tets
     for (int t = 0; t < blocks[b].num_tets; t++) {
 
-      // skip tets with missing neighbors
-      if (blocks[b].tets[t].tets[0] == -1 ||
-	  blocks[b].tets[t].tets[1] == -1 ||
-	  blocks[b].tets[t].tets[2] == -1 ||
-	  blocks[b].tets[t].tets[3] == -1) {
-	continue;
-      }
-
       // skip tets with vertices corresponding to incomplete voronoi cells
       vector< pair<int, int> > nbrs;
       if (!neighbor_edges(nbrs, blocks[b].tets[t].verts[0], blocks[b].tets, t) ||
@@ -1255,13 +1234,8 @@ void PrepTetRendering(int &num_tets, int *gid2lid) {
 	continue;
       }
 
-      // skip tets with no local vertices
-      // these tets are not guaranteed to be correct
-      for (v = 0; v < 4; v++) {
-        if (blocks[b].tets[t].verts[v] < blocks[b].num_orig_particles)
-          break;
-      }
-      if (v == 4)
+      // determine unique ownership of the tet
+      if (!my_tet(blocks[b], t))
         continue;
 
       for (int v = 0; v < 4; v++) {
@@ -1271,7 +1245,6 @@ void PrepTetRendering(int &num_tets, int *gid2lid) {
         p.x = blocks[b].particles[3 * s];
         p.y = blocks[b].particles[3 * s + 1];
         p.z = blocks[b].particles[3 * s + 2];
-
 	tet_verts.push_back(p);
 
       }
@@ -1408,6 +1381,55 @@ void PrepSiteRendering(int &num_sites) {
   } // blocks
 
   num_sites = (int)sites.size();
+
+}
+//--------------------------------------------------------------------------
+//
+// determines whether this block owns this tet
+//
+// all verts are mine     -> the tet is mine
+// no verts are mine      -> the tet is not mine
+// mixed vertex ownership -> the minimum gid block is the owner
+//
+// dblock: local delaunay block
+// t: index of tet
+//
+bool my_tet(dblock_t& dblock, int t) {
+
+  int v; // tet vertex (0-3)
+
+  // check whether this tet is entirely local
+  for (v = 0; v < 4; v++) {
+    int p = dblock.tets[t].verts[v];
+    if (p >= dblock.num_orig_particles)
+      break;
+  }
+  if (v == 4)
+    return true;
+
+  // check whether this tet is entirely remote
+  for (v = 0; v < 4; v++) {
+    int p = dblock.tets[t].verts[v];
+    if (p < dblock.num_orig_particles)
+      break;
+  }
+  if (v == 4)
+    return false;
+
+  // debug: skip the deduplication
+//   return true;
+
+  // tet has both local and remote verts; minimum gid of the vertex owners wins
+  vector <int> gids; // owners (block gids) of tet vertices
+  for (v = 0; v < 4; v++) {
+    int p = dblock.tets[t].verts[v];
+    if (p < dblock.num_orig_particles)
+      gids.push_back(dblock.gid);
+    else
+      gids.push_back(dblock.rem_gids[p - dblock.num_orig_particles]);
+  }
+
+  return(*min_element(gids.begin(), gids.end()) == dblock.gid);
 
 }
 //--------------------------------------------------------------------------

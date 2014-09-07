@@ -43,7 +43,7 @@ add_definitions             (${cxx_flags})
 # OSX flags
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     add_definitions	    (-DMAC_OSX)
-ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin") 
+ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 # QHull vs. CGAL
 if			    (${serial} MATCHES "CGAL")
@@ -110,7 +110,7 @@ include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 			     ${GenericIO_INCLUDE_DIR}
                              SYSTEM ${MPI_INCLUDE_PATH}
                             )
-		
+
 set			    (libraries
 			     ${libraries}
 			     ${DIY_LIBRARY}

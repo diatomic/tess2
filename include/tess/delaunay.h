@@ -25,9 +25,10 @@
 /* remote particle */
 struct point_t {
   float x, y, z; /* coordinates */
+  int gid; /* owner block global id */
 };
 
-/* CLP  - struct walls - using general equation of plane 
+/* CLP  - struct walls - using general equation of plane
    per http://mathworld.wolfram.com/Plane.html */
 struct wall_t {
 float a;
@@ -48,13 +49,14 @@ struct dblock_t {
   int num_orig_particles; /* number of original particles in this block
   			     before any neighbor exhcange */
   int num_particles; /* current number of particles in this block after any
-			neighbor exchange; original particles appear first 
+			neighbor exchange; original particles appear first
 			followed by received particles */
   float *particles; /* all particles, original plus those received from neighbors */
 
   /* tets */
   int num_tets; /* number of delaunay tetrahedra */
   struct tet_t *tets; /* delaunay tets */
+  int *rem_gids; /* owners of remote particles */
   int* vert_to_tet; /* a tet that contains the vertex */
 
   /* sent particles and convex hull particles

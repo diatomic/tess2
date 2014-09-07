@@ -24,15 +24,23 @@
 #define ERR {if(err!=NC_NOERR)printf("Error at line %d in %s: %s\n", __LINE__, __FILE__, ncmpi_strerror(err));}
 
 /* quantity vector */
-#define NUM_QUANTS 8
-#define NUM_VERTICES 0
-#define NUM_COMP_CELLS 1
-#define NUM_CELL_FACES 2
-#define NUM_ORIG_PARTS 3
-#define NUM_NEIGHBORS 4
-#define NUM_BLOCKS 5
-#define NUM_LOC_TETRAS 6
-#define NUM_PARTS 7
+#define NUM_QUANTS 5
+#define NUM_NEIGHBORS 0
+#define NUM_BLOCKS 1
+#define NUM_TETRAS 2
+#define NUM_REM_GIDS 3
+#define NUM_PARTS 4
+
+/* DEPRECATED */
+/* #define NUM_QUANTS 8 */
+/* #define NUM_VERTICES 0 */
+/* #define NUM_COMP_CELLS 1 */
+/* #define NUM_CELL_FACES 2 */
+/* #define NUM_ORIG_PARTS 3 */
+/* #define NUM_NEIGHBORS 4 */
+/* #define NUM_BLOCKS 5 */
+/* #define NUM_LOC_TETRAS 6 */
+/* #define NUM_PARTS 7 */
 
 #ifdef __cplusplus
 extern "C"
@@ -42,19 +50,13 @@ void diy_write(int nblocks, struct dblock_t *dblocks, int **hdrs, char *out_file
 #ifdef __cplusplus
 extern "C"
 #endif
-void pnetcdf_write(int nblocks, struct dblock_t **dblocks, 
+void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
 		   char *out_file, MPI_Comm comm, int *num_nbrs, struct gb_t **nbrs);
 
 #ifdef __cplusplus
 extern "C"
 #endif
-void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks, char *in_file, 
-                  MPI_Comm comm, int **gids, int **num_neighbors, int ***neighbors, 
-                  int ***neigh_procs);
-
-/* #ifdef __cplusplus */
-/* extern "C" */
-/* #endif */
-/* void create_datatype(void* dblock, int did, int lid, DIY_Datatype *dtype); */
+void pnetcdf_read(int *nblocks, int *tot_blocks, struct dblock_t **dblocks, char *in_file,
+                  MPI_Comm comm, int **num_neighbors, int ***neighbors, int ***neigh_procs);
 
 #endif

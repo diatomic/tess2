@@ -155,7 +155,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   master.foreach(&delaunay3);
   timing(-1, DEL3_TIME);
 
-  // All the foreach block functions are done. We now make a very dangerous assumption 
+  // All the foreach block functions are done. We now make a very dangerous assumption
   // that all blocks fit in memory because the remaining functions are done on all blocks
   // turn off output if all blocks are not resident in core
 
@@ -222,6 +222,8 @@ void destroy_block(void* b_)
     free(b->particles);
   if (b->tets)
     free(b->tets);
+  if (b->rem_gids)
+    free(b->rem_gids);
   if (b->vert_to_tet)
     free(b->vert_to_tet);
 
@@ -479,12 +481,13 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
   // enqueue the particles
   for (int p = 0; p < dblock->num_orig_particles; p++)
   {
-    for (set<int>::iterator it = (*sent_particles)[p].begin(); it != (*sent_particles)[p].end(); 
+    for (set<int>::iterator it = (*sent_particles)[p].begin(); it != (*sent_particles)[p].end();
          it++)
     {
       rp.x   = dblock->particles[3 * p];
       rp.y   = dblock->particles[3 * p + 1];
       rp.z   = dblock->particles[3 * p + 2];
+      rp.gid = dblock->gid;
       wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
       cp.enqueue(l->target(*it), rp);
     }
@@ -564,9 +567,14 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
     {
       for (set<int>::iterator it = new_dests.begin(); it != new_dests.end(); it++)
       {
-        rp.x = dblock->particles[3 * p];
-        rp.y = dblock->particles[3 * p + 1];
-        rp.z = dblock->particles[3 * p + 2];
+        rp.x   = dblock->particles[3 * p];
+        rp.y   = dblock->particles[3 * p + 1];
+        rp.z   = dblock->particles[3 * p + 2];
+        if (p >= dblock->num_orig_particles)
+          fprintf(stderr, "Warning: p %d is not one of the original particles of block gid %d.\n"
+                  "Not sure whther this is a sign of trouble, but in any case its remote gid "
+                  "will not be assigned correctly\n", p, dblock->gid);
+        rp.gid = dblock->gid;
         wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
         cp.enqueue(cp.link()->target(*it), rp);
       }
@@ -590,9 +598,11 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
 
   // grow space for remote particles
   int n = (b->num_particles - b->num_orig_particles);
-  int new_remote_particles = numpts + n;
   if (numpts)
+  {
     b->particles = (float *)realloc(b->particles, (b->num_particles + numpts) * 3 * sizeof(float));
+    b->rem_gids  = (int*)realloc(b->rem_gids, (n + numpts) * sizeof(int));
+  }
 
   // copy received particles
   for (int i = 0; i < (int)in.size(); i++)
@@ -607,6 +617,7 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
       b->particles[3 * b->num_particles    ] = pts[j].x;
       b->particles[3 * b->num_particles + 1] = pts[j].y;
       b->particles[3 * b->num_particles + 2] = pts[j].z;
+      b->rem_gids[n] = pts[j].gid;
 
       b->num_particles++;
       n++;
@@ -888,11 +899,12 @@ void tess_finalize() {
 //
 //   parallel tessellation
 //
+//   nblocks: local number of blocks
 //   particles: particles[block_num][particle]
 //   where each particle is 3 values, px, py, pz
 //   num_particles; number of particles in each block
 //   out_file: output file name
-void tess(float **particles, int *num_particles, char *out_file) {
+void tess(int nblocks, float **particles, int *num_particles, char *out_file) {
 
   delaunay(nblocks, particles, num_particles, times, out_file);
 
