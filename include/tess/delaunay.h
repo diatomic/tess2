@@ -43,6 +43,7 @@ struct dblock_t {
   int gid; /* global block id */
   float mins[3], maxs[3]; /* block extents */
   struct bb_c_t data_bounds; /* global data extents */
+  struct bb_c_t box;	     /* current box; used in swap-reduce() when distributing particles */
   void *Dt; /* native delaunay data structure */
 
   /* input particles */

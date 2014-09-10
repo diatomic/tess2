@@ -25,12 +25,15 @@ typedef  diy::RegularContinuousLink  RCLink;
 
 using namespace std;
 
+void tess(diy::Master& master);
+void tess_save(diy::Master& master, const char* outfile);
+
 void* create_block();
 void destroy_block(void* b);
 void save_block(const void* b, diy::BinaryBuffer& bb);
 void load_block(void* b, diy::BinaryBuffer& bb);
 void create(int gid, const Bounds& core, const Bounds& bounds, const diy::Link& link);
-void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp);
+void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
 void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*);
 void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*);
 void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void*);
@@ -51,7 +54,7 @@ struct AddBlock
   AddBlock(diy::Master& master_):
     master(master_)           {}
 
-  void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
+  dblock_t*	operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
                    const RCLink& link) const
   {
     dblock_t*      b = static_cast<dblock_t*>(create_block());
@@ -75,6 +78,8 @@ struct AddBlock
 
     // debug
     //     fprintf(stderr, "Done adding block gid %d\n", b->gid);
+
+    return b;
   }
 
   diy::Master&  master;

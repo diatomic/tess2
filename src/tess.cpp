@@ -118,7 +118,6 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
                                    &load_block);
   diy::RoundRobinAssigner   assigner(world.size(), tot_blocks);
   AddBlock create(master);
-  ::rank = world.rank();
 
   // decompose
   std::vector<int> my_gids;
@@ -129,12 +128,26 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
   if (wrap_)
     wrap.assign(3, true);
-  diy::decompose(3, ::rank, domain, assigner, create, share_face, wrap, ghosts);
+  diy::decompose(3, comm.rank(), domain, assigner, create, share_face, wrap, ghosts);
+
+  master.foreach(&gen_particles);   // generate particles
+
+  tess(master);
+
+  tess_save(master, outfile);
+
+  // TODO: original version had the option of returning blocks instead of writing to file
+  // (for coupling to dense and other tools)
+}
+
+void tess(diy::Master& master)
+{
+  ::rank = master.communicator().rank();	// Tom and his globals; grrr
 
   timing(-1, -1);
+  timing(TOT_TIME, -1);
 
   // compute first stage tessellation
-  timing(TOT_TIME, -1);
   timing(DEL1_TIME, -1);
   master.foreach(&delaunay1);
 
@@ -154,7 +167,10 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   timing(DEL3_TIME, NEIGH2_TIME);
   master.foreach(&delaunay3);
   timing(-1, DEL3_TIME);
+}
 
+void tess_save(diy::Master& master, const char* outfile)
+{
   // All the foreach block functions are done. We now make a very dangerous assumption
   // that all blocks fit in memory because the remaining functions are done on all blocks
   // turn off output if all blocks are not resident in core
@@ -182,7 +198,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
     }
     strncpy(out_ncfile, outfile, sizeof(out_ncfile));
     strncat(out_ncfile, ".nc", sizeof(out_ncfile));
-    pnetcdf_write(nblocks, dblocks, out_ncfile, mpi_comm, num_nbrs, nbrs);
+    pnetcdf_write(nblocks, dblocks, out_ncfile, master.communicator().comm(), num_nbrs, nbrs);
     for (int i = 0; i < (int)master.size(); i++)
       delete[] nbrs[i];
     delete[] nbrs;
@@ -197,10 +213,8 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   delete[] dblocks;
 
   collect_stats();
-
-  // TODO: original version had the option of returning blocks instead of writing to file
-  // (for coupling to dense and other tools)
 }
+
 //
 // diy::Master callback functions
 //
@@ -256,7 +270,7 @@ void load_block(void* b, diy::BinaryBuffer& bb)
 //
 // foreach block functions
 //
-void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp)
+void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   int sizes[3]; // number of grid points
   int i, j, k;
@@ -327,15 +341,13 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp)
     }
   }
   b->num_particles = n; // final count <= amount originally allocated
-  b->num_orig_particles = n;
 }
 
 void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
   dblock_t* b = (dblock_t*)b_;
-
-  // generate particles
-  gen_particles(b_, cp);
+  
+  b->num_orig_particles = b->num_particles;
 
   // create local delaunay cells
   timing(LOC1_TIME, -1);
