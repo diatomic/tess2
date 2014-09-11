@@ -8,6 +8,7 @@ option                      (memory	    "Build tess with memory profiling"		    
 option			    (draw	    "Build draw"				    ON)
 option			    (hacc_test	    "Build HACC test"				    OFF)
 option			    (bgq	    "Build on BG/Q"				    OFF)
+option			    (pread-voronoi  "Build pread-voronoi example (requires HDF5)"   OFF)
 set			    (serial	    "QHull" CACHE STRING "serial Delaunay library to use")
 set_property		    (CACHE serial PROPERTY STRINGS CGAL QHull)
 

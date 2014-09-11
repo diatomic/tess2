@@ -128,8 +128,9 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
   dimids_2D[1] = dimids[9];
   err = ncmpi_def_var(ncid, "tets", NC_INT, 2, dimids_2D,
 		      &varids[27]); ERR;
-  err = ncmpi_def_var(ncid, "rem_gids", NC_INT, 1, &dimids[10],
-		      &varids[30]); ERR;
+  if (tot_quants[NUM_REM_GIDS])
+    err = ncmpi_def_var(ncid, "rem_gids", NC_INT, 1, &dimids[10],
+                        &varids[30]); ERR;
   err = ncmpi_def_var(ncid, "vert_to_tet", NC_INT, 1, &dimids[6],
 		      &varids[33]); ERR;
 
@@ -217,9 +218,11 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
 				 (int *)(d->tets)); ERR;
 
     /* remote gids */
-    count[0] = d->num_particles - d->num_orig_particles;
-    start[0] = (count[0] ? block_ofsts[NUM_REM_GIDS] : 0);
-    err = ncmpi_put_vara_int_all(ncid, varids[30], start, count, d->rem_gids); ERR;
+    if (tot_quants[NUM_REM_GIDS]) {
+      count[0] = d->num_particles - d->num_orig_particles;
+      start[0] = (count[0] ? block_ofsts[NUM_REM_GIDS] : 0);
+      err = ncmpi_put_vara_int_all(ncid, varids[30], start, count, d->rem_gids); ERR;
+    }
 
     /* vert_to_tet */
     start[0] = block_ofsts[NUM_PARTS];

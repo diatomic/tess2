@@ -17,11 +17,12 @@
 #include <stdlib.h>
 #include <vector>
 #include <algorithm>
-#include <assert.h>
 #include "tess/delaunay.h"
 #include "tess/tet-neighbors.h"
 #include "tess/tet.h"
 #include <math.h>
+#include "mpi.h"
+#include "tess/io.h"
 
 #if defined(MAC_OSX)
 #include <GLUT/glut.h>
@@ -34,12 +35,6 @@
 
 #define SPHERE_RAD_FACTOR .004 // used to compute sphere radius
 // #define PAPER // color scheme for paper (white backgound)
-
-
-#ifndef SERIAL_IO
-#include "mpi.h"
-#include "tess/io.h"
-#endif
 
 using namespace std;
 
@@ -1005,7 +1000,7 @@ void Centroid(vec3d *verts, int num_verts, vec3d &centroid) {
 // compute normal of a face using Newell's method
 //
 // Newell's method is more robust than simply computing the cross product of
-//   three points when the points are colinear or slightly nonplanar. 
+//   three points when the points are colinear or slightly nonplanar.
 //
 void NewellNormal(vec3d *verts, int num_verts, vec3d &normal) {
 
@@ -1122,7 +1117,7 @@ void PrepCellRendering(int &num_vis_cells) {
 	  blocks[b].tets[t].tets[2] == -1 || blocks[b].tets[t].tets[3] == -1)
 	continue;
 
-      // neighbor edges a vector of (vertex u, tet of vertex u) pairs 
+      // neighbor edges a vector of (vertex u, tet of vertex u) pairs
       // that neighbor vertex v
       vector< pair<int, int> > nbrs;
       bool finite = neighbor_edges(nbrs, p, blocks[b].tets, t);
@@ -1174,7 +1169,7 @@ void PrepCellRendering(int &num_vis_cells) {
 	vec3d normal;
 	NewellNormal(&temp_verts[v0], edge_link.size(), normal);
 
-	// check sign of dot product of normal with vector from site 
+	// check sign of dot product of normal with vector from site
 	// to first face vertex to see if normal has correct direction
 	// want outward normal
 	vec3d vec;
@@ -1216,8 +1211,6 @@ void PrepCellRendering(int &num_vis_cells) {
 //
 void PrepTetRendering(int &num_tets) {
 
-  int v; // vertex (0-3)
-
   num_tets = 0;
 
   for (int b = 0; b < nblocks; b++) { // blocks
@@ -1226,13 +1219,13 @@ void PrepTetRendering(int &num_tets) {
     for (int t = 0; t < blocks[b].num_tets; t++) {
 
       // skip tets with vertices corresponding to incomplete voronoi cells
-      vector< pair<int, int> > nbrs;
-      if (!neighbor_edges(nbrs, blocks[b].tets[t].verts[0], blocks[b].tets, t) ||
-	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[1], blocks[b].tets, t) ||
-	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[2], blocks[b].tets, t) ||
-	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[3], blocks[b].tets, t)) {
-	continue;
-      }
+//       vector< pair<int, int> > nbrs;
+//       if (!neighbor_edges(nbrs, blocks[b].tets[t].verts[0], blocks[b].tets, t) ||
+// 	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[1], blocks[b].tets, t) ||
+// 	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[2], blocks[b].tets, t) ||
+// 	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[3], blocks[b].tets, t)) {
+// 	continue;
+//       }
 
       // determine unique ownership of the tet
       if (!my_tet(blocks[b], t))
@@ -1417,6 +1410,7 @@ bool my_tet(dblock_t& dblock, int t) {
     return false;
 
   // debug: skip the deduplication
+//   fprintf(stderr, "skipping dedup\n");
 //   return true;
 
   // tet has both local and remote verts; minimum gid of the vertex owners wins

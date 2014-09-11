@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
   float mins[3], maxs[3]; // data global extents
   float minvol, maxvol; // volume range, -1.0 = unused
   //double times[TESS_MAX_TIMES]; // timing
-  float **particles; // particles[block_num][particle] 
+  float **particles; // particles[block_num][particle]
 		     //  where each particle is 3 values, px, py, pz
   int *num_particles; // number of particles in each block
   int num_threads = 1; // number of threads diy can use
@@ -88,6 +88,8 @@ int main(int argc, char *argv[])
   int rank,size; // MPI usual
   vector <float> p; // temporary particles
   std::vector<std::string>  coordinates; // coordinates to read
+  double times[MAX_TIMES]; // timing
+  quants_t quants; // quantity stats
 
   diy::mpi::environment	    env(argc, argv);
   diy::mpi::communicator    world;
@@ -101,7 +103,7 @@ int main(int argc, char *argv[])
   GetArgs(argc, argv, tot_blocks, infile, outfile,
           coordinates,
 	  domain.min, domain.max,
-          &minvol, &maxvol, 
+          &minvol, &maxvol,
 	  &swap, &wrap_);
 
   // initialize DIY and decompose domain
@@ -159,12 +161,12 @@ int main(int argc, char *argv[])
 		master.block<dblock_t>(i)->maxs[2]);
   }
 #endif
-  
+
   // debug purposes only: checks if the particles got into the right blocks
   master.foreach(&verify_particles);
-  
-  tess(master);
-  tess_save(master, outfile);
+
+  tess(master, quants, times);
+  tess_save(my_gids.size(), master, outfile, quants, times);
 
   return 0;
 

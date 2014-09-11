@@ -11,17 +11,17 @@ void read_particles(char *infile, int rank, int size,
 		    int   swap)
 {
   H5::H5File file(infile, H5F_ACC_RDONLY);
-  
+
   H5::DataSet	dataset	    = file.openDataSet(coordinates[0]);
   H5::DataSpace dataspace   = dataset.getSpace();
   int           r	    = dataspace.getSimpleExtentNdims();     // should be 1
   std::vector<hsize_t>        dims(r);
   int           ndims       = dataspace.getSimpleExtentDims(&dims[0], NULL);
   hsize_t	count	    = dims[0];
-  
+
   hsize_t  offset = count/size*rank;
   hsize_t  local_count = (rank != size - 1 ? count/size : count - count/size*rank);
-  
+
   std::vector<float>  tmp(local_count);         // optimizes reading
   particles.resize(3*local_count);
 

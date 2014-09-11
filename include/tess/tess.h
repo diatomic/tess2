@@ -112,7 +112,6 @@ extern "C"
 #endif
 void get_mem(int breakpoint, int dwell);
 
-void collect_stats();
 void print_block(struct dblock_t *dblock, int gid);
 void print_particles(float *particles, int num_particles, int gid);
 void write_particles(int nblocks, float **particles, int *num_particles, char *outfile);
@@ -124,6 +123,6 @@ void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall);
 void add_mirror_particles(int nblocks, float **mirror_particles, int *num_mirror_particles,
                           float **particles, int *num_particles, int *num_orig_particles,
 			  int **gids, int **nids, unsigned char **dirs);
-void timing(int start, int stop);
+void timing(double* times, int start, int stop);
 
 #endif

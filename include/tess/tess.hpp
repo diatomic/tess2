@@ -20,23 +20,31 @@
 #include <diy/serialization.hpp>
 #include <diy/master.hpp>
 
+// quantity stats per process
+struct quants_t {
+int min_quants[MAX_QUANTS];
+int max_quants[MAX_QUANTS];
+};
+
 typedef  diy::ContinuousBounds       Bounds;
 typedef  diy::RegularContinuousLink  RCLink;
 
 using namespace std;
 
-void tess(diy::Master& master);
-void tess_save(diy::Master& master, const char* outfile);
+void tess(diy::Master& master, quants_t& quants, double* times);
+void tess_save(int nblocks, diy::Master& master, const char* outfile, quants_t& quants,
+               double* times);
+void collect_stats(diy::Master& master, quants_t& quants, double* times);
 
 void* create_block();
 void destroy_block(void* b);
 void save_block(const void* b, diy::BinaryBuffer& bb);
 void load_block(void* b, diy::BinaryBuffer& bb);
 void create(int gid, const Bounds& core, const Bounds& bounds, const diy::Link& link);
-void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
-void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void*);
+void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);
+void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);
 void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*);
-void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void*);
+void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);
 void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp);
 void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp);
 void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp);
