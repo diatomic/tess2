@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
   master.foreach(&verify_particles);
 
   tess(master, quants, times);
-  tess_save(my_gids.size(), master, outfile, quants, times);
+  tess_save(master, outfile, quants, times);
 
   return 0;
 

@@ -117,7 +117,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   tess(master, quants, times);
 
   // output
-  tess_save(my_gids.size(), master, outfile, quants, times);
+  tess_save(master, outfile, quants, times);
 
   // TODO: original version had the option of returning blocks instead of writing to file
   // (for coupling to dense and other tools)
@@ -150,7 +150,7 @@ void tess(diy::Master& master, quants_t& quants, double* times)
   timing(times, -1, DEL3_TIME);
 }
 
-void tess_save(int nblocks, diy::Master& master, const char* outfile, quants_t& quants,
+void tess_save(diy::Master& master, const char* outfile, quants_t& quants,
                double *times)
 {
   // All the foreach block functions are done. We now make a very dangerous assumption
@@ -180,7 +180,7 @@ void tess_save(int nblocks, diy::Master& master, const char* outfile, quants_t& 
     }
     strncpy(out_ncfile, outfile, sizeof(out_ncfile));
     strncat(out_ncfile, ".nc", sizeof(out_ncfile));
-    pnetcdf_write(nblocks, dblocks, out_ncfile, master.communicator().comm(), num_nbrs, nbrs);
+    pnetcdf_write(master.size(), dblocks, out_ncfile, master.communicator().comm(), num_nbrs, nbrs);
     for (int i = 0; i < (int)master.size(); i++)
       delete[] nbrs[i];
     delete[] nbrs;
