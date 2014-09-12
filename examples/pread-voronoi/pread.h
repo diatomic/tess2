@@ -6,7 +6,6 @@
 
 void read_particles(char *infile, int rank, int size,
 		    std::vector <float> &particles,
-		    const std::vector<std::string>& coordinates,
-		    int   swap);
+		    const std::vector<std::string>& coordinates);
 
 #endif

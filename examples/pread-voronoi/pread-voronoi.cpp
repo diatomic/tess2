@@ -21,7 +21,7 @@ using namespace std;
 void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
 	     std::vector<std::string>& coordinates,
 	     float* mins, float* maxs,
-	     float *minvol, float *maxvol, int *swap, int *wrap);
+	     float *minvol, float *maxvol, int *wrap);
 
 void ExchangeParticles(diy::Master& master, diy::Assigner& assigner, int tot_blocks);
 void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
@@ -32,13 +32,11 @@ struct AddAndRead: public AddBlock
 	AddAndRead(diy::Master&			    m,
 		   int				    nblocks_,
 		   char*			    infile_,
-		   const std::vector<std::string>&  coordinates_,
-		   int				    swap_):
+		   const std::vector<std::string>&  coordinates_):
 	  AddBlock(m),
 	  nblocks(nblocks_),
 	  infile(infile_),
-	  coordinates(coordinates_),
-	  swap(swap_)				    {}
+	  coordinates(coordinates_)		    {}
 
   void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
                    const RCLink& link) const
@@ -47,7 +45,7 @@ struct AddAndRead: public AddBlock
 
     // read points
     std::vector<float>	particles;
-    read_particles(infile, gid, nblocks, particles, coordinates, swap);
+    read_particles(infile, gid, nblocks, particles, coordinates);
     //printf("%d: Read %lu particles\n", gid, particles.size()/3);
 
     b->num_particles = particles.size()/3;
@@ -65,7 +63,6 @@ struct AddAndRead: public AddBlock
   int					nblocks;
   char*					infile;
   const std::vector<std::string>&	coordinates;
-  int					swap;
 };
 
 int main(int argc, char *argv[])
@@ -83,7 +80,6 @@ int main(int argc, char *argv[])
   int num_threads = 1; // number of threads diy can use
   int dim = 3; // 3d always
   int block_given[3] = {0, 0, 0}; // constraints on blocking (none)
-  int swap; // whether byte swapping
   int wrap_; // whether wraparound neighbors are used
   int rank,size; // MPI usual
   vector <float> p; // temporary particles
@@ -104,7 +100,7 @@ int main(int argc, char *argv[])
           coordinates,
 	  domain.min, domain.max,
           &minvol, &maxvol,
-	  &swap, &wrap_);
+	  &wrap_);
 
   // initialize DIY and decompose domain
   diy::FileStorage          storage("./DIY.XXXXXX");
@@ -119,7 +115,7 @@ int main(int argc, char *argv[])
   //diy::RoundRobinAssigner   assigner(world.size(), tot_blocks);
   diy::ContiguousAssigner   assigner(world.size(), tot_blocks);
 
-  AddAndRead		    create_and_read(master, tot_blocks, infile, coordinates, swap);
+  AddAndRead		    create_and_read(master, tot_blocks, infile, coordinates);
 
   // decompose
   std::vector<int> my_gids;
@@ -178,7 +174,7 @@ int main(int argc, char *argv[])
 void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
 	     std::vector<std::string>& coordinates,
 	     float* mins, float* maxs,
-	     float *minvol, float *maxvol, int *swap, int *wrap) {
+	     float *minvol, float *maxvol, int *wrap) {
 
   assert(argc >= 10);
 
@@ -202,8 +198,7 @@ void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
   maxs[2] = atof(argv[12]);
   *minvol = atof(argv[13]);
   *maxvol = atof(argv[14]);
-  *swap = atoi(argv[15]);
-  *wrap = atoi(argv[16]);
+  *wrap = atoi(argv[15]);
 
 }
 

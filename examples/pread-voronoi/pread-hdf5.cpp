@@ -7,8 +7,7 @@
 
 void read_particles(char *infile, int rank, int size,
 		    std::vector <float> &particles,
-		    const std::vector <std::string>& coordinates,
-		    int   swap)
+		    const std::vector <std::string>& coordinates)
 {
   H5::H5File file(infile, H5F_ACC_RDONLY);
 
@@ -39,7 +38,4 @@ void read_particles(char *infile, int rank, int size,
       for (size_t j = 0; j < local_count; ++j)
           particles[3*j + i] = tmp[j];			// probably wildly cache inefficient
   }
-
-  if (swap)
-    Swap((char*) &particles[0], local_count, sizeof(float));
 }
