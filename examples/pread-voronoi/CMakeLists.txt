@@ -27,7 +27,6 @@ else			    (HDF5_FOUND)
 
     add_executable          (pread-voronoi pread-voronoi.cpp pread-hdf5.cpp)
     target_link_libraries   (pread-voronoi tess ${libraries} ${HDF5_libraries})
-
   endif                     (HDF5_CXX_LIBRARY)
 
 endif			    (HDF5_FOUND)
