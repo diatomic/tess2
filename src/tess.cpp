@@ -324,14 +324,13 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_ar
     }
   }
   b->num_particles = n; // final count <= amount originally allocated
+  b->num_orig_particles = b->num_particles;
 }
 
 void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
 {
   dblock_t* b = (dblock_t*)b_;
   double* times = (double*)misc_args;
-
-  b->num_orig_particles = b->num_particles;
 
   // create local delaunay cells
   timing(times, LOC1_TIME, -1);

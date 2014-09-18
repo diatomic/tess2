@@ -44,7 +44,7 @@ struct dblock_t {
   float mins[3], maxs[3]; /* block extents */
   struct bb_c_t data_bounds; /* global data extents */
   struct bb_c_t box;	     /* current box; used in swap-reduce() when distributing particles */
-  void *Dt; /* native delaunay data structure */
+  void* Dt; /* native delaunay data structure */
 
   /* input particles */
   int num_orig_particles; /* number of original particles in this block
@@ -52,12 +52,12 @@ struct dblock_t {
   int num_particles; /* current number of particles in this block after any
 			neighbor exchange; original particles appear first
 			followed by received particles */
-  float *particles; /* all particles, original plus those received from neighbors */
+  float* particles; /* all particles, original plus those received from neighbors */
 
   /* tets */
   int num_tets; /* number of delaunay tetrahedra */
-  struct tet_t *tets; /* delaunay tets */
-  int *rem_gids; /* owners of remote particles */
+  struct tet_t* tets; /* delaunay tets */
+  int* rem_gids; /* owners of remote particles */
   int* vert_to_tet; /* a tet that contains the vertex */
 
   /* sent particles and convex hull particles

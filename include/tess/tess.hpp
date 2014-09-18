@@ -102,7 +102,7 @@ namespace diy
     static void save(BinaryBuffer& bb, const dblock_t& d)
     {
       // debug
-      //             fprintf(stderr, "Saving block gid %d\n", d.gid);
+//       fprintf(stderr, "Saving block gid %d\n", d.gid);
       diy::save(bb, d.gid);
       diy::save(bb, d.mins);
       diy::save(bb, d.maxs);
@@ -120,14 +120,14 @@ namespace diy
       // TODO: not saving Dt for now, recomputing upon loading instead
 
       // debug
-      //       fprintf(stderr, "Done saving block gid %d\n", d.gid);
+//       fprintf(stderr, "Done saving block gid %d\n", d.gid);
     }
 
     static void load(BinaryBuffer& bb, dblock_t& d)
     {
       diy::load(bb, d.gid);
       // debug
-      //             fprintf(stderr, "Loading block gid %d\n", d.gid);
+//       fprintf(stderr, "Loading block gid %d\n", d.gid);
       diy::load(bb, d.mins);
       diy::load(bb, d.maxs);
       diy::load(bb, d.num_orig_particles);
@@ -136,6 +136,7 @@ namespace diy
       if (d.num_particles)
         d.particles = (float*)malloc(d.num_particles * 3 * sizeof(float));
       diy::load(bb, d.particles, 3 * d.num_particles);
+      d.rem_gids = NULL;
       if (d.num_particles - d.num_orig_particles)
         d.rem_gids = (int*)malloc((d.num_particles - d.num_orig_particles) * sizeof(int));
       diy::load(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
@@ -151,7 +152,7 @@ namespace diy
       // allocated in create_block
 
       // debug
-      //       fprintf(stderr, "Done loading block gid %d\n", d.gid);
+//       fprintf(stderr, "Done loading block gid %d\n", d.gid);
     }
   };
 }
