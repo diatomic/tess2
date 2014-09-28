@@ -17,12 +17,14 @@
 #include <stdlib.h>
 #include <vector>
 #include <algorithm>
+#include <iostream>
 #include "tess/delaunay.h"
 #include "tess/tet-neighbors.h"
 #include "tess/tet.h"
 #include <math.h>
 #include "mpi.h"
 #include "tess/io.h"
+#include "tess/volume.h"
 
 #if defined(MAC_OSX)
 #include <GLUT/glut.h>
@@ -112,11 +114,12 @@ vec3d site_min;
 vec3d site_max;
 vec3d site_center;
 
-// voronoi vertices, faces, cells, normals
+// voronoi vertices, faces, cells, normals, volumes
 vector<vec3d> verts;
 vector<vec3d> cell_verts;
 vector<int> num_face_verts;
 vector<vec3d> vor_normals;
+vector<float> vols;
 
 // delaunay tet vertics, face normals
 vector<vec3d> tet_verts;
@@ -146,6 +149,23 @@ static GLubyte sprite_intensity[5][5] = {
 static GLubyte sprite_rgba[5][5][4];
 static GLuint tex;
 
+// statistical summary
+#define NUM_HIST_BINS 50
+struct stats_t {
+  int tot_particles; // total number of particles
+  int tot_tets; // total number of delaunay tetrahedra found
+  int tot_cells; // total number of finit voronoi cells found
+  int tot_cell_faces; // total number of faces in all finite voronoi cells (not unique)
+  int tot_cell_verts; // total number of vertices in all finite voronoi cells (not unique)
+  float avg_cell_faces; // average number of faces per cell
+  float avg_cell_verts; // average number of vertices per cell
+  float min_cell_vol; // minimum cell volume for finite voronoi cells
+  float max_cell_vol; // maximum cell volume for finite voronoi cells
+  float tot_cell_vol; // total cell volume for finite voronoi cells
+  float avg_cell_vol; // average cell volume for finite voronoi cells
+  int vol_hist[NUM_HIST_BINS]; // cell volume histogram
+};
+
 // function prototypes
 void display();
 void init_display();
@@ -167,11 +187,17 @@ void headlight();
 void Centroid(vec3d *verts, int num_verts, vec3d &centroid);
 void NewellNormal(vec3d *verts, int num_verts, vec3d &normal);
 void PrepRenderingData();
-void PrepSiteRendering(int &num_sites);
-void PrepCellRendering(int &num_visible_cells);
-void PrepCellVertRendering();
-void PrepTetRendering(int &num_tets);
+void PrepSiteRendering(stats_t& stats);
+void PrepCellRendering(stats_t& stats);
+void PrepCellVertRendering(stats_t& stats);
+void PrepTetRendering(stats_t& stats);
 bool my_tet(dblock_t& dblock, int t);
+bool check_if_delaunay(dblock_t& dblock, int t);
+void collect_stats(stats_t& stats);
+void histogram(struct stats_t& stats);
+
+// debug
+float flatness(dblock_t& b, int t);
 
 //--------------------------------------------------------------------------
 
@@ -475,7 +501,6 @@ void init_display() {
     size = sizes.y;
   if (sizes.z > size)
     size = sizes.z;
-  fprintf(stderr, "max size = %.4f\n", size);
   sphere_rad = SPHERE_RAD_FACTOR * size;
 
   init_model();
@@ -1035,24 +1060,18 @@ void NewellNormal(vec3d *verts, int num_verts, vec3d &normal) {
 //
 void PrepRenderingData() {
 
-  // number of sites, cells and tets
-  int num_sites;
-  int num_vis_cells;
-  int num_tets;
+  stats_t stats;
 
   // sites
-  PrepSiteRendering(num_sites);
+  PrepSiteRendering(stats);
 
   // voronoi cells
-  PrepCellRendering(num_vis_cells);
+  PrepCellRendering(stats);
 
   // delauany tets
-  PrepTetRendering(num_tets);
+  PrepTetRendering(stats);
 
-  fprintf(stderr, "Number of particles = %d\n"
-	  "Number of visible cells = %d\n"
-	  "Number of tets = %d\n",
-	  (int)sites.size(), num_vis_cells, num_tets);
+  collect_stats(stats);
 
 }
 //--------------------------------------------------------------------------
@@ -1095,16 +1114,16 @@ void PrepCellVertRendering() {
 //
 // package cell faces for rendering
 //
-// num_vis_cells: (output) number of visible cells
-//
-void PrepCellRendering(int &num_vis_cells) {
+void PrepCellRendering(stats_t& stats) {
 
   int v0 = 0; // starting vertex of the current face
-  num_vis_cells = 0; // number of visible cells
-
+  stats.tot_cells = 0; // number of visible cells
+  stats.tot_cell_vol = 0.0; // total cell volume
 
   for (int b = 0; b < nblocks; b++) { // blocks
 
+    vector<float> circumcenters;
+    fill_circumcenters(circumcenters, blocks[b].tets, blocks[b].num_tets, blocks[b].particles);
 
     // for all voronoi cells
     for (int p = 0; p < blocks[b].num_orig_particles; p++) {
@@ -1194,24 +1213,55 @@ void PrepCellRendering(int &num_vis_cells) {
 	  num_face_verts.push_back(temp_num_face_verts[k]);
 	for (int k = 0; k < (int)temp_vor_normals.size(); k++)
 	  vor_normals.push_back(temp_vor_normals[k]);
-	num_vis_cells++;
-
+        stats.tot_cells++;
+        vols.push_back(volume(p, blocks[b].vert_to_tet, blocks[b].tets, blocks[b].num_tets,
+                              blocks[b].particles, circumcenters));
+        if (vols.size() == 1 || vols.back() < stats.min_cell_vol)
+          stats.min_cell_vol = vols.back();
+        if (vols.size() == 1 || vols.back() > stats.max_cell_vol)
+          stats.max_cell_vol = vols.back();
+        stats.tot_cell_vol += vols.back();
       }
 
     } // voronoi cells
 
   } // blocks
 
+  stats.tot_cell_faces = num_face_verts.size();
+  stats.tot_cell_verts = verts.size();
+
 }
+//--------------------------------------------------------------------------
+
+bool check_if_delaunay(dblock_t& dblock, int t)
+{
+  vec3d center;
+  circumcenter(&center.x,
+	       &(dblock.tets[t]), dblock.particles);
+
+  const tet_t& tt = dblock.tets[t];
+  float dist = distance(&center.x, &dblock.particles[3*tt.verts[0]]);
+
+  for (unsigned i = 0; i < dblock.num_particles; ++i)
+  {
+    float dist_i = distance(&center.x, &dblock.particles[3*i]);
+    if (dist_i < dist - .00001)
+    {
+      std::cout << dist_i << " < " << dist << std::endl;
+      return false;
+    }
+  }
+
+  return true;
+}
+
 //--------------------------------------------------------------------------
 //
 // package tets for rendering
 //
-// num_tets: (output) number of tets
-//
-void PrepTetRendering(int &num_tets) {
+void PrepTetRendering(stats_t& stats) {
 
-  num_tets = 0;
+  stats.tot_tets = 0;
 
   for (int b = 0; b < nblocks; b++) { // blocks
 
@@ -1231,6 +1281,16 @@ void PrepTetRendering(int &num_tets) {
       if (!my_tet(blocks[b], t))
         continue;
 
+      // debug: check flatness
+      float flat = flatness(blocks[b], t);
+      if (flat < 0.1) {
+//         fprintf(stderr, "b = %d t = %d flat = %.3f\n", b, t, flat);
+        continue;
+      }
+
+      //if (!check_if_delaunay(blocks[b], t))
+      //  continue;
+
       for (int v = 0; v < 4; v++) {
 
 	int s = blocks[b].tets[t].verts[v]; // index pf particle
@@ -1242,7 +1302,7 @@ void PrepTetRendering(int &num_tets) {
 
       }
 
-      num_tets++;
+      stats.tot_tets++;
 
     } // tets
 
@@ -1350,9 +1410,7 @@ void PrepTetRendering(int &num_tets) {
 //
 // package sites for rendering
 //
-// num_sites: (output) number of sites
-//
-void PrepSiteRendering(int &num_sites) {
+void PrepSiteRendering(stats_t& stats) {
 
   int n;
 
@@ -1373,7 +1431,7 @@ void PrepSiteRendering(int &num_sites) {
 
   } // blocks
 
-  num_sites = (int)sites.size();
+  stats.tot_particles = (int)sites.size();
 
 }
 //--------------------------------------------------------------------------
@@ -1424,6 +1482,121 @@ bool my_tet(dblock_t& dblock, int t) {
   }
 
   return(*min_element(gids.begin(), gids.end()) == dblock.gid);
+
+}
+//--------------------------------------------------------------------------
+//
+// debug: check flatness of tet
+// (minimum unsigned distance from 4th point to the plane of the other 3,
+// for all 4 vertex candidates for 4th point)
+//
+// dblock: local delaunay block
+// t: index of tet
+float flatness(dblock_t& b, int t) {
+
+  vec3d x[3]; // triangle vertices from v0, v1, v2
+  vec3d n; // unit normal to v0, v1, v2
+  vec3d d; // v3 - v0
+  float min_flat; // minimum flatness so far
+
+  // fourth vertex
+  for (int vv = 0; vv < 4; vv++) {
+
+    // unit normal from other 3 verts
+    int m = 0; // triangle vertex counter
+    for (int v = 0; v < 4; v++) {
+      if (v == vv)
+        continue;
+      int p = b.tets[t].verts[v];
+      x[m].x = b.particles[3 * p];
+      x[m].y = b.particles[3 * p + 1];
+      x[m].z = b.particles[3 * p + 2];
+      m++;
+    }
+    NewellNormal(x, 3, n);
+
+    // distance from fourth vertex to any of the other vertices
+    int p3 = b.tets[t].verts[vv];
+    int p0 = b.tets[t].verts[(vv + 1) % 4];
+    d.x = b.particles[3 * p3    ] - b.particles[3 * p0    ];
+    d.y = b.particles[3 * p3 + 1] - b.particles[3 * p0 + 1];
+    d.z = b.particles[3 * p3 + 2] - b.particles[3 * p0 + 2];
+
+    float flat = fabs(n.x * d.x + n.y * d.y + n.z * d.z);
+    if (vv == 0 || flat < min_flat)
+      min_flat = flat;
+
+  }
+
+  // unsigned distance is absolute value of n dot dv
+  return min_flat;
+
+}
+//--------------------------------------------------------------------------
+//
+//  collects statistics
+//
+void collect_stats(stats_t& stats) {
+
+  float vol_bin_width; // width of a volume histogram bin
+
+  stats.avg_cell_faces = stats.tot_cell_faces / stats.tot_cells;
+  stats.avg_cell_verts = stats.tot_cell_verts / stats.tot_cells;
+  stats.avg_cell_vol   = stats.tot_cell_vol   / stats.tot_cells;
+  histogram(stats);
+
+  // --- print output ---
+
+  vol_bin_width = (stats.max_cell_vol - stats.min_cell_vol) / NUM_HIST_BINS;
+  fprintf(stderr, "----------------- global stats ------------------\n");
+  fprintf(stderr, "total delaunay tetrahedra                = %d\n", stats.tot_tets);
+  fprintf(stderr, "total voronoi cells                      = %d\n", stats.tot_cells);
+  fprintf(stderr, "average number of faces    per vor. cell = %.0lf\n", stats.avg_cell_faces);
+  fprintf(stderr, "average number of vertices per vor. cell = %.0lf\n", stats.avg_cell_verts);
+  fprintf(stderr, "average number of vertices per vor. face = %.0lf\n",
+          stats.avg_cell_verts / stats.avg_cell_faces);
+  fprintf(stderr, "-----\n");
+  fprintf(stderr, "min vor. cell volume = %.3lf max vor. cell volume = %.3lf\n"
+          "avg vor. cell volume = %.3lf units^3\n",
+          stats.min_cell_vol, stats.max_cell_vol, stats.avg_cell_vol);
+  fprintf(stderr, "number of vor. cell volume histogram bins = %d\n", NUM_HIST_BINS);
+  fprintf(stderr, "-----\n");
+  fprintf(stderr, "voronoi cell volume histogram:\n");
+  fprintf(stderr, "min value\tcount\t\tmax value\n");
+  for (int k = 0; k < NUM_HIST_BINS; k++)
+    fprintf(stderr, "%.3lf\t\t%d\t\t%.3lf\n",
+            stats.min_cell_vol + k * vol_bin_width, stats.vol_hist[k],
+            stats.min_cell_vol + (k + 1) * vol_bin_width);
+  fprintf(stderr, "-------------------------------------------------\n");
+
+}
+//--------------------------------------------------------------------------
+//
+//  computes histogram
+//
+void histogram(struct stats_t& stats) {
+
+  float vol_bin_width; // width of a volume histogram bin
+
+  // find local cell volume and density histograms
+  vol_bin_width = (stats.max_cell_vol - stats.min_cell_vol) / NUM_HIST_BINS;
+  for (int j = 0; j < NUM_HIST_BINS; j++) // volume
+    stats.vol_hist[j] = 0;
+
+  for (int j = 0; j < stats.tot_cells; j++) { // for all cells
+
+    int k;
+    for (k = 0; k < NUM_HIST_BINS; k++) { // for all bins
+      if (vols[j] >= stats.min_cell_vol + k * vol_bin_width &&
+          vols[j] < stats.min_cell_vol + (k + 1) * vol_bin_width) {
+        stats.vol_hist[k]++;
+        break;
+      }
+    } // for all bins
+    if (k == NUM_HIST_BINS)
+      stats.vol_hist[k - 1]++; // catch roundoff error and open interval on right side of bin
+
+  } // for all cells
 
 }
 //--------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 #include <cmath>
 
-#include "volume.h"
-#include "tet-neighbors.h"
+#include "tess/volume.h"
+#include "tess/tet-neighbors.h"
 
 void fill_circumcenters(std::vector<float>& circumcenters, tet_t* tets, int num_tets, float* particles)
 {
@@ -44,7 +44,7 @@ float volume(int v, int* verts_to_tets, tet_t* tets, int num_tets, float* partic
       cross(cp, ab, ac);
       area += sqrt(norm(cp))/2;
     }
-    
+
     // distance between u and v
     float dist = distance(&particles[3*u], &particles[3*v]);
     vol += area*dist/6;
