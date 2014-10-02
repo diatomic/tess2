@@ -42,7 +42,6 @@ void save_block(const void* b, diy::BinaryBuffer& bb);
 void load_block(void* b, diy::BinaryBuffer& bb);
 void create(int gid, const Bounds& core, const Bounds& bounds, const diy::Link& link);
 void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);
-void gen_particles1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args); // debug
 void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);
 void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*);
 void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);

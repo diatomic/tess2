@@ -1268,28 +1268,9 @@ void PrepTetRendering(stats_t& stats) {
     // tets
     for (int t = 0; t < blocks[b].num_tets; t++) {
 
-      // skip tets with vertices corresponding to incomplete voronoi cells
-//       vector< pair<int, int> > nbrs;
-//       if (!neighbor_edges(nbrs, blocks[b].tets[t].verts[0], blocks[b].tets, t) ||
-// 	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[1], blocks[b].tets, t) ||
-// 	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[2], blocks[b].tets, t) ||
-// 	  !neighbor_edges(nbrs, blocks[b].tets[t].verts[3], blocks[b].tets, t)) {
-// 	continue;
-//       }
-
       // determine unique ownership of the tet
       if (!my_tet(blocks[b], t))
         continue;
-
-      // debug: check flatness
-      float flat = flatness(blocks[b], t);
-      if (flat < 0.1) {
-//         fprintf(stderr, "b = %d t = %d flat = %.3f\n", b, t, flat);
-        continue;
-      }
-
-      //if (!check_if_delaunay(blocks[b], t))
-      //  continue;
 
       for (int v = 0; v < 4; v++) {
 

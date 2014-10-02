@@ -110,8 +110,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   diy::decompose(3, comm.rank(), domain, assigner, create, share_face, wrap, ghosts);
 
   // generate particles
-//   master.foreach(&gen_particles, &jitter);
-  master.foreach(&gen_particles1);
+  master.foreach(&gen_particles, &jitter);
 
   // tessellate
   quants_t quants;
@@ -276,6 +275,22 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_ar
   float *p = b->particles;
 
   // assign particles
+  srand(b->gid);
+
+#if 0 // generate points uniformly at random in the block
+
+  for (unsigned i = 0; i < num_particles; ++i)
+  {
+    for (unsigned j = 0; j < 3; ++j)
+    {
+      float t = (float) rand() / RAND_MAX;
+      p[3 * i + j] = t * (b->maxs[j] - b->mins[j]) + b->mins[j];
+    }
+    ++n;
+  }
+
+#else  // randomly jitter points on a grid
+
   n = 0;
   for (i = 0; i < sizes[0]; i++)
   {
@@ -324,57 +339,8 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_ar
       }
     }
   }
-  b->num_particles = n; // final count <= amount originally allocated
-  b->num_orig_particles = b->num_particles;
-}
 
-// debug
-void gen_particles1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
-{
-  int sizes[3]; // number of grid points
-  int i, j, k;
-  int n = 0;
-  int num_particles; // theorectical
-
-  dblock_t* b = (dblock_t*)b_;
-
-  // allocate particles
-  sizes[0] = (int)(b->maxs[0] - b->mins[0] + 1);
-  sizes[1] = (int)(b->maxs[1] - b->mins[1] + 1);
-  sizes[2] = (int)(b->maxs[2] - b->mins[2] + 1);
-
-  num_particles = sizes[0] * sizes[1] * sizes[2];
-
-  b->particles = (float *)malloc(num_particles * 3 * sizeof(float));
-  float *p = b->particles;
-
-  // assign particles
-  srand(b->gid);
-  n = 0;
-  for (i = 0; i < sizes[0]; i++) {
-    if (b->mins[0] > 0 && i == 0) // dedup block boundary points
-      continue;
-    for (j = 0; j < sizes[1]; j++) {
-      if (b->mins[1] > 0 && j == 0) // dedup block boundary points
-	continue;
-      for (k = 0; k < sizes[2]; k++) {
-	if (b->mins[2] > 0 && k == 0) // dedup block boundary points
-	  continue;
-
-	p[3 * n]     = b->mins[0] + rand() / (float)RAND_MAX *
-          (b->maxs[0] - b->mins[0]);
-	p[3 * n + 1] = b->mins[1] + rand() / (float)RAND_MAX *
-          (b->maxs[1] - b->mins[1]);
-	p[3 * n + 2] = b->mins[2] + rand() / (float)RAND_MAX *
-          (b->maxs[2] - b->mins[2]);
-
-	n++;
-
-      }
-
-    }
-
-  }
+#endif
 
   b->num_particles = n; // final count <= amount originally allocated
   b->num_orig_particles = b->num_particles;
