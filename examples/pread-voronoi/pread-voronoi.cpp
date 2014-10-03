@@ -18,7 +18,7 @@
 
 using namespace std;
 
-void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
+void GetArgs(int argc, char **argv, int &tb, int &threads, char *infile, char *outfile,
 	     std::vector<std::string>& coordinates,
 	     float* mins, float* maxs,
 	     float *minvol, float *maxvol, int *wrap);
@@ -69,6 +69,7 @@ struct AddAndRead: public AddBlock
 int main(int argc, char *argv[])
 {
   int tot_blocks; // total number of blocks in the domain
+  int num_threads; // number of threads diy can use
   int mem_blocks = -1; // number of blocks to keep in memory
   char infile[256]; // input file name
   char outfile[256]; // output file name
@@ -78,7 +79,6 @@ int main(int argc, char *argv[])
   float **particles; // particles[block_num][particle]
 		     //  where each particle is 3 values, px, py, pz
   int *num_particles; // number of particles in each block
-  int num_threads = 1; // number of threads diy can use
   int dim = 3; // 3d always
   int block_given[3] = {0, 0, 0}; // constraints on blocking (none)
   int wrap_; // whether wraparound neighbors are used
@@ -97,7 +97,9 @@ int main(int argc, char *argv[])
   typedef     diy::ContinuousBounds         Bounds;
   Bounds domain;
 
-  GetArgs(argc, argv, tot_blocks, infile, outfile,
+  GetArgs(argc, argv,
+	  tot_blocks, num_threads,
+	  infile, outfile,
           coordinates,
 	  domain.min, domain.max,
           &minvol, &maxvol,
@@ -173,7 +175,7 @@ int main(int argc, char *argv[])
 //
 // gets command line args
 //
-void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
+void GetArgs(int argc, char **argv, int &tb, int &threads, char *infile, char *outfile,
 	     std::vector<std::string>& coordinates,
 	     float* mins, float* maxs,
 	     float *minvol, float *maxvol, int *wrap) {
@@ -181,26 +183,27 @@ void GetArgs(int argc, char **argv, int &tb, char *infile, char *outfile,
   assert(argc >= 10);
 
   tb = atoi(argv[1]);
-  strcpy(infile, argv[2]);
+  threads = atoi(argv[2]);
+  strcpy(infile, argv[3]);
 
-  if (argv[3][0] =='!')
+  if (argv[4][0] =='!')
     strcpy(outfile, "");
   else
-    strcpy(outfile, argv[3]);
+    strcpy(outfile, argv[4]);
 
   coordinates.resize(3);
-  coordinates[0] = argv[4];
-  coordinates[1] = argv[5];
-  coordinates[2] = argv[6];
-  mins[0] = atof(argv[7]);
-  mins[1] = atof(argv[8]);
-  mins[2] = atof(argv[9]);
-  maxs[0] = atof(argv[10]);
-  maxs[1] = atof(argv[11]);
-  maxs[2] = atof(argv[12]);
-  *minvol = atof(argv[13]);
-  *maxvol = atof(argv[14]);
-  *wrap = atoi(argv[15]);
+  coordinates[0] = argv[5];
+  coordinates[1] = argv[6];
+  coordinates[2] = argv[7];
+  mins[0] = atof(argv[8]);
+  mins[1] = atof(argv[9]);
+  mins[2] = atof(argv[10]);
+  maxs[0] = atof(argv[11]);
+  maxs[1] = atof(argv[12]);
+  maxs[2] = atof(argv[13]);
+  *minvol = atof(argv[14]);
+  *maxvol = atof(argv[15]);
+  *wrap = atoi(argv[16]);
 
 }
 
