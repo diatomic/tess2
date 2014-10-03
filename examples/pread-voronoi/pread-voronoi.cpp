@@ -49,6 +49,7 @@ struct AddAndRead: public AddBlock
     //printf("%d: Read %lu particles\n", gid, particles.size()/3);
 
     b->num_particles = particles.size()/3;
+    b->num_orig_particles = b->num_particles;
     b->particles     = (float *)malloc(particles.size() * sizeof(float));
     for (size_t i = 0; i < particles.size(); ++i)
       b->particles[i] = particles[i];
@@ -109,6 +110,7 @@ int main(int argc, char *argv[])
                                    &create_block,
                                    &destroy_block,
                                    mem_blocks,
+				   num_threads,
                                    &storage,
                                    &save_block,
                                    &load_block);
@@ -230,6 +232,7 @@ void redistribute(void* b_, const diy::SwapReduceProxy& srp, const diy::RegularP
 	b->particles[o++] = in_points[j];
       b->num_particles += npts;
     }
+    b->num_orig_particles = b->num_particles;
 
     // step 2: subset and enqueue
     //fprintf(stderr, "[%d] out_link().count(): %d\n", srp.gid(), srp.out_link().count());
@@ -255,6 +258,7 @@ void redistribute(void* b_, const diy::SwapReduceProxy& srp, const diy::RegularP
 	for (size_t j = 0; j < out_points[i].size(); ++j)
 	  b->particles[j] = out_points[i][j];
 	b->num_particles = out_points[i].size() / 3;
+	b->num_orig_particles = b->num_particles;
         pos = i;
       }
       else

@@ -93,6 +93,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
                                    &create_block,
                                    &destroy_block,
                                    mem_blocks,
+				   -1,
                                    &storage,
                                    &save_block,
                                    &load_block);
@@ -433,6 +434,12 @@ void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
 //
 void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp)
 {
+  if (dblock->num_orig_particles == 0)
+  {
+    fprintf(stderr, "In incomplete_cells_initial, number of particles: %d\n", dblock->num_orig_particles);
+    assert(false);
+  }
+
   // particles on the convex hull of the local points and
   // information about particles sent to neighbors
   // sent_particles[particle][i] = ith neighbor (edge)
