@@ -1418,10 +1418,7 @@ void PrepSiteRendering(stats_t& stats) {
 //--------------------------------------------------------------------------
 //
 // determines whether this block owns this tet
-//
-// all verts are mine     -> the tet is mine
-// no verts are mine      -> the tet is not mine
-// mixed vertex ownership -> the minimum gid block is the owner
+// the minimum gid block of the four vertices is the tet owner
 //
 // dblock: local delaunay block
 // t: index of tet
@@ -1430,16 +1427,11 @@ bool my_tet(dblock_t& dblock, int t) {
 
   int v; // tet vertex (0-3)
 
-  // check whether this tet is entirely local
-  for (v = 0; v < 4; v++) {
-    int p = dblock.tets[t].verts[v];
-    if (p >= dblock.num_orig_particles)
-      break;
-  }
-  if (v == 4)
-    return true;
-
-  // check whether this tet is entirely remote
+  // Check whether this tet is entirely remote.
+  // This test is redundant in most cases because it is covered by the check for minimum gid, but
+  // when wrapping and only one block in a dimension (a degenerate case that we don't handle),
+  // ruling out the tets that can't belong to me based on particle id produces a "nicer" result;
+  // in those cases the minimum gid test is used only for tets that have possible multiple owners
   for (v = 0; v < 4; v++) {
     int p = dblock.tets[t].verts[v];
     if (p < dblock.num_orig_particles)
@@ -1448,13 +1440,8 @@ bool my_tet(dblock_t& dblock, int t) {
   if (v == 4)
     return false;
 
-  // debug: skip the deduplication
-//   fprintf(stderr, "skipping dedup\n");
-//   return true;
-
-  // tet has both local and remote verts; minimum gid of the vertex owners wins
   vector <int> gids; // owners (block gids) of tet vertices
-  for (v = 0; v < 4; v++) {
+  for (int v = 0; v < 4; v++) {
     int p = dblock.tets[t].verts[v];
     if (p < dblock.num_orig_particles)
       gids.push_back(dblock.gid);

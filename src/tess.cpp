@@ -52,7 +52,6 @@
 
 using namespace std;
 
-// ------------------------------------------------------------------------
 //
 //   test of parallel tesselation
 //
@@ -85,6 +84,14 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
     domain.max[i] = data_size[i] - 1.0;
   }
 
+  // threads
+  int num_threads = -1;
+#if (defined TIMING || defined MEMORY)
+  num_threads = 1;
+#endif
+
+  fprintf(stderr, "num_threads = %d\n", num_threads);
+
   // init diy
   diy::mpi::communicator    world(mpi_comm);
   diy::FileStorage          storage("./DIY.XXXXXX");
@@ -93,7 +100,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
                                    &create_block,
                                    &destroy_block,
                                    mem_blocks,
-				   -1,
+				   num_threads,
                                    &storage,
                                    &save_block,
                                    &load_block);
@@ -278,7 +285,7 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_ar
   // assign particles
   srand(b->gid);
 
-#if 0 // generate points uniformly at random in the block
+#if 1 // generate points uniformly at random in the block
 
   for (unsigned i = 0; i < num_particles; ++i)
   {
@@ -647,7 +654,7 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
   }
 }
 //
-// cleans a blocks in between phases
+// cleans a block in between phases
 // (deletes tets but keeps delauany data structure and convex hull particles, sent particles)
 //
 void reset_block(struct dblock_t* &dblock)
@@ -789,8 +796,8 @@ void fill_vert_to_tet(dblock_t* dblock)
 // start: index of timer to start (-1 if not used)
 // stop: index of timer to stop (-1 if not used)
 //
-void timing(double* times, int start, int stop) {
-
+void timing(double* times, int start, int stop)
+{
   if (start < 0 && stop < 0)
   {
     for (int i = 0; i < MAX_TIMES; i++)
@@ -806,7 +813,66 @@ void timing(double* times, int start, int stop) {
     times[stop] = MPI_Wtime() - times[stop];
 
 #endif
+}
+//
+// memory profile, prints max reseident usage of all procs
+//
+void get_mem(int breakpoint)
+{
+#ifdef MEMORY
 
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+#ifdef BGQ
+
+  uint64_t shared, persist, heapavail, stackavail, stack, heap, heapmax, guard, mmap;
+
+  // we're only interested in max heap size
+  // (same as max resident size, high water mark)
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPMAX, &heapmax);
+
+  // some examples of other memory usage we could get if we wanted it
+  // note that stack and heap both count the total of both, use one or the other
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_SHARED, &shared);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_PERSIST, &persist);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPAVAIL, &heapavail);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACKAVAIL, &stackavail);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACK, &stack);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heap);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_GUARD, &guard);
+  Kernel_GetMemorySize(KERNEL_MEMSIZE_MMAP, &mmap);
+
+  int to_mb = 1024 * 1024;
+  double heap_mem = double(heapmax) / to_mb;
+  double max_heap_mem;
+  MPI_Reduce(&heap_mem, &max_heap_mem, 1, MPI_DOUBLE, MPI_MAX, 0,
+	     MPI_COMM_WORLD);
+  if (rank == 0)
+    fprintf(stderr, "%d: BGQ max memory = %.0lf MB\n",
+	    breakpoint, max_heap_mem);
+
+#else // !BGQ
+
+  struct rusage r_usage;
+  getrusage(RUSAGE_SELF, &r_usage);
+
+#ifdef __APPLE__
+  const int to_mb = 1048576;
+#else
+  const int to_mb = 1024;
+#endif // APPLE
+
+  float res = r_usage.ru_maxrss;
+  float mem = res / (float)to_mb;
+  float max_mem;
+  MPI_Reduce(&mem, &max_mem, 1, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
+  if (rank == 0)
+    fprintf(stderr, "%d: max memory = %0.1f MB\n", breakpoint, max_mem);
+
+#endif // BGQ
+
+#endif // MEMORY
 }
 // ---------------------------------------------------------------------------
 //
@@ -1437,78 +1503,4 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
 }
 
 #endif
-
-// ---------------------------------------------------------------------------
-//
-// memory profile, prints max reseident usage and sleeps so that user
-// can read current usage some other way, eg. an OS tool or dashboard
-//
-// breakpoint: breakpoint number
-// dwell: sleep time in seconds
-//
-void get_mem(int breakpoint, int dwell) {
-
-  // quite compiler warnings in case MEMORY is not defined
-  breakpoint = breakpoint;
-  dwell = dwell;
-
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-#ifdef MEMORY
-
-#ifdef BGQ
-
-  uint64_t shared, persist, heapavail, stackavail,
-    stack, heap, heapmax, guard, mmap;
-
-  // we're only interested in max heap size
-  // (same as max resident size, high water mark)
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPMAX, &heapmax);
-
-  // some examples of other memory usage we could get if we wanted it
-  // note that stack and heap both count the total of both, use one or the other
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_SHARED, &shared);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_PERSIST, &persist);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAPAVAIL, &heapavail);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACKAVAIL, &stackavail);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_STACK, &stack);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_HEAP, &heap);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_GUARD, &guard);
-  Kernel_GetMemorySize(KERNEL_MEMSIZE_MMAP, &mmap);
-
-  int to_mb = 1024 * 1024;
-  double heap_mem = double(heapmax) / to_mb;
-  double max_heap_mem;
-  MPI_Reduce(&heap_mem, &max_heap_mem, 1, MPI_DOUBLE, MPI_MAX, 0,
-	     MPI_COMM_WORLD);
-  if (rank == 0)
-    fprintf(stderr, "%d: BGQ max memory = %.0lf MB\n",
-	    breakpoint, max_heap_mem);
-
-#else
-
-  struct rusage r_usage;
-  getrusage(RUSAGE_SELF, &r_usage);
-
-#ifdef __APPLE__
-  const int to_mb = 1048576;
-#else
-  const int to_mb = 1024;
-#endif
-
-  float res = r_usage.ru_maxrss;
-  float mem = res / (float)to_mb;
-  float max_mem;
-  MPI_Reduce(&mem, &max_mem, 1, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
-  if (rank == 0)
-    fprintf(stderr, "%d: max memory = %0.1f MB\n", breakpoint, max_mem);
-//   sleep(dwell);
-//   fprintf(stderr, "%d: done\n", breakpoint);
-
-#endif // BGQ
-
-#endif // MEMORY
-
-}
 // ---------------------------------------------------------------------------
