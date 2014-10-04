@@ -35,13 +35,12 @@ void tess(diy::Master& master, quants_t& quants, double* times);
 void tess_save(diy::Master& master, const char* outfile, quants_t& quants,
                double* times);
 void collect_stats(diy::Master& master, quants_t& quants, double* times);
-
 void* create_block();
 void destroy_block(void* b);
 void save_block(const void* b, diy::BinaryBuffer& bb);
 void load_block(void* b, diy::BinaryBuffer& bb);
 void create(int gid, const Bounds& core, const Bounds& bounds, const diy::Link& link);
-void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);
+int gen_particles(dblock_t* b, float jitter);
 void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);
 void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*);
 void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);
@@ -56,7 +55,7 @@ diy::Direction nearest_neighbor(float* p, float* mins, float* maxs);
 void wrap_pt(point_t& rp, int wrap_dir, Bounds& domain);
 int compare(const void *a, const void *b);
 
-// add blocks to a master
+// add block to a master
 struct AddBlock
 {
   AddBlock(diy::Master& master_):
@@ -84,13 +83,29 @@ struct AddBlock
     b->rem_gids = NULL;
     b->vert_to_tet = NULL;
 
-    // debug
-    //     fprintf(stderr, "Done adding block gid %d\n", b->gid);
-
     return b;
   }
 
   diy::Master&  master;
+};
+
+// add block to master and generate test particles
+struct AddAndGenerate: public AddBlock
+{
+  AddAndGenerate(diy::Master& master_,
+                 float        jitter_):
+    AddBlock(master_),
+    jitter(jitter_)           {}
+
+  void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
+                   const RCLink& link) const
+  {
+    dblock_t* b = AddBlock::operator()(gid, core, bounds, domain, link);
+    b->num_particles = gen_particles(b, jitter);
+    b->num_orig_particles = b->num_particles;
+  }
+
+  float jitter;
 };
 
 // serialize a block

@@ -90,8 +90,6 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   num_threads = 1;
 #endif
 
-  fprintf(stderr, "num_threads = %d\n", num_threads);
-
   // init diy
   diy::mpi::communicator    world(mpi_comm);
   diy::FileStorage          storage("./DIY.XXXXXX");
@@ -105,7 +103,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
                                    &save_block,
                                    &load_block);
   diy::RoundRobinAssigner   assigner(world.size(), tot_blocks);
-  AddBlock create(master);
+  AddAndGenerate create(master, jitter);
 
   // decompose
   std::vector<int> my_gids;
@@ -116,9 +114,6 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   if (wrap_)
     wrap.assign(3, true);
   diy::decompose(3, comm.rank(), domain, assigner, create, share_face, wrap, ghosts);
-
-  // generate particles
-  master.foreach(&gen_particles, &jitter);
 
   // tessellate
   quants_t quants;
@@ -258,27 +253,20 @@ void load_block(void* b, diy::BinaryBuffer& bb)
   diy::load(bb, *static_cast<dblock_t*>(b));
 }
 //
-// foreach block functions
+// generate particles, return final number of particles generated
 //
-void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
+int gen_particles(dblock_t* b, float jitter)
 {
   int sizes[3]; // number of grid points
-  int i, j, k;
   int n = 0;
-  int num_particles; // theoretical num particles with duplicates at
-		     // block boundaries
-  float jitter = *((float*)misc_args);
+  int num_particles; // theoretical num particles with duplicates at block boundaries
   float jit; // random jitter amount, 0 - MAX_JITTER
-
-  dblock_t* b = (dblock_t*)b_;
 
   // allocate particles
   sizes[0] = (int)(b->maxs[0] - b->mins[0] + 1);
   sizes[1] = (int)(b->maxs[1] - b->mins[1] + 1);
   sizes[2] = (int)(b->maxs[2] - b->mins[2] + 1);
-
   num_particles = sizes[0] * sizes[1] * sizes[2];
-
   b->particles = (float *)malloc(num_particles * 3 * sizeof(float));
   float *p = b->particles;
 
@@ -300,15 +288,15 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_ar
 #else  // randomly jitter points on a grid
 
   n = 0;
-  for (i = 0; i < sizes[0]; i++)
+  for (unsigned i = 0; i < sizes[0]; i++)
   {
     if (b->mins[0] > 0 && i == 0) // dedup block doundary points
       continue;
-    for (j = 0; j < sizes[1]; j++)
+    for (unsigned j = 0; j < sizes[1]; j++)
     {
       if (b->mins[1] > 0 && j == 0) // dedup block doundary points
 	continue;
-      for (k = 0; k < sizes[2]; k++)
+      for (unsigned k = 0; k < sizes[2]; k++)
       {
 	if (b->mins[2] > 0 && k == 0) // dedup block doundary points
 	  continue;
@@ -350,10 +338,11 @@ void gen_particles(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_ar
 
 #endif
 
-  b->num_particles = n; // final count <= amount originally allocated
-  b->num_orig_particles = b->num_particles;
+  return n;
 }
-
+//
+// foreach block functions, 3 delaunay stages
+//
 void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
 {
   dblock_t* b = (dblock_t*)b_;

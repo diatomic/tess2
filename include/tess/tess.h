@@ -110,7 +110,7 @@ void fill_vert_to_tet(struct dblock_t *dblock);
 #ifdef __cplusplus
 extern "C"
 #endif
-void get_mem(int breakpoint, int dwell);
+void get_mem(int breakpoint);
 
 void print_block(struct dblock_t *dblock, int gid);
 void print_particles(float *particles, int num_particles, int gid);
