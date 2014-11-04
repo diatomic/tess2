@@ -169,7 +169,9 @@ int main(int argc, char *argv[])
   tess(master, quants, times);
   
   if (mem_blocks == -1 || mem_blocks >= tot_blocks)
-    tess_save(master, outfile, quants, times);
+    tess_save(master, outfile, times);
+
+  collect_stats(master, quants, times);
 
   return 0;
 

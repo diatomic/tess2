@@ -120,7 +120,8 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   tess(master, quants, times);
 
   // output
-  tess_save(master, outfile, quants, times);
+  tess_save(master, outfile, times);
+  collect_stats(master, quants, times);
 
   // TODO: original version had the option of returning blocks instead of writing to file
   // (for coupling to dense and other tools)
@@ -128,6 +129,11 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
 
 void tess(diy::Master& master, quants_t& quants, double* times)
 {
+#ifdef TIMING
+  if (master.threads() != 1)
+    fprintf(stderr, "Warning: timing() calls MPI directly; it's not compatible with using multiple threads\n");
+#endif
+
   timing(times, -1, -1);
   timing(times, TOT_TIME, -1);
 
@@ -153,8 +159,7 @@ void tess(diy::Master& master, quants_t& quants, double* times)
   timing(times, -1, DEL3_TIME);
 }
 
-void tess_save(diy::Master& master, const char* outfile, quants_t& quants,
-               double *times)
+void tess_save(diy::Master& master, const char* outfile, double* times)
 {
   // All the foreach block functions are done. We now make a very dangerous assumption
   // that all blocks fit in memory because the remaining functions are done on all blocks
@@ -196,8 +201,6 @@ void tess_save(diy::Master& master, const char* outfile, quants_t& quants,
   // cleanup array of block points only used for writing all blocks using existing writer
   // actual blocks cleaned up with the destroy_block() callback function
   delete[] dblocks;
-
-  collect_stats(master, quants, times);
 }
 
 //
