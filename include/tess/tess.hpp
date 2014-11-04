@@ -20,6 +20,10 @@
 #include <diy/serialization.hpp>
 #include <diy/master.hpp>
 
+#ifdef TESS_USE_CGAL
+#include "tess-cgal.h"
+#endif
+
 // quantity stats per process
 struct quants_t {
 int min_quants[MAX_QUANTS];
@@ -121,6 +125,8 @@ namespace diy
       diy::save(bb, d.gid);
       diy::save(bb, d.mins);
       diy::save(bb, d.maxs);
+      diy::save(bb, d.box);
+      diy::save(bb, d.data_bounds);
       diy::save(bb, d.num_orig_particles);
       diy::save(bb, d.num_particles);
       diy::save(bb, d.particles, 3 * d.num_particles);
@@ -132,7 +138,12 @@ namespace diy
       vector <set <int> > *sent_particles =
         static_cast<vector <set <int> >*>(d.sent_particles);
       diy::save(bb, *sent_particles);
-      // TODO: not saving Dt for now, recomputing upon loading instead
+
+#ifdef TESS_USE_CGAL
+      const Delaunay3D* Dt = static_cast<Delaunay3D*>(d.Dt);
+      diy::save(bb, *Dt);
+      //fprintf(stderr, "Delaunay saved with %lu vertices\n", Dt->number_of_vertices());
+#endif
 
       // debug
 //       fprintf(stderr, "Done saving block gid %d\n", d.gid);
@@ -145,6 +156,8 @@ namespace diy
 //       fprintf(stderr, "Loading block gid %d\n", d.gid);
       diy::load(bb, d.mins);
       diy::load(bb, d.maxs);
+      diy::load(bb, d.box);
+      diy::load(bb, d.data_bounds);
       diy::load(bb, d.num_orig_particles);
       diy::load(bb, d.num_particles);
       d.particles = NULL;
@@ -163,8 +176,12 @@ namespace diy
         d.vert_to_tet = (int*)malloc(d.num_particles * sizeof(int));
       diy::load(bb, *(static_cast<vector <int>*>(d.convex_hull_particles)));
       diy::load(bb, *(static_cast<vector <set <int> >*>(d.sent_particles)));
-      // TODO: re-initializing Dt instead of loading it here;
-      // allocated in create_block
+
+#ifdef TESS_USE_CGAL
+      Delaunay3D* Dt = static_cast<Delaunay3D*>(d.Dt);
+      diy::load(bb, *Dt);
+      //fprintf(stderr, "Delaunay loaded with %lu vertices\n", Dt->number_of_vertices());
+#endif
 
       // debug
 //       fprintf(stderr, "Done loading block gid %d\n", d.gid);

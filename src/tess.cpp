@@ -762,6 +762,8 @@ void collect_stats(diy::Master& master, quants_t& quants, double* times)
 //
 void fill_vert_to_tet(dblock_t* dblock)
 {
+  //fprintf(stderr, "fill_vert_to_tet(): %d %d\n", dblock->num_particles, dblock->num_tets);
+
   dblock->vert_to_tet =
     (int*)realloc(dblock->vert_to_tet, sizeof(int) * dblock->num_particles);
 
@@ -773,6 +775,8 @@ void fill_vert_to_tet(dblock_t* dblock)
     for (int v = 0; v < 4; ++v)
     {
       int p = dblock->tets[t].verts[v];
+      //if (p >= dblock->num_particles || p < 0)
+      //  fprintf(stderr, "Warning: %d is out of bounds!\n", p);
       dblock->vert_to_tet[p] = t;	// the last one wins
     }
   }
