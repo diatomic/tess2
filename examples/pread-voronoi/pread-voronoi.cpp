@@ -13,7 +13,8 @@
 #include <diy/master.hpp>
 #include <diy/assigner.hpp>
 #include <diy/decomposition.hpp>
-#include <diy/global.hpp>
+#include <diy/reduce.hpp>
+#include <diy/partners/swap.hpp>
 
 
 using namespace std;
@@ -215,7 +216,7 @@ void GetArgs(int argc, char **argv, int &tb, int &threads, int &mb,
 
 }
 
-void redistribute(void* b_, const diy::SwapReduceProxy& srp, const diy::RegularPartners& partners)
+void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapPartners& partners)
 {
     dblock_t*                   b        = static_cast<dblock_t*>(b_);
     unsigned                    round    = srp.round();
@@ -292,8 +293,8 @@ void redistribute(void* b_, const diy::SwapReduceProxy& srp, const diy::RegularP
 void ExchangeParticles(diy::Master& master, diy::Assigner& assigner, int tot_blocks)
 {
   int k = 2;
-  diy::RegularPartners  partners(3, tot_blocks, k, false);
-  diy::swap_reduce(master, assigner, partners, redistribute);
+  diy::RegularSwapPartners  partners(3, tot_blocks, k, false);
+  diy::reduce(master, assigner, partners, redistribute);
 }
 
 // check if the particles fall inside the block bounds
