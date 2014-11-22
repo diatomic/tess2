@@ -13,12 +13,14 @@
 #include <diy/master.hpp>
 #include <diy/assigner.hpp>
 #include <diy/decomposition.hpp>
-#include <diy/global.hpp>
+#include <diy/reduce.hpp>
+#include <diy/partners/swap.hpp>
 
 
 using namespace std;
 
-void GetArgs(int argc, char **argv, int &tb, int &threads, char *infile, char *outfile,
+void GetArgs(int argc, char **argv, int &tb, int &threads, int &mb,
+	     char *infile, char *outfile,
 	     std::vector<std::string>& coordinates,
 	     float* mins, float* maxs,
 	     float *minvol, float *maxvol, int *wrap);
@@ -70,7 +72,7 @@ int main(int argc, char *argv[])
 {
   int tot_blocks; // total number of blocks in the domain
   int num_threads; // number of threads diy can use
-  int mem_blocks = -1; // number of blocks to keep in memory
+  int mem_blocks; // number of blocks to keep in memory
   char infile[256]; // input file name
   char outfile[256]; // output file name
   float mins[3], maxs[3]; // data global extents
@@ -98,7 +100,7 @@ int main(int argc, char *argv[])
   Bounds domain;
 
   GetArgs(argc, argv,
-	  tot_blocks, num_threads,
+	  tot_blocks, num_threads, mem_blocks,
 	  infile, outfile,
           coordinates,
 	  domain.min, domain.max,
@@ -166,7 +168,11 @@ int main(int argc, char *argv[])
   master.foreach(&verify_particles);
 
   tess(master, quants, times);
-  tess_save(master, outfile, quants, times);
+  
+  if (mem_blocks == -1 || mem_blocks >= tot_blocks)
+    tess_save(master, outfile, times);
+
+  collect_stats(master, quants, times);
 
   return 0;
 
@@ -175,7 +181,8 @@ int main(int argc, char *argv[])
 //
 // gets command line args
 //
-void GetArgs(int argc, char **argv, int &tb, int &threads, char *infile, char *outfile,
+void GetArgs(int argc, char **argv, int &tb, int &threads, int &mb,
+	     char *infile, char *outfile,
 	     std::vector<std::string>& coordinates,
 	     float* mins, float* maxs,
 	     float *minvol, float *maxvol, int *wrap) {
@@ -184,30 +191,32 @@ void GetArgs(int argc, char **argv, int &tb, int &threads, char *infile, char *o
 
   tb = atoi(argv[1]);
   threads = atoi(argv[2]);
-  strcpy(infile, argv[3]);
+  mb = atoi(argv[3]);
 
-  if (argv[4][0] =='!')
+  strcpy(infile, argv[4]);
+
+  if (argv[5][0] =='!')
     strcpy(outfile, "");
   else
-    strcpy(outfile, argv[4]);
+    strcpy(outfile, argv[5]);
 
   coordinates.resize(3);
-  coordinates[0] = argv[5];
-  coordinates[1] = argv[6];
-  coordinates[2] = argv[7];
-  mins[0] = atof(argv[8]);
-  mins[1] = atof(argv[9]);
-  mins[2] = atof(argv[10]);
-  maxs[0] = atof(argv[11]);
-  maxs[1] = atof(argv[12]);
-  maxs[2] = atof(argv[13]);
-  *minvol = atof(argv[14]);
-  *maxvol = atof(argv[15]);
-  *wrap = atoi(argv[16]);
+  coordinates[0] = argv[6];
+  coordinates[1] = argv[7];
+  coordinates[2] = argv[8];
+  mins[0] = atof(argv[9]);
+  mins[1] = atof(argv[10]);
+  mins[2] = atof(argv[11]);
+  maxs[0] = atof(argv[12]);
+  maxs[1] = atof(argv[13]);
+  maxs[2] = atof(argv[14]);
+  *minvol = atof(argv[15]);
+  *maxvol = atof(argv[16]);
+  *wrap = atoi(argv[17]);
 
 }
 
-void redistribute(void* b_, const diy::SwapReduceProxy& srp, const diy::RegularPartners& partners)
+void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapPartners& partners)
 {
     dblock_t*                   b        = static_cast<dblock_t*>(b_);
     unsigned                    round    = srp.round();
@@ -284,8 +293,8 @@ void redistribute(void* b_, const diy::SwapReduceProxy& srp, const diy::RegularP
 void ExchangeParticles(diy::Master& master, diy::Assigner& assigner, int tot_blocks)
 {
   int k = 2;
-  diy::RegularPartners  partners(3, tot_blocks, k, false);
-  diy::swap_reduce(master, assigner, partners, redistribute);
+  diy::RegularSwapPartners  partners(3, tot_blocks, k, false);
+  diy::reduce(master, assigner, partners, redistribute);
 }
 
 // check if the particles fall inside the block bounds

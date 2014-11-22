@@ -3,6 +3,7 @@
 procs=2
 tb=8
 threads=2
+mb=-1
 #infile=~/Data/astro/MattTurk/particles/particles.h5
 infile=unit-cube.h5
 outfile=del.out
@@ -11,4 +12,4 @@ coords="x y z"
 mins="0 0 0"
 maxs="1. 1. 1."
 
-mpiexec -n $procs ./pread-voronoi $tb $threads $infile $outfile $coords $mins $maxs 0 0 0 0
+mpiexec -n $procs ./pread-voronoi $tb $threads $mb $infile $outfile $coords $mins $maxs 0 0 0 0

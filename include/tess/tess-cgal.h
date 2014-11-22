@@ -36,3 +36,48 @@ int gen_delaunay_output(Delaunay3D &Dt, int **tet_verts);
 void construct_delaunay(Delaunay3D &Dt, int num_particles, float *particles);
 
 void gen_tets(Delaunay3D& Dt, tet_t* tets);
+
+
+#include <diy/serialization.hpp>
+
+namespace diy
+{
+  template<>
+  struct Serialization<Delaunay3D>
+  {
+    static void	    save(BinaryBuffer& bb, const Delaunay3D& Dt)
+    {
+      std::ostringstream out;
+      CGAL::set_mode(out, CGAL::IO::BINARY);
+      out << Dt;
+
+      size_t s = out.str().size();
+      diy::save(bb, s);
+      bb.save_binary(out.str().c_str(), out.str().size());
+    }
+
+    static void	    load(BinaryBuffer& bb, Delaunay3D& Dt)
+    {
+      size_t s;
+      diy::load(bb, s);
+
+      // This is not pretty, but portable.
+      // Double copying is annoying. Perhaps, it's worth implementing an
+      // iostream wrapper around BinaryBuffer.
+      std::vector<char> in_vec(s);
+      bb.load_binary(&in_vec[0], s);
+
+      std::string in_str(in_vec.begin(), in_vec.end());
+      std::istringstream in(in_str);
+      CGAL::set_mode(in, CGAL::IO::BINARY);
+      in >> Dt;
+
+      // NB: this shouldn't be necessary, but CGAL doesn't save vertex info,
+      //     so we reset it here. This works because we don't need vertex ids to
+      //     be consistent across iterations.
+      unsigned idx = 0;
+      for(Vertex_iterator vit = Dt.finite_vertices_begin(); vit != Dt.finite_vertices_end(); ++vit)
+	vit->info() = idx++;
+    }
+  };
+}
