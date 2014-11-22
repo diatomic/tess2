@@ -1049,43 +1049,35 @@ struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter,
 
 }
 // ------------------------------------------------------------------------
+// CLP
 //
-//   CLP Add wall particles
-//
-//   nblocks: local number of blocks
-//   dblocks: local blocks
+//   Add wall particles
 //
 void wall_particles(struct dblock_t *dblock)
 {
-  //   using data_mins and data_maxs
-  //   Currently assuimg walls on all sides, but format can easily be
+  //   init using data_mins and data_maxs
+  //   currently assuimg walls on all sides, but format can easily be
   //   modified to be ANY set of walls
-  struct wall_t *walls = NULL;
-  int num_walls = 0;
-
+  struct wall_t*  walls     = NULL;
+  int             num_walls = 0;
   create_walls(&num_walls,&walls);
-
-  int* wall_cut = (int *)malloc(num_walls * sizeof(int));
-
-  std::vector<double> new_points;
+  int* wall_cut = new int[num_walls];
+  std::vector<float> new_points;
 
   // Find all particles that need to be mirrored.
   for (int p = 0; p < dblock->num_orig_particles; ++p)
   {
     //  zero generate-wall-point array (length of number of walls)
-    for (int wi = 0; wi < num_walls; wi++) wall_cut[wi] = 0;
+    memset(wall_cut, 0, num_walls*sizeof(int));
 
     // Determine if the cell is complete
     vector< pair<int, int> > nbrs;
     bool finite = neighbor_edges(nbrs, p, dblock->tets, dblock->vert_to_tet[p]);
 
     if (!finite)
-    {
       //  set the mirror-generate array to all ones
       // (extra calculations but simpler to assume!)
-      for (int wi = 0; wi < num_walls; wi++)
-	wall_cut[wi] = 1;
-    }
+      memset(wall_cut, 1, num_walls*sizeof(int));
     else
     {
       // loop throug the list of all the Voronoi cell vertices of the point.
@@ -1099,17 +1091,15 @@ void wall_particles(struct dblock_t *dblock)
       for (int i = 0; i < (int)nbrs.size(); ++i)
       {
 	// get edge link
-	int u  = nbrs[i].first;
-	int ut = nbrs[i].second;
 	std::vector<int> edge_link;
-	fill_edge_link(edge_link, p, u, ut, dblock->tets);
+	fill_edge_link(edge_link, p, nbrs[i].first, nbrs[i].second, dblock->tets);
 
 	// following is equivalent of all vertices in a face
 	for (int j = 0; j < (int)edge_link.size(); ++j)
         {
 	  float pt[3];
 	  circumcenter(pt,&(dblock->tets[edge_link[j]]), dblock->particles);
-	  for (int wi = 0; wi < num_walls; wi++)
+	  for (int wi = 0; wi < num_walls; ++wi)
 	    if (!wall_cut[wi])
 	      wall_cut[wi] = test_outside(pt,&walls[wi]);
 	}
@@ -1117,54 +1107,46 @@ void wall_particles(struct dblock_t *dblock)
     }
 
     // Make the mirrored particles
-    //   For each mirror-generate index that is 1,
-    //   generate the mirror point given site rp and the wall
-    //   Create list of points
-    for (int wi =0; wi < num_walls; wi++)
+    // For each mirror-generate index that is 1, generate the mirror point given site rp
+    // and the wall
+    // Create list of points
+    for (int wi = 0; wi < num_walls; ++wi)
     {
       if (wall_cut[wi])
       {
         float rpt[3];
-        float spt[3];
-        spt[0] = dblock->particles[3 * p];
-        spt[1] = dblock->particles[3 * p + 1];
-        spt[2] = dblock->particles[3 * p + 2];
-        generate_mirror(rpt,spt,&walls[wi]);
-        new_points.push_back(rpt[0]);
-        new_points.push_back(rpt[1]);
-        new_points.push_back(rpt[2]);
+        generate_mirror(rpt,&dblock->particles[3*p],&walls[wi]);
+        new_points.insert(new_points.end(), rpt, rpt+3);
       }
     }
   }
 
   // Add all the new points to the dblock.
-
-  if (new_points.size())
+  if (!new_points.empty())
   {
-    int n = (dblock->num_particles - dblock->num_orig_particles);
-    int new_remote_particles = new_points.size()/3 + n;
+    size_t realloc_size;
 
     // grow space
-    dblock->particles =
-      (float *)realloc(dblock->particles,
-		       (dblock->num_particles*3 +
-			new_points.size())*sizeof(float));
+    realloc_size      = dblock->num_particles * 3 + new_points.size();
+    dblock->particles = (float*) realloc(dblock->particles, realloc_size * sizeof(float));
+
+    realloc_size      = dblock->num_particles + new_points.size() / 3 - dblock->num_orig_particles;
+    dblock->rem_gids  = (int*) realloc(dblock->rem_gids, realloc_size * sizeof(int));
 
     // copy new particles
-    for (int j = 0; j < (int)new_points.size(); j=j+3)
+    for (size_t j = 0; j < new_points.size(); j += 3)
     {
       dblock->particles[3 * dblock->num_particles    ] = new_points[j    ];
       dblock->particles[3 * dblock->num_particles + 1] = new_points[j + 1];
       dblock->particles[3 * dblock->num_particles + 2] = new_points[j + 2];
+      dblock->rem_gids[dblock->num_particles - dblock->num_orig_particles] = -1;
       dblock->num_particles++;
-      n++;
     }
   }
 
   // cleanup
-  free(wall_cut);
+  delete[] wall_cut;
   destroy_walls(num_walls, walls);
-
 }
 
 #endif
@@ -1340,6 +1322,7 @@ void handle_error(int errcode, MPI_Comm comm, char *str) {
 #if 0
 
 // CLP
+//
 //   creates and initializes walls
 //
 //   walls: pointer to array of walls
@@ -1349,46 +1332,48 @@ void handle_error(int errcode, MPI_Comm comm, char *str) {
 //    allocate blocks and headers
 //
 //
-void create_walls(int *num_walls, struct wall_t **walls) {
+void create_walls(int *num_walls, struct wall_t **walls)
+{
+  *num_walls  = 6;
+  *walls      = new struct wall_t[*num_walls];
 
-  (*num_walls) = 6;
-  *walls = (struct wall_t*)malloc(sizeof(struct wall_t) * (*num_walls));
+  float epsilon = 1e-6f; // TODO parameter/autoadaptive
 
   // bottom xy wall
   (*walls)[0].a = 0;
   (*walls)[0].b = 0;
   (*walls)[0].c = 1;
-  (*walls)[0].d = -data_mins[2];
+  (*walls)[0].d = - data_mins[2] - epsilon;
 
   // forward xz wall
   (*walls)[1].a = 0;
   (*walls)[1].b = 1;
   (*walls)[1].c = 0;
-  (*walls)[1].d = -data_mins[1];
+  (*walls)[1].d = -data_mins[1] - epsilon;
 
   // left yz wall
   (*walls)[2].a = 1;
   (*walls)[2].b = 0;
   (*walls)[2].c = 0;
-  (*walls)[2].d = -data_mins[0];
+  (*walls)[2].d = -data_mins[0] - epsilon;
 
   // top xy wall
   (*walls)[3].a = 0;
   (*walls)[3].b = 0;
   (*walls)[3].c = -1;
-  (*walls)[3].d = data_maxs[2];
+  (*walls)[3].d = data_maxs[2] + epsilon;
 
   // back xz wall
   (*walls)[4].a = 0;
   (*walls)[4].b = -1;
   (*walls)[4].c = 0;
-  (*walls)[4].d = data_maxs[1];
+  (*walls)[4].d = data_maxs[1] + epsilon;
 
   // right yz wall
   (*walls)[5].a = -1;
   (*walls)[5].b = 0;
   (*walls)[5].c = 0;
-  (*walls)[5].d = data_maxs[0];
+  (*walls)[5].d = data_maxs[0] + epsilon;
 
 }
 // ---------------------------------------------------------------------------
