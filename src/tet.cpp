@@ -173,21 +173,8 @@ bool neighbor_edges(std::vector< std::pair<int, int> >& nbrs,
   std::queue<int>   q;
   std::set<int>	    visited_tets,
 		    visited_verts;
-  visited_tets.insert(t);
 
-  for (int i = 0; i < 4; ++i) {
-    int u = tets[t].verts[i];
-    if (u != v) {
-      nbrs.push_back(std::make_pair(u,t));
-      visited_verts.insert(u);
-
-      int next = tets[t].tets[i];
-      if (next == -1)
-	finite = false;
-      else
-	q.push(next);
-    }
-  }
+  q.push(t);
 
   // BFS in the star of v
   while (!q.empty())
