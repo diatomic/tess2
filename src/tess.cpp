@@ -181,7 +181,7 @@ void tess_save(diy::Master& master, const char* outfile, double* times)
     for (int i = 0; i < (int)master.size(); i++)
     {
       diy::Link* l = m.link(i);
-      num_nbrs[i] = l->count();
+      num_nbrs[i] = l->size();
       nbrs[i] = new gb_t[num_nbrs[i]];
       for (int j = 0; j < num_nbrs[i]; j++)
         nbrs[i][j] = l->target(j);
@@ -549,7 +549,7 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
     if (!complete)
     {
       // local point still on the convex hull goes to everybody it hasn't gone to yet
-      for (int n = 0; n < l->count(); n++) // all neighbors
+      for (int n = 0; n < l->size(); n++) // all neighbors
       {
       	if ((*sent_particles)[p].find(n) == (*sent_particles)[p].end())
           new_dests.insert(n);
