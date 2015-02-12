@@ -61,7 +61,7 @@ void pnetcdf_write(int nblocks, struct dblock_t **dblocks,
   MPI_Allreduce(proc_quants, tot_quants, NUM_QUANTS, MPI_OFFSET, MPI_SUM, comm);
 
   // prefix sum proc offsets
-  MPI_Exscan(proc_quants, &block_ofsts, NUM_QUANTS, MPI_OFFSET, MPI_SUM, comm);
+  MPI_Exscan(proc_quants, block_ofsts, NUM_QUANTS, MPI_OFFSET, MPI_SUM, comm);
 
   // create a new file for writing
   cmode = NC_CLOBBER | NC_64BIT_DATA;

@@ -35,13 +35,6 @@
 #include "tess/tet.h"
 #include "tess/tet-neighbors.h"
 
-#include <diy/mpi.hpp>
-#include <diy/master.hpp>
-#include <diy/assigner.hpp>
-#include <diy/serialization.hpp>
-#include <diy/decomposition.hpp>
-#include <diy/pick.hpp>
-
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>
 #include "builtins.h"
@@ -51,89 +44,90 @@
 
 using namespace std;
 
-//
-//   test of parallel tesselation
-//
-//   tot_blocks: total number of blocks in the domain
-//   mem_blocks: max number of blocks in memory (-1 for no limit)
-//   data_size: domain grid size (x, y, z)
-//   jitter: maximum amount to randomly move each particle
-//   minvol, maxvol: filter range for which cells to keep
-//   pass -1.0 to skip either or both bounds
-//   wrap_: whether wraparound neighbors are used
-//   twalls_on: whether walls boundaries are used
-//   times: times for particle exchange, voronoi cells, convex hulls, and output
-//   outfile: output file name
-//   mpi_comm: MPI communicator
-//
-void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
-	       float minvol, float maxvol, int wrap_, int twalls_on,
-	       double *times, char *outfile, MPI_Comm mpi_comm)
-{
-  // minvol, maxvol not used, but may be in the future; quiet compiler warning for now
-  minvol = minvol;
-  maxvol = maxvol;
+// DEPRECATED
+// //
+// //   test of parallel tesselation
+// //
+// //   tot_blocks: total number of blocks in the domain
+// //   mem_blocks: max number of blocks in memory (-1 for no limit)
+// //   data_size: domain grid size (x, y, z)
+// //   jitter: maximum amount to randomly move each particle
+// //   minvol, maxvol: filter range for which cells to keep
+// //   pass -1.0 to skip either or both bounds
+// //   wrap_: whether wraparound neighbors are used
+// //   twalls_on: whether walls boundaries are used
+// //   times: times for particle exchange, voronoi cells, convex hulls, and output
+// //   outfile: output file name
+// //   mpi_comm: MPI communicator
+// //
+// void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
+// 	       float minvol, float maxvol, int wrap_, int twalls_on,
+// 	       double *times, char *outfile, MPI_Comm mpi_comm)
+// {
+//   // minvol, maxvol not used, but may be in the future; quiet compiler warning for now
+//   minvol = minvol;
+//   maxvol = maxvol;
 
-  // data extents
-  typedef     diy::ContinuousBounds         Bounds;
-  Bounds domain;
-  for(int i = 0; i < 3; i++)
-  {
-    domain.min[i] = 0;
-    domain.max[i] = data_size[i] - 1.0;
-  }
+//   // data extents
+//   typedef     diy::ContinuousBounds         Bounds;
+//   Bounds domain;
+//   for(int i = 0; i < 3; i++)
+//   {
+//     domain.min[i] = 0;
+//     domain.max[i] = data_size[i] - 1.0;
+//   }
 
-  // threads
-  int num_threads = -1;
-#if (defined TIMING || defined MEMORY)
-  num_threads = 1;
-#endif
+//   // threads
+//   int num_threads = -1;
+// #if (defined TIMING || defined MEMORY)
+//   num_threads = 1;
+// #endif
 
-  // init diy
-  diy::mpi::communicator    world(mpi_comm);
-  diy::FileStorage          storage("./DIY.XXXXXX");
-  diy::Master               master(world,
-                                   &create_block,
-                                   &destroy_block,
-                                   mem_blocks,
-				   num_threads,
-                                   &storage,
-                                   &save_block,
-                                   &load_block);
-  diy::RoundRobinAssigner   assigner(world.size(), tot_blocks);
-  AddAndGenerate create(master, jitter);
+//   // init diy
+//   diy::mpi::communicator    world(mpi_comm);
+//   diy::FileStorage          storage("./DIY.XXXXXX");
+//   diy::Master               master(world,
+//                                    &create_block,
+//                                    &destroy_block,
+//                                    mem_blocks,
+// 				   num_threads,
+//                                    &storage,
+//                                    &save_block,
+//                                    &load_block);
+//   diy::RoundRobinAssigner   assigner(world.size(), tot_blocks);
+//   AddAndGenerate create(master, jitter);
 
-  // decompose
-  std::vector<int> my_gids;
-  assigner.local_gids(world.rank(), my_gids);
-  diy::RegularDecomposer<Bounds>::BoolVector          wrap;
-  diy::RegularDecomposer<Bounds>::BoolVector          share_face;
-  diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
-  if (wrap_)
-    wrap.assign(3, true);
-  diy::decompose(3, world.rank(), domain, assigner, create, share_face, wrap, ghosts);
+//   // decompose
+//   std::vector<int> my_gids;
+//   assigner.local_gids(world.rank(), my_gids);
+//   diy::RegularDecomposer<Bounds>::BoolVector          wrap;
+//   diy::RegularDecomposer<Bounds>::BoolVector          share_face;
+//   diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
+//   if (wrap_)
+//     wrap.assign(3, true);
+//   diy::decompose(3, world.rank(), domain, assigner, create, share_face, wrap, ghosts);
 
-  // tessellate
-  quants_t quants;
-  tess(master, quants, times);
+//   // tessellate
+//   quants_t quants;
+//   tess(master, quants, times);
 
-  // output
-  tess_save(master, outfile, times);
-  collect_stats(master, quants, times);
+//   // output
+//   tess_save(master, outfile, times, mpi_comm);
+//   collect_stats(master, quants, times, mpi_comm);
 
-  // TODO: original version had the option of returning blocks instead of writing to file
-  // (for coupling to dense and other tools)
-}
+//   // TODO: original version had the option of returning blocks instead of writing to file
+//   // (for coupling to dense and other tools)
+// }
 
-void tess(diy::Master& master, quants_t& quants, double* times)
+void tess(diy::Master& master,
+          quants_t& quants,
+          double* times)
 {
 #ifdef TIMING
   if (master.threads() != 1)
-    fprintf(stderr, "Warning: timing() calls MPI directly; it's not compatible with using multiple threads\n");
+    fprintf(stderr, "Warning: timing() calls MPI directly; "
+            "it's not compatible with using multiple threads\n");
 #endif
-
-  timing(times, -1, -1);
-  timing(times, TOT_TIME, -1);
 
   // compute first stage tessellation
   timing(times, DEL1_TIME, -1);
@@ -157,7 +151,7 @@ void tess(diy::Master& master, quants_t& quants, double* times)
   timing(times, -1, DEL3_TIME);
 }
 
-void tess_save(diy::Master& master, const char* outfile, double* times)
+void tess_save(diy::Master& master, const char* outfile, double* times, MPI_Comm mpi_comm)
 {
   // All the foreach block functions are done. We now make a very dangerous assumption
   // that all blocks fit in memory because the remaining functions are done on all blocks
@@ -184,9 +178,10 @@ void tess_save(diy::Master& master, const char* outfile, double* times)
       for (int j = 0; j < num_nbrs[i]; j++)
         nbrs[i][j] = l->target(j);
     }
-    strncpy(out_ncfile, outfile, sizeof(out_ncfile));
-    strncat(out_ncfile, ".nc", sizeof(out_ncfile));
-    pnetcdf_write(master.size(), dblocks, out_ncfile, master.communicator(), num_nbrs, nbrs);
+    strncpy(out_ncfile, outfile, sizeof(out_ncfile) - 4);
+    out_ncfile[sizeof(out_ncfile) - 4] = 0;
+    strcat(out_ncfile, ".nc");
+    pnetcdf_write(master.size(), dblocks, out_ncfile, mpi_comm, num_nbrs, nbrs);
     for (int i = 0; i < (int)master.size(); i++)
       delete[] nbrs[i];
     delete[] nbrs;
@@ -194,7 +189,6 @@ void tess_save(diy::Master& master, const char* outfile, double* times)
   }
 
   timing(times, -1, OUT_TIME);
-  timing(times, -1, TOT_TIME);
 
   // cleanup array of block points only used for writing all blocks using existing writer
   // actual blocks cleaned up with the destroy_block() callback function
@@ -226,6 +220,10 @@ void destroy_block(void* b_)
     free(b->rem_gids);
   if (b->vert_to_tet)
     free(b->vert_to_tet);
+
+  // density
+  if (b->density)
+    delete[] b->density;   // allocated with new, freed with delete
 
   // convex hull particles and sent particles
   vector <int> *convex_hull_particles =
@@ -714,16 +712,15 @@ void wrap_pt(point_t& rp, int wrap_dir, Bounds& domain)
   if ((wrap_dir & DIY_Z1) == DIY_Z1)
     rp.z -= (domain.max[2] - domain.min[2]);
 }
-//
+
 //   collects statistics
-//
-void collect_stats(diy::Master& master, quants_t& quants, double* times)
+void tess_stats(diy::Master& master,
+                quants_t& quants,double* times,
+                MPI_Comm mpi_comm)
 {
   int global_min_quants[MAX_QUANTS], global_max_quants[MAX_QUANTS];
-  MPI_Reduce(quants.min_quants, global_min_quants, MAX_QUANTS, MPI_INT, MPI_MIN, 0,
-             master.communicator());
-  MPI_Reduce(quants.max_quants, global_max_quants, MAX_QUANTS, MPI_INT, MPI_MAX, 0,
-             master.communicator());
+  MPI_Reduce(quants.min_quants, global_min_quants, MAX_QUANTS, MPI_INT, MPI_MIN, 0, mpi_comm);
+  MPI_Reduce(quants.max_quants, global_max_quants, MAX_QUANTS, MPI_INT, MPI_MAX, 0, mpi_comm);
 
   if (master.communicator().rank() == 0)
   {
@@ -794,7 +791,7 @@ void timing(double* times, int start, int stop)
 {
   if (start < 0 && stop < 0)
   {
-    for (int i = 0; i < MAX_TIMES; i++)
+    for (int i = 0; i < TESS_MAX_TIMES; i++)
       times[i] = 0.0;
   }
 

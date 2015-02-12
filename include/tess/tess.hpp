@@ -1,7 +1,6 @@
 // ---------------------------------------------------------------------------
 //
-//   functions that have C++ arguments that C source files
-//   should not see, hence they are in a separate header
+//   tess2 header
 //
 //   Tom Peterka
 //   Argonne National Laboratory
@@ -9,16 +8,19 @@
 //   Argonne, IL 60439
 //   tpeterka@mcs.anl.gov
 //
-//   (C) 2013 by Argonne National Laboratory.
-//   See COPYRIGHT in top-level directory.
-//
 // --------------------------------------------------------------------------
+#ifndef _TESS_HPP
+#define _TESS_HPP
 
 #include <vector>
 #include <set>
 
-#include <diy/serialization.hpp>
+#include <diy/mpi.hpp>
 #include <diy/master.hpp>
+#include <diy/assigner.hpp>
+#include <diy/serialization.hpp>
+#include <diy/decomposition.hpp>
+#include <diy/pick.hpp>
 
 #ifdef TESS_USE_CGAL
 #include "tess-cgal.h"
@@ -36,8 +38,8 @@ typedef  diy::RegularContinuousLink  RCLink;
 using namespace std;
 
 void tess(diy::Master& master, quants_t& quants, double* times);
-void tess_save(diy::Master& master, const char* outfile, double* times);
-void collect_stats(diy::Master& master, quants_t& quants, double* times);
+void tess_save(diy::Master& master, const char* outfile, double* times, MPI_Comm mpi_comm);
+void tess_stats(diy::Master& master, quants_t& quants, double* times, MPI_Comm mpi_comm);
 void* create_block();
 void destroy_block(void* b);
 void save_block(const void* b, diy::BinaryBuffer& bb);
@@ -85,6 +87,7 @@ struct AddBlock
     b->tets = NULL;
     b->rem_gids = NULL;
     b->vert_to_tet = NULL;
+    b->density = NULL;
 
     return b;
   }
@@ -130,6 +133,7 @@ namespace diy
       diy::save(bb, d.num_particles);
       diy::save(bb, d.particles, 3 * d.num_particles);
       diy::save(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+      diy::save(bb, d.density, d.num_grid_pts);
       // NB tets and vert_to_tet get recreated in each phase; not saved and reloaded
       vector <int> *convex_hull_particles =
         static_cast<vector <int>*>(d.convex_hull_particles);
@@ -167,6 +171,7 @@ namespace diy
       if (d.num_particles - d.num_orig_particles)
         d.rem_gids = (int*)malloc((d.num_particles - d.num_orig_particles) * sizeof(int));
       diy::load(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+      diy::load(bb, d.density, d.num_grid_pts);
       // NB tets and vert_to_tet get recreated in each phase; not saved and reloaded
       d.num_tets = 0;
       d.tets = NULL;
@@ -187,3 +192,5 @@ namespace diy
     }
   };
 }
+
+#endif

@@ -22,26 +22,36 @@
 #include "utils.h"
 
 /* timing and quantity stats */
-enum {TOT_TIME,
-      LOC1_TIME,
-      INC1_TIME,
-      DEL1_TIME,
-      DEL2_TIME,
-      DEL3_TIME,
-      NEIGH1_TIME,
-      NEIGH2_TIME,
-      OUT_TIME,
-      MAX_TIMES};
-enum {NUM_ORIG_PTS, NUM_FINAL_PTS, NUM_TETS, MAX_QUANTS};
+enum
+{
+  TOT_TIME,
+  LOC1_TIME,
+  INC1_TIME,
+  DEL1_TIME,
+  DEL2_TIME,
+  DEL3_TIME,
+  NEIGH1_TIME,
+  NEIGH2_TIME,
+  OUT_TIME,
+  TESS_MAX_TIMES
+};
+
+enum
+{
+  NUM_ORIG_PTS,
+  NUM_FINAL_PTS,
+  NUM_TETS,MAX_QUANTS
+};
 
 /* public */
 
-#ifdef __cplusplus
-extern "C"
-#endif
-void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter, float minvol,
-               float maxvol, int wrap, int twalls_on,  double *all_times, char *outfile,
-               MPI_Comm mpi_comm);
+/* DEPRECATED */
+/* #ifdef __cplusplus */
+/* extern "C" */
+/* #endif */
+/* void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter, float minvol, */
+/*                float maxvol, int wrap, int twalls_on,  double *all_times, char *outfile, */
+/*                MPI_Comm mpi_comm); */
 
 #if 0
 

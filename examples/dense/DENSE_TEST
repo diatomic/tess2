@@ -60,6 +60,9 @@ infile="../tess-driver/del.out.nc"
 # output file
 outfile="dense.raw"
 
+# algorithm (0=tess, 1 = cic)
+alg=0
+
 # sample grid size (number of points) x y z
 #gsize="16 16 16"
 #gsize="32 32 32"
@@ -89,7 +92,7 @@ gmax="1.5 1.5"
 # program arguments
 #
 
-args="$infile $outfile $gsize $project $mass $ng $gmin $gmax"
+args="$infile $outfile $alg $gsize $project $mass $ng $gmin $gmax"
 
 #------
 #

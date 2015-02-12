@@ -19,13 +19,13 @@
 #include <stddef.h>
 #include "diy/types.h"
 
-#define MAX_HIST_BINS 256 /* maximum number of bins in cell volume histogram */
-#define MAX_NEIGHBORS 27 /* maximum number of neighbor blocks */
+#define MAX_HIST_BINS 256     /* maximum number of bins in cell volume histogram */
+#define MAX_NEIGHBORS 27      /* maximum number of neighbor blocks */
 
 /* remote particle */
 struct point_t {
-  float x, y, z; /* coordinates */
-  int gid; /* owner block global id */
+  float x, y, z;              /* coordinates */
+  int gid;                    /* owner block global id */
 };
 
 /* CLP  - struct walls - using general equation of plane
@@ -40,25 +40,25 @@ float d;
 /* delaunay tessellation for one DIY block */
 struct dblock_t {
 
-  int gid; /* global block id */
-  float mins[3], maxs[3]; /* block extents */
+  int gid;                   /* global block id */
+  float mins[3], maxs[3];    /* block extents */
   struct bb_c_t data_bounds; /* global data extents */
   struct bb_c_t box;	     /* current box; used in swap-reduce() when distributing particles */
-  void* Dt; /* native delaunay data structure */
+  void* Dt;                  /* native delaunay data structure */
 
   /* input particles */
-  int num_orig_particles; /* number of original particles in this block
-  			     before any neighbor exhcange */
-  int num_particles; /* current number of particles in this block after any
-			neighbor exchange; original particles appear first
-			followed by received particles */
-  float* particles; /* all particles, original plus those received from neighbors */
+  int num_orig_particles;    /* number of original particles in this block
+                                before any neighbor exchange */
+  int num_particles;         /* current number of particles in this block after any
+                                neighbor exchange; original particles appear first
+                                followed by received particles */
+  float* particles;          /* all particles, original plus those received from neighbors */
 
   /* tets */
-  int num_tets; /* number of delaunay tetrahedra */
-  struct tet_t* tets; /* delaunay tets */
-  int* rem_gids; /* owners of remote particles */
-  int* vert_to_tet; /* a tet that contains the vertex */
+  int num_tets;              /* number of delaunay tetrahedra */
+  struct tet_t* tets;        /* delaunay tets */
+  int* rem_gids;             /* owners of remote particles */
+  int* vert_to_tet;          /* a tet that contains the vertex */
 
   /* sent particles and convex hull particles
      these persist between phases of the algorithm but ar not saved in the final output
@@ -66,6 +66,9 @@ struct dblock_t {
   void* convex_hull_particles;
   void* sent_particles;
 
+  /* estimated density field */
+  float* density;            /* density field */
+  int num_grid_pts;          /* total number of density grid points */
 };
 
 #endif

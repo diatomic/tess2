@@ -46,6 +46,9 @@ exe=${HOME}/tess/examples/tess-dense/tess-dense
 tb=$[$num_procs * 1]
 #tb=4
 
+# algorithm (0=tess, 1 = cic)
+alg=0
+
 # data size x y z (always 3D)
 #dsize="3 2 2"
 #dsize="3 3 3"
@@ -103,7 +106,7 @@ gmax="1.5 1.5"
 #
 # program arguments
 #
-args="$tb $dsize $jitter $minv $maxv $wrap $walls $outfile $gsize $project $mass $ng $gmin $gmax"
+args="$alg $tb $dsize $jitter $minv $maxv $wrap $walls $outfile $gsize $project $mass $ng $gmin $gmax"
 
 #------
 #
