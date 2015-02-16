@@ -256,6 +256,13 @@ void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapP
     for (size_t i = 0; i < b->num_particles; ++i)
     {
       int loc = floor((b->particles[3*i + cur_dim] - b->box.min[cur_dim]) / (b->box.max[cur_dim] - b->box.min[cur_dim]) * group_size);
+      if (loc >= out_points.size() || loc < 0)
+	fprintf(stderr, "Warning: loc=%d >= %lu : %f vs [%f,%f]\n",
+			loc, out_points.size(),
+			b->particles[3*i + cur_dim],
+			b->box.min[cur_dim], b->box.max[cur_dim]
+		);
+
       out_points[loc].push_back(b->particles[3*i]);
       out_points[loc].push_back(b->particles[3*i + 1]);
       out_points[loc].push_back(b->particles[3*i + 2]);
