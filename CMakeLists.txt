@@ -82,6 +82,7 @@ else			    ()
     message		    ("OpenMP not found")
     add_definitions	    (-DTESS_NO_OPENMP)
 endif()
+add_definitions		    (-DDIY_NO_THREADS)
 
 # OpenGL
 if			    (draw)

@@ -36,7 +36,6 @@
 #include "tess/tet-neighbors.h"
 
 #include <diy/mpi.hpp>
-#include <diy/communicator.hpp>
 #include <diy/master.hpp>
 #include <diy/assigner.hpp>
 #include <diy/serialization.hpp>
@@ -93,8 +92,7 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
   // init diy
   diy::mpi::communicator    world(mpi_comm);
   diy::FileStorage          storage("./DIY.XXXXXX");
-  diy::Communicator         comm(world);
-  diy::Master               master(comm,
+  diy::Master               master(world,
                                    &create_block,
                                    &destroy_block,
                                    mem_blocks,
@@ -107,13 +105,13 @@ void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter,
 
   // decompose
   std::vector<int> my_gids;
-  assigner.local_gids(comm.rank(), my_gids);
+  assigner.local_gids(world.rank(), my_gids);
   diy::RegularDecomposer<Bounds>::BoolVector          wrap;
   diy::RegularDecomposer<Bounds>::BoolVector          share_face;
   diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
   if (wrap_)
     wrap.assign(3, true);
-  diy::decompose(3, comm.rank(), domain, assigner, create, share_face, wrap, ghosts);
+  diy::decompose(3, world.rank(), domain, assigner, create, share_face, wrap, ghosts);
 
   // tessellate
   quants_t quants;
@@ -188,7 +186,7 @@ void tess_save(diy::Master& master, const char* outfile, double* times)
     }
     strncpy(out_ncfile, outfile, sizeof(out_ncfile));
     strncat(out_ncfile, ".nc", sizeof(out_ncfile));
-    pnetcdf_write(master.size(), dblocks, out_ncfile, master.communicator().comm(), num_nbrs, nbrs);
+    pnetcdf_write(master.size(), dblocks, out_ncfile, master.communicator(), num_nbrs, nbrs);
     for (int i = 0; i < (int)master.size(); i++)
       delete[] nbrs[i];
     delete[] nbrs;
@@ -723,9 +721,9 @@ void collect_stats(diy::Master& master, quants_t& quants, double* times)
 {
   int global_min_quants[MAX_QUANTS], global_max_quants[MAX_QUANTS];
   MPI_Reduce(quants.min_quants, global_min_quants, MAX_QUANTS, MPI_INT, MPI_MIN, 0,
-             master.communicator().comm());
+             master.communicator());
   MPI_Reduce(quants.max_quants, global_max_quants, MAX_QUANTS, MPI_INT, MPI_MAX, 0,
-             master.communicator().comm());
+             master.communicator());
 
   if (master.communicator().rank() == 0)
   {

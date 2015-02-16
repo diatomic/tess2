@@ -109,8 +109,7 @@ int main(int argc, char *argv[])
 
   // initialize DIY and decompose domain
   diy::FileStorage          storage("./DIY.XXXXXX");
-  diy::Communicator         comm(world);
-  diy::Master               master(comm,
+  diy::Master               master(world,
                                    &create_block,
                                    &destroy_block,
                                    mem_blocks,
@@ -125,7 +124,7 @@ int main(int argc, char *argv[])
 
   // decompose
   std::vector<int> my_gids;
-  assigner.local_gids(comm.rank(), my_gids);
+  assigner.local_gids(rank, my_gids);
   diy::RegularDecomposer<Bounds>::BoolVector          wrap;
   diy::RegularDecomposer<Bounds>::BoolVector          share_face;
   diy::RegularDecomposer<Bounds>::CoordinateVector    ghosts;
