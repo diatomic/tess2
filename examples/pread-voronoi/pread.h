@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 
-void read_particles(char *infile, int rank, int size,
+void read_particles(const char *infile, int rank, int size,
 		    std::vector <float> &particles,
 		    const std::vector<std::string>& coordinates);
 
