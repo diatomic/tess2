@@ -44,7 +44,7 @@ struct AddAndRead: public AddBlock
 
     // read points
     std::vector<float>	particles;
-    read_particles(infile, gid, nblocks, particles, coordinates);
+    read_particles(master.communicator(), infile, gid, nblocks, particles, coordinates);
     //printf("%d: Read %lu particles\n", gid, particles.size()/3);
 
     b->num_particles = particles.size()/3;
