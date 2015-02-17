@@ -134,6 +134,8 @@ int main(int argc, char *argv[])
     return 1;
   }
 
+  if (outfile == "!")
+    outfile = "";
 
   // initialize DIY and decompose domain
   diy::FileStorage          storage(prefix);
