@@ -59,4 +59,5 @@ void read_particles(MPI_Comm comm,
   }
 
   status = H5Fclose(file_id);
+  status = H5Pclose(acc_tpl1);
 }
