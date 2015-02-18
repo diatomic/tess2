@@ -224,16 +224,9 @@ int main(int argc, char** argv) {
   diy::mpi::environment	    env(argc, argv);
   diy::mpi::communicator    world;
 
-  string prefix = "./DIY.XXXXXX";
-  diy::FileStorage          storage(prefix);
   diy::Master               master(world,
                                    &create_block,
-                                   &destroy_block,
-                                   -1,
-				   1,
-                                   &storage,
-                                   &save_block,
-                                   &load_block);
+                                   &destroy_block);
 
   diy::ContiguousAssigner   assigner(world.size(), -1);	    // number of blocks will be set by read_blocks()
   diy::io::read_blocks(argv[1], world, assigner, master, &load_block_light);
