@@ -26,6 +26,11 @@
 #include "tess/io.h"
 #include "tess/volume.h"
 
+#include "tess/tess.hpp"
+
+#include <diy/master.hpp>
+#include <diy/io/block.hpp>
+
 #if defined(MAC_OSX)
 #include <GLUT/glut.h>
 #include <OpenGL/gl.h>
@@ -132,8 +137,9 @@ vector <float> face_vols;
 vec3d data_min, data_max;
 
 // local blocks
-dblock_t *blocks; // newer delaunay blocks
+//dblock_t *blocks; // newer delaunay blocks
 int nblocks;
+diy::Master* master;
 
 // general prupose quadrics
 GLUquadricObj *q;
@@ -214,35 +220,53 @@ int main(int argc, char** argv) {
   int **neighbors; // neighbors of each local block (unused)
   int **neigh_procs; // procs of neighbors of each local block (unused)
 
-  MPI_Init(&argc, &argv);
+  //MPI_Init(&argc, &argv);
+  diy::mpi::environment	    env(argc, argv);
+  diy::mpi::communicator    world;
 
-  pnetcdf_read(&nblocks, &tot_blocks, &blocks, argv[1], MPI_COMM_WORLD,
-	       &num_neighbors, &neighbors, &neigh_procs);
+  string prefix = "./DIY.XXXXXX";
+  diy::FileStorage          storage(prefix);
+  diy::Master               master(world,
+                                   &create_block,
+                                   &destroy_block,
+                                   -1,
+				   1,
+                                   &storage,
+                                   &save_block,
+                                   &load_block);
 
-  MPI_Finalize();
+  diy::ContiguousAssigner   assigner(world.size(), -1);	    // number of blocks will be set by read_blocks()
+  diy::io::read_blocks(argv[1], world, assigner, master, &load_block_light);
+  //pnetcdf_read(&nblocks, &tot_blocks, &blocks, argv[1], MPI_COMM_WORLD,
+  //             &num_neighbors, &neighbors, &neigh_procs);
+
+  //MPI_Finalize();
+  
+  tot_blocks = nblocks = master.size();
+  ::master = &master;
 
   // get overall data extent
   for (int i = 0; i < nblocks; i++) {
     if (i == 0) {
-      data_min.x = blocks[i].mins[0];
-      data_min.y = blocks[i].mins[1];
-      data_min.z = blocks[i].mins[2];
-      data_max.x = blocks[i].maxs[0];
-      data_max.y = blocks[i].maxs[1];
-      data_max.z = blocks[i].maxs[2];
+      data_min.x = master.block<dblock_t>(i)->mins[0];
+      data_min.y = master.block<dblock_t>(i)->mins[1];
+      data_min.z = master.block<dblock_t>(i)->mins[2];
+      data_max.x = master.block<dblock_t>(i)->maxs[0];
+      data_max.y = master.block<dblock_t>(i)->maxs[1];
+      data_max.z = master.block<dblock_t>(i)->maxs[2];
     }
-    if (blocks[i].mins[0] < data_min.x)
-      data_min.x = blocks[i].mins[0];
-    if (blocks[i].mins[1] < data_min.y)
-      data_min.y = blocks[i].mins[1];
-    if (blocks[i].mins[2] < data_min.z)
-      data_min.z = blocks[i].mins[2];
-    if (blocks[i].maxs[0] > data_max.x)
-      data_max.x = blocks[i].maxs[0];
-    if (blocks[i].maxs[1] > data_max.y)
-      data_max.y = blocks[i].maxs[1];
-    if (blocks[i].maxs[2] > data_max.z)
-      data_max.z = blocks[i].maxs[2];
+    if (master.block<dblock_t>(i)->mins[0] < data_min.x)
+      data_min.x = master.block<dblock_t>(i)->mins[0];
+    if (master.block<dblock_t>(i)->mins[1] < data_min.y)
+      data_min.y = master.block<dblock_t>(i)->mins[1];
+    if (master.block<dblock_t>(i)->mins[2] < data_min.z)
+      data_min.z = master.block<dblock_t>(i)->mins[2];
+    if (master.block<dblock_t>(i)->maxs[0] > data_max.x)
+      data_max.x = master.block<dblock_t>(i)->maxs[0];
+    if (master.block<dblock_t>(i)->maxs[1] > data_max.y)
+      data_max.y = master.block<dblock_t>(i)->maxs[1];
+    if (master.block<dblock_t>(i)->maxs[2] > data_max.z)
+      data_max.z = master.block<dblock_t>(i)->maxs[2];
   }
 
   // debug
@@ -307,7 +331,7 @@ void display() {
   // block bounds
   if (block_mode) {
     for (int i = 0; i < nblocks; i++)
-      draw_cube(blocks[i].mins, blocks[i].maxs, 1.0, 0.0, 1.0);
+      draw_cube(master->block<dblock_t>(i)->mins, master->block<dblock_t>(i)->maxs, 1.0, 0.0, 1.0);
   }
 
   // cell verts
@@ -1084,19 +1108,19 @@ void PrepCellVertRendering() {
   for (int b = 0; b < nblocks; b++) { // blocks
 
     // tets
-    for (int t = 0; t < blocks[b].num_tets; t++) {
+    for (int t = 0; t < master->block<dblock_t>(b)->num_tets; t++) {
 
       // push voronoi vertex for rendering
       // voronoi vertex is the circumcenter of the tet
       vec3d center;
       circumcenter(&center.x,
-		   &(blocks[b].tets[t]), blocks[b].particles);
+		   &(master->block<dblock_t>(b)->tets[t]), master->block<dblock_t>(b)->particles);
 
 #if 0	// debug purpuses only
-      const tet_t& tt = blocks[b].tets[t];
-      float dist = distance(&center.x, &blocks[b].particles[3*tt.verts[0]]);
+      const tet_t& tt = master->block<dblock_t>(b)->tets[t];
+      float dist = distance(&center.x, &master->block<dblock_t>(b)->particles[3*tt.verts[0]]);
       for (int i = 1; i < 4; ++i) {
-	float dist2 = distance(&center.x, &blocks[b].particles[3*tt.verts[i]]);
+	float dist2 = distance(&center.x, &master->block<dblock_t>(b)->particles[3*tt.verts[i]]);
 	if (fabs(dist - dist2) > .00001) {
 	  fprintf(stderr, "Warning: %f %f\n", dist, dist2);
 	}
@@ -1123,23 +1147,23 @@ void PrepCellRendering(stats_t& stats) {
   for (int b = 0; b < nblocks; b++) { // blocks
 
     vector<float> circumcenters;
-    fill_circumcenters(circumcenters, blocks[b].tets, blocks[b].num_tets, blocks[b].particles);
+    fill_circumcenters(circumcenters, master->block<dblock_t>(b)->tets, master->block<dblock_t>(b)->num_tets, master->block<dblock_t>(b)->particles);
 
     // for all voronoi cells
-    for (int p = 0; p < blocks[b].num_orig_particles; p++) {
+    for (int p = 0; p < master->block<dblock_t>(b)->num_orig_particles; p++) {
 
       // tet
-      int t = blocks[b].vert_to_tet[p];
+      int t = master->block<dblock_t>(b)->vert_to_tet[p];
 
       // skip tets with missing neighbors
-      if (blocks[b].tets[t].tets[0] == -1 || blocks[b].tets[t].tets[1] == -1 ||
-	  blocks[b].tets[t].tets[2] == -1 || blocks[b].tets[t].tets[3] == -1)
+      if (master->block<dblock_t>(b)->tets[t].tets[0] == -1 || master->block<dblock_t>(b)->tets[t].tets[1] == -1 ||
+	  master->block<dblock_t>(b)->tets[t].tets[2] == -1 || master->block<dblock_t>(b)->tets[t].tets[3] == -1)
 	continue;
 
       // neighbor edges a vector of (vertex u, tet of vertex u) pairs
       // that neighbor vertex v
       vector< pair<int, int> > nbrs;
-      bool finite = neighbor_edges(nbrs, p, blocks[b].tets, t);
+      bool finite = neighbor_edges(nbrs, p, master->block<dblock_t>(b)->tets, t);
 
       // skip tet vertices corresponding to incomplete voronoi cells
       if (!finite)
@@ -1160,14 +1184,14 @@ void PrepCellRendering(stats_t& stats) {
 	int u  = nbrs[i].first;
 	int ut = nbrs[i].second;
 	std::vector<int> edge_link;
-	fill_edge_link(edge_link, p, u, ut, blocks[b].tets);
+	fill_edge_link(edge_link, p, u, ut, master->block<dblock_t>(b)->tets);
 
 	// following is equivalent of all vertices in a face
 	for (int j = 0; j < (int)edge_link.size(); ++j) {
 
 	  vec3d center;
 	  circumcenter((float *)&(center.x),
-		       &(blocks[b].tets[edge_link[j]]), blocks[b].particles);
+		       &(master->block<dblock_t>(b)->tets[edge_link[j]]), master->block<dblock_t>(b)->particles);
 
 	  // filter out cells far outside the overal extents
 	  if (center.x > data_max.x + (data_max.x - data_min.x) * (ds - 1) ||
@@ -1214,8 +1238,8 @@ void PrepCellRendering(stats_t& stats) {
 	for (int k = 0; k < (int)temp_vor_normals.size(); k++)
 	  vor_normals.push_back(temp_vor_normals[k]);
         stats.tot_cells++;
-        vols.push_back(volume(p, blocks[b].vert_to_tet, blocks[b].tets, blocks[b].num_tets,
-                              blocks[b].particles, circumcenters));
+        vols.push_back(volume(p, master->block<dblock_t>(b)->vert_to_tet, master->block<dblock_t>(b)->tets, master->block<dblock_t>(b)->num_tets,
+                              master->block<dblock_t>(b)->particles, circumcenters));
         if (vols.size() == 1 || vols.back() < stats.min_cell_vol)
           stats.min_cell_vol = vols.back();
         if (vols.size() == 1 || vols.back() > stats.max_cell_vol)
@@ -1266,19 +1290,19 @@ void PrepTetRendering(stats_t& stats) {
   for (int b = 0; b < nblocks; b++) { // blocks
 
     // tets
-    for (int t = 0; t < blocks[b].num_tets; t++) {
+    for (int t = 0; t < master->block<dblock_t>(b)->num_tets; t++) {
 
       // determine unique ownership of the tet
-      if (!my_tet(blocks[b], t))
+      if (!my_tet(*(master->block<dblock_t>(b)), t))
         continue;
 
       for (int v = 0; v < 4; v++) {
 
-	int s = blocks[b].tets[t].verts[v]; // index pf particle
+	int s = master->block<dblock_t>(b)->tets[t].verts[v]; // index pf particle
 	vec3d p; // coordinates for tet vertices
-        p.x = blocks[b].particles[3 * s];
-        p.y = blocks[b].particles[3 * s + 1];
-        p.z = blocks[b].particles[3 * s + 2];
+        p.x = master->block<dblock_t>(b)->particles[3 * s];
+        p.y = master->block<dblock_t>(b)->particles[3 * s + 1];
+        p.z = master->block<dblock_t>(b)->particles[3 * s + 2];
 	tet_verts.push_back(p);
 
       }
@@ -1399,12 +1423,12 @@ void PrepSiteRendering(stats_t& stats) {
 
     // sites
     n = 0;
-    for (int j = 0; j < blocks[i].num_orig_particles; j++) {
+    for (int j = 0; j < master->block<dblock_t>(i)->num_orig_particles; j++) {
 
       vec3d s;
-      s.x = blocks[i].particles[n];
-      s.y = blocks[i].particles[n + 1];
-      s.z = blocks[i].particles[n + 2];
+      s.x = master->block<dblock_t>(i)->particles[n];
+      s.y = master->block<dblock_t>(i)->particles[n + 1];
+      s.z = master->block<dblock_t>(i)->particles[n + 2];
       n += 3;
       sites.push_back(s);
 

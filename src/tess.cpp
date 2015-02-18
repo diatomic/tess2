@@ -41,6 +41,7 @@
 #include <diy/serialization.hpp>
 #include <diy/decomposition.hpp>
 #include <diy/pick.hpp>
+#include <diy/io/block.hpp>
 
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>
@@ -184,9 +185,10 @@ void tess_save(diy::Master& master, const char* outfile, double* times)
       for (int j = 0; j < num_nbrs[i]; j++)
         nbrs[i][j] = l->target(j);
     }
-    strncpy(out_ncfile, outfile, sizeof(out_ncfile));
-    strncat(out_ncfile, ".nc", sizeof(out_ncfile));
-    pnetcdf_write(master.size(), dblocks, out_ncfile, master.communicator(), num_nbrs, nbrs);
+    //strncpy(out_ncfile, outfile, sizeof(out_ncfile));
+    //strncat(out_ncfile, ".nc", sizeof(out_ncfile));
+    //pnetcdf_write(master.size(), dblocks, out_ncfile, master.communicator(), num_nbrs, nbrs);
+    diy::io::write_blocks(outfile, master.communicator(), master, &save_block_light);
     for (int i = 0; i < (int)master.size(); i++)
       delete[] nbrs[i];
     delete[] nbrs;
@@ -253,6 +255,57 @@ void load_block(void* b, diy::BinaryBuffer& bb)
 {
   diy::load(bb, *static_cast<dblock_t*>(b));
 }
+
+void save_block_light(const void* b_, diy::BinaryBuffer& bb)
+{
+  const dblock_t& d = *static_cast<const dblock_t*>(b_);
+
+  diy::save(bb, d.gid);
+  diy::save(bb, d.mins);
+  diy::save(bb, d.maxs);
+  diy::save(bb, d.box);
+  diy::save(bb, d.data_bounds);
+  diy::save(bb, d.num_orig_particles);
+  diy::save(bb, d.num_particles);
+  diy::save(bb, d.particles, 3 * d.num_particles);
+  diy::save(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+ 
+  diy::save(bb, d.num_tets);
+  diy::save(bb, d.tets, d.num_tets);
+  diy::save(bb, d.vert_to_tet, d.num_particles);
+}
+
+void load_block_light(void* b_, diy::BinaryBuffer& bb)
+{
+  dblock_t& d = *static_cast<dblock_t*>(b_);
+
+  diy::load(bb, d.gid);
+  // debug
+  // fprintf(stderr, "Loading block gid %d\n", d.gid);
+  diy::load(bb, d.mins);
+  diy::load(bb, d.maxs);
+  diy::load(bb, d.box);
+  diy::load(bb, d.data_bounds);
+  diy::load(bb, d.num_orig_particles);
+  diy::load(bb, d.num_particles);
+  d.particles = NULL;
+  if (d.num_particles)
+    d.particles = (float*)malloc(d.num_particles * 3 * sizeof(float));
+  diy::load(bb, d.particles, 3 * d.num_particles);
+  d.rem_gids = NULL;
+  if (d.num_particles - d.num_orig_particles)
+    d.rem_gids = (int*)malloc((d.num_particles - d.num_orig_particles) * sizeof(int));
+  diy::load(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+
+  diy::load(bb, d.num_tets);
+  d.tets = (tet_t*)malloc(d.num_tets * sizeof(tet_t));
+  diy::load(bb, d.tets, d.num_tets);
+  d.vert_to_tet = NULL;
+  if (d.num_particles)
+    d.vert_to_tet = (int*)malloc(d.num_particles * sizeof(int));
+  diy::load(bb, d.vert_to_tet, d.num_particles);
+}
+
 //
 // generate particles, return final number of particles generated
 //

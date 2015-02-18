@@ -24,6 +24,8 @@
 #include "tess-cgal.h"
 #endif
 
+#include "tess.h"
+
 // quantity stats per process
 struct quants_t {
 int min_quants[MAX_QUANTS];
@@ -42,6 +44,8 @@ void* create_block();
 void destroy_block(void* b);
 void save_block(const void* b, diy::BinaryBuffer& bb);
 void load_block(void* b, diy::BinaryBuffer& bb);
+void save_block_light(const void* b, diy::BinaryBuffer& bb);
+void load_block_light(void* b, diy::BinaryBuffer& bb);
 void create(int gid, const Bounds& core, const Bounds& bounds, const diy::Link& link);
 int gen_particles(dblock_t* b, float jitter);
 void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);

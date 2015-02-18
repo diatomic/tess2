@@ -96,11 +96,11 @@ endif			    (draw)
 find_path                   (DIY_INCLUDE_DIRS		diy/types.h)
 
 # PNetCDF
-find_path                   (PNetCDF_INCLUDE_DIR	pnetcdf.h)
-find_library                (PNetCDF_LIBRARY NAMES	pnetcdf)
-if			    (PNetCDF_LIBRARY)
-  add_definitions	    (-DPNETCDF_IO)
-endif			    (PNetCDF_LIBRARY)
+#find_path                   (PNetCDF_INCLUDE_DIR	pnetcdf.h)
+#find_library                (PNetCDF_LIBRARY NAMES	pnetcdf)
+#if			    (PNetCDF_LIBRARY)
+#  add_definitions	    (-DPNETCDF_IO)
+#endif			    (PNetCDF_LIBRARY)
 
 # GenericIO
 if			    (hacc_test)
@@ -111,7 +111,7 @@ endif			    (hacc_test)
 set                         (CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-isystem")
 include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 			     ${DIY_INCLUDE_DIRS}
-			     ${PNetCDF_INCLUDE_DIR}
+			     #${PNetCDF_INCLUDE_DIR}
 			     ${GenericIO_INCLUDE_DIR}
                              SYSTEM ${MPI_INCLUDE_PATH}
                             )
@@ -119,7 +119,7 @@ include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 set			    (libraries
 			     ${libraries}
 			     ${DIY_LIBRARY}
-			     ${PNetCDF_LIBRARY}
+			     #${PNetCDF_LIBRARY}
 			     ${GenericIO_LIBRARY}
 			     ${MPI_C_LIBRARIES}
 			     ${MPI_CXX_LIBRARIES}
