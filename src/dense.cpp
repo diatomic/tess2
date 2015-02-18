@@ -239,7 +239,6 @@ void IterateCells(dblock_t* block,
   grid_pt_t *grid_pts = NULL;                   // grid points covered by the cell
   int *border = NULL;                           // cell border, min,max x index for each y, z index
   int num_grid_pts;                             // number of grid points
-  int num_enqs = 0;                             // debug: number of items enqueued
   RCLink* l = dynamic_cast<RCLink*>(cp.link()); // link to block neighbors
 
   // divisor for volume (3d density) or area (2d density)
@@ -308,7 +307,6 @@ void IterateCells(dblock_t* block,
         in(*l, grid_pos, std::inserter(dests, dests.end()), block->data_bounds);
         for (set<int>::iterator it = dests.begin(); it != dests.end(); it++)
           cp.enqueue(l->target(*it), grid_pts[i]);
-        num_enqs++; // debug
       }
     } // grid points covered by cell
   } // cells
@@ -317,9 +315,6 @@ void IterateCells(dblock_t* block,
     free(grid_pts);
   if (border)
     free(border);
-
-  // debug
-//   fprintf(stderr, "Number of items of size %lu enqueued = %d\n", sizeof(grid_pt_t), num_enqs);
 }
 
 #ifdef TESS_OPENMP_FOUND
@@ -987,9 +982,8 @@ void ProjectGrid(MPI_Comm comm,
     {
       reqs.resize(reqs.size()+1);
       // Send density to projected block's proc
-      int errcode = MPI_Isend(dblocks[block]->density, block_info[block].size, MPI_FLOAT,
+      MPI_Isend(dblocks[block]->density, block_info[block].size, MPI_FLOAT,
                               root_rank, block_info[block].root_gid, comm, &reqs.back());
-      if (errcode != MPI_SUCCESS) handle_error(errcode, (char *)"MPI_ISEND", comm);
     }
     else
     {
@@ -1006,23 +1000,26 @@ void ProjectGrid(MPI_Comm comm,
     if (block_info[block].min_idx[2]) continue; // Only z=0 blocks receive data (accumulators)
 
     // buffer for retreived values
-    float* density_buffer =
-      static_cast<float*>(calloc(sizeof(float),
-                                 block_info[block].num_idx[0]*block_info[block].num_idx[1]));
+    float* density_buffer = new float[block_info[block].size];
 
     // For all block on z axis (external block)
     for(int zidx = 1; zidx < block_info[block].zcount; ++zidx)
     {
-      // Retrieve density (in buffer) for external block on other proc, then set pointer to buffer
-      int errcode = MPI_Recv(density_buffer, block_info[block].size, MPI_FLOAT, MPI_ANY_SOURCE,
+      // Retrieve density (in buffer) for external block on other proc
+      MPI_Recv(density_buffer, block_info[block].size, MPI_FLOAT, MPI_ANY_SOURCE,
                              block_info[block].root_gid, comm, MPI_STATUS_IGNORE);
-      if (errcode != MPI_SUCCESS) handle_error(errcode, (char *)"MPI_Recv", comm);
 
       // add external block density to local block
+      float block_tot_dense = 0.0;  // debug
+      float buf_tot_dense = 0.0;    // debug
       for (int i = 0; i < block_info[block].size; ++i)
+      {
         dblocks[block]->density[i] += density_buffer[i];
+        block_tot_dense += dblocks[block]->density[i];  // debug
+        buf_tot_dense += density_buffer[i];             // debug
+      }
     }
-    free(density_buffer); // free buffer
+    delete[] density_buffer;
   }
 
   // ------ cleanup ------
