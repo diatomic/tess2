@@ -21,10 +21,13 @@
 #include <diy/serialization.hpp>
 #include <diy/decomposition.hpp>
 #include <diy/pick.hpp>
+#include <diy/io/block.hpp>
 
 #ifdef TESS_USE_CGAL
 #include "tess-cgal.h"
 #endif
+
+#include "tess.h"
 
 // quantity stats per process
 struct quants_t {
@@ -44,6 +47,8 @@ void* create_block();
 void destroy_block(void* b);
 void save_block(const void* b, diy::BinaryBuffer& bb);
 void load_block(void* b, diy::BinaryBuffer& bb);
+void save_block_light(const void* b, diy::BinaryBuffer& bb);
+void load_block_light(void* b, diy::BinaryBuffer& bb);
 void create(int gid, const Bounds& core, const Bounds& bounds, const diy::Link& link);
 int gen_particles(dblock_t* b, float jitter);
 void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args);

@@ -3,6 +3,7 @@
 #include <vector>
 #include <stdio.h>
 #include <cmath>
+#include <iostream>
 
 #include "tess/tess.h"
 #include "tess/tess.hpp"
@@ -16,14 +17,10 @@
 #include <diy/reduce.hpp>
 #include <diy/partners/swap.hpp>
 
+#include "../opts.h"
+
 
 using namespace std;
-
-void GetArgs(int argc, char **argv, int &tb, int &threads, int &mb,
-	     char *infile, char *outfile,
-	     std::vector<std::string>& coordinates,
-	     float* mins, float* maxs,
-	     float *minvol, float *maxvol, int *wrap);
 
 void ExchangeParticles(diy::Master& master, diy::Assigner& assigner, int tot_blocks);
 void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
@@ -33,7 +30,7 @@ struct AddAndRead: public AddBlock
 {
 	AddAndRead(diy::Master&			    m,
 		   int				    nblocks_,
-		   char*			    infile_,
+		   const char*			    infile_,
 		   const std::vector<std::string>&  coordinates_):
 	  AddBlock(m),
 	  nblocks(nblocks_),
@@ -47,7 +44,7 @@ struct AddAndRead: public AddBlock
 
     // read points
     std::vector<float>	particles;
-    read_particles(infile, gid, nblocks, particles, coordinates);
+    read_particles(master.communicator(), infile, gid, nblocks, particles, coordinates);
     //printf("%d: Read %lu particles\n", gid, particles.size()/3);
 
     b->num_particles = particles.size()/3;
@@ -64,7 +61,7 @@ struct AddAndRead: public AddBlock
   }
 
   int					nblocks;
-  char*					infile;
+  const char*				infile;
   const std::vector<std::string>&	coordinates;
 };
 
@@ -73,8 +70,8 @@ int main(int argc, char *argv[])
   int tot_blocks; // total number of blocks in the domain
   int num_threads; // number of threads diy can use
   int mem_blocks; // number of blocks to keep in memory
-  char infile[256]; // input file name
-  char outfile[256]; // output file name
+  string infile; // input file name
+  string outfile; // output file name
   float mins[3], maxs[3]; // data global extents
   float minvol, maxvol; // volume range, -1.0 = unused
   //double times[TESS_MAX_TIMES]; // timing
@@ -99,16 +96,49 @@ int main(int argc, char *argv[])
   typedef     diy::ContinuousBounds         Bounds;
   Bounds domain;
 
-  GetArgs(argc, argv,
-	  tot_blocks, num_threads, mem_blocks,
-	  infile, outfile,
-          coordinates,
-	  domain.min, domain.max,
-          &minvol, &maxvol,
-	  &wrap_);
+  using namespace opts;
+
+  // defaults
+  tot_blocks  = size;
+  num_threads = 1;
+  mem_blocks  = -1;
+  string prefix = "./DIY.XXXXXX";
+  minvol = 0;
+  maxvol = 0;
+
+  Options ops(argc, argv);
+  ops
+    >> Option('b', "blocks",    tot_blocks,   "Total number of blocks to use")
+    >> Option('t', "threads",   num_threads,  "Number of threads to use")
+    >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
+    >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
+    >> Option(     "minvol",    minvol,       "minvol cutoff")
+    >> Option(     "maxvol",    maxvol,       "minvol cutoff")
+  ;
+  wrap_ = ops >> Present('w', "wrap", "Use periodic boundary conditions");
+
+  coordinates.resize(3);
+  if (  ops >> Present('h', "help", "show help") ||
+      !(ops >> PosOption(infile) >> PosOption(outfile)
+            >> PosOption(coordinates[0]) >> PosOption(coordinates[1]) >> PosOption(coordinates[2])
+            >> PosOption(domain.min[0])  >> PosOption(domain.min[1])  >> PosOption(domain.min[2])
+            >> PosOption(domain.max[0])  >> PosOption(domain.max[1])  >> PosOption(domain.max[2])
+       )
+     )
+  {
+    if (rank == 0)
+    {
+      std::cout << "Usage: " << argv[0] << " [OPTIONS] infile outfile coordinates mins maxs\n";
+      std::cout << ops;
+    }
+    return 1;
+  }
+
+  if (outfile == "!")
+    outfile = "";
 
   // initialize DIY and decompose domain
-  diy::FileStorage          storage("./DIY.XXXXXX");
+  diy::FileStorage          storage(prefix);
   diy::Master               master(world,
                                    &create_block,
                                    &destroy_block,
@@ -120,7 +150,7 @@ int main(int argc, char *argv[])
   //diy::RoundRobinAssigner   assigner(world.size(), tot_blocks);
   diy::ContiguousAssigner   assigner(world.size(), tot_blocks);
 
-  AddAndRead		    create_and_read(master, tot_blocks, infile, coordinates);
+  AddAndRead		    create_and_read(master, tot_blocks, infile.c_str(), coordinates);
 
   // decompose
   std::vector<int> my_gids;
@@ -139,6 +169,7 @@ int main(int argc, char *argv[])
 
   // sort and distribute particles to all blocks
   ExchangeParticles(master, assigner, tot_blocks);
+  printf("%d: particles exchanged\n", rank);
 
 #if 0	    // debug
   for (unsigned i = 0; i < master.size(); ++i)
@@ -169,49 +200,11 @@ int main(int argc, char *argv[])
   tess(master, quants, times);
   
   if (mem_blocks == -1 || mem_blocks >= tot_blocks)
-    tess_save(master, outfile, times);
+    tess_save(master, outfile.c_str(), times);
 
   collect_stats(master, quants, times);
 
   return 0;
-
-}
-//----------------------------------------------------------------------------
-//
-// gets command line args
-//
-void GetArgs(int argc, char **argv, int &tb, int &threads, int &mb,
-	     char *infile, char *outfile,
-	     std::vector<std::string>& coordinates,
-	     float* mins, float* maxs,
-	     float *minvol, float *maxvol, int *wrap) {
-
-  assert(argc >= 10);
-
-  tb = atoi(argv[1]);
-  threads = atoi(argv[2]);
-  mb = atoi(argv[3]);
-
-  strcpy(infile, argv[4]);
-
-  if (argv[5][0] =='!')
-    strcpy(outfile, "");
-  else
-    strcpy(outfile, argv[5]);
-
-  coordinates.resize(3);
-  coordinates[0] = argv[6];
-  coordinates[1] = argv[7];
-  coordinates[2] = argv[8];
-  mins[0] = atof(argv[9]);
-  mins[1] = atof(argv[10]);
-  mins[2] = atof(argv[11]);
-  maxs[0] = atof(argv[12]);
-  maxs[1] = atof(argv[13]);
-  maxs[2] = atof(argv[14]);
-  *minvol = atof(argv[15]);
-  *maxvol = atof(argv[16]);
-  *wrap = atoi(argv[17]);
 
 }
 
