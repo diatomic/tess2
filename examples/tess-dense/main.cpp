@@ -212,7 +212,7 @@ int main(int argc, char *argv[])
   dense_times[COMP_TIME] = MPI_Wtime();
 
   // compute the density
-  dense(alg_type, comm, num_given_bounds, given_mins, given_maxs, project, proj_plane, mass,
+  dense(alg_type, num_given_bounds, given_mins, given_maxs, project, proj_plane, mass,
         data_mins, data_maxs, grid_phys_mins, grid_phys_maxs, grid_step_size, eps, glo_num_idx,
         master);
   MPI_Barrier(comm);
@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
   MPI_Barrier(comm);
   dense_time = MPI_Wtime() - dense_time;
   dense_times[OUTPUT_TIME] = MPI_Wtime();
-  WriteGrid(comm, maxblocks, tot_blocks, outfile, project, glo_num_idx, eps, data_mins, data_maxs,
+  WriteGrid(maxblocks, tot_blocks, outfile, project, glo_num_idx, eps, data_mins, data_maxs,
             num_given_bounds, given_mins, given_maxs, master, &assigner);
   MPI_Barrier(comm);
   dense_times[OUTPUT_TIME] = MPI_Wtime() - dense_times[OUTPUT_TIME];

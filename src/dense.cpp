@@ -27,7 +27,6 @@ static float check_mass = 0.0; // ground truth total mass
 
 // density estimator
 void dense(alg alg_type,              // algorithm DENSE_TESS, DENSE_CIC
-           MPI_Comm comm,             // MPI communicator
            int num_given_bounds,      // number of given physical bounds of grid
            float *given_mins,         // given physical bounds of grid (x,y,z)
 	   float *given_maxs,
@@ -50,7 +49,7 @@ void dense(alg alg_type,              // algorithm DENSE_TESS, DENSE_CIC
 
   // find global data bounds
   // TODO: needs to be a foreach function, currently assumes all blocks in memory
-  DataBounds(comm, data_mins, data_maxs, master);
+  DataBounds(data_mins, data_maxs, master);
 
   // find grid bounds and step size
   GridStepParams(num_given_bounds, given_mins, given_maxs, data_mins, data_maxs, grid_phys_mins,
@@ -737,7 +736,6 @@ void CellBounds(dblock_t *dblock,
 
 // write density grid
 //
-// comm: MPI communicator
 // mblocks: max number of blocks in any process
 // tblocks: total (global) number of blocks
 // outfile: output file name
@@ -749,8 +747,7 @@ void CellBounds(dblock_t *dblock,
 // given_mins, given_maxs: given global data extents (x,y,z)
 // master: diy master object
 // assigner: diy assigner object
-void WriteGrid(MPI_Comm comm,
-               int mblocks,
+void WriteGrid(int mblocks,
                int tblocks,
                char *outfile,
                bool project,
@@ -771,6 +768,7 @@ void WriteGrid(MPI_Comm comm,
   int subsizes[3]; // sizes of subarrays
   int starts[3]; // starting offsets of subarrays
   MPI_Datatype dtype; // subarray datatype
+  MPI_Comm comm = master.communicator();
 
   // array of pointers to all my local blocks
   int nblocks = master.size();
@@ -788,13 +786,12 @@ void WriteGrid(MPI_Comm comm,
   // global grid parameters
   float grid_phys_mins[3], grid_phys_maxs[3]; // global grid extents
   float grid_step_size[3]; // physical grid space size
-  GridStepParams(num_given_bounds, given_mins, given_maxs, data_mins,
-		 data_maxs, grid_phys_mins, grid_phys_maxs, grid_step_size,
-		 glo_num_idx);
+  GridStepParams(num_given_bounds, given_mins, given_maxs, data_mins, data_maxs, grid_phys_mins,
+                 grid_phys_maxs, grid_step_size, glo_num_idx);
 
   // project
   if (project)
-    ProjectGrid(comm, tblocks, glo_num_idx, eps, data_mins, data_maxs,
+    ProjectGrid(tblocks, glo_num_idx, eps, data_mins, data_maxs,
                 grid_phys_mins, grid_step_size, master, assigner);
 
   // write
@@ -821,11 +818,9 @@ void WriteGrid(MPI_Comm comm,
 	subsizes[0] = block_num_idx[1];
 	subsizes[1] = block_num_idx[0];
 
-	MPI_Type_create_subarray(2, sizes, subsizes, starts, MPI_ORDER_C,
-				 MPI_FLOAT, &dtype);
+	MPI_Type_create_subarray(2, sizes, subsizes, starts, MPI_ORDER_C, MPI_FLOAT, &dtype);
 	MPI_Type_commit(&dtype);
-	MPI_File_set_view(fd, 0, MPI_FLOAT, dtype, (char *)"native",
-			  MPI_INFO_NULL);
+	MPI_File_set_view(fd, 0, MPI_FLOAT, dtype, (char *)"native", MPI_INFO_NULL);
 
         // blocks not at z0 write 0 points
 	num_pts = block_min_idx[2] ? 0 : block_num_idx[0] * block_num_idx[1];
@@ -843,21 +838,17 @@ void WriteGrid(MPI_Comm comm,
 	subsizes[1] = block_num_idx[1];
 	subsizes[2] = block_num_idx[0];
 
-	MPI_Type_create_subarray(3, sizes, subsizes, starts, MPI_ORDER_C,
-				 MPI_FLOAT, &dtype);
+	MPI_Type_create_subarray(3, sizes, subsizes, starts, MPI_ORDER_C, MPI_FLOAT, &dtype);
 	MPI_Type_commit(&dtype);
-	MPI_File_set_view(fd, 0, MPI_FLOAT, dtype, (char *)"native",
-			  MPI_INFO_NULL);
+	MPI_File_set_view(fd, 0, MPI_FLOAT, dtype, (char *)"native", MPI_INFO_NULL);
 
 	num_pts = block_num_idx[0] * block_num_idx[1] * block_num_idx[2];
       }
 
       // write block
-      int errcode = MPI_File_write_all(fd, dblocks[block]->density, num_pts,
-					  MPI_FLOAT, &status);
+      int errcode = MPI_File_write_all(fd, dblocks[block]->density, num_pts, MPI_FLOAT, &status);
       if (errcode != MPI_SUCCESS)
-	handle_error(errcode, (char *)"MPI_File_write_all nonempty datatype",
-		     comm);
+	handle_error(errcode, (char *)"MPI_File_write_all nonempty datatype", comm);
       MPI_Get_count(&status, MPI_FLOAT, &pts_written);
       assert(pts_written == num_pts);
 
@@ -867,8 +858,7 @@ void WriteGrid(MPI_Comm comm,
     else // null block
     {
       float unused;
-      MPI_File_set_view(fd, 0, MPI_FLOAT, MPI_FLOAT, (char *)"native",
-			MPI_INFO_NULL);
+      MPI_File_set_view(fd, 0, MPI_FLOAT, MPI_FLOAT, (char *)"native", MPI_INFO_NULL);
       MPI_File_write_all(fd, &unused, 0, MPI_FLOAT, &status);
     }
   }
@@ -880,7 +870,6 @@ void WriteGrid(MPI_Comm comm,
 
 // project density to 2d
 //
-// comm: MPI communicator
 // gnblocks: total (global) number of blocks
 // glo_num_idx: global number of grid points (i,j,k)
 // eps: floating point error tolerance
@@ -888,8 +877,7 @@ void WriteGrid(MPI_Comm comm,
 // grid_phys_mins, grid_step_size: physical global grid parameters (x, y, z)
 // master: diy master object
 // assigner: diy assigner object
-void ProjectGrid(MPI_Comm comm,
-                 int gnblocks,
+void ProjectGrid(int gnblocks,
                  int *glo_num_idx,
                  float eps,
                  float *data_mins,
@@ -899,6 +887,8 @@ void ProjectGrid(MPI_Comm comm,
                  diy::Master& master,
                  diy::Assigner* assigner)
 {
+  MPI_Comm comm = master.communicator();
+
   // array of pointers to all my local blocks
   int nblocks = master.size();
   dblock_t** dblocks = new dblock_t*[nblocks];
@@ -1232,8 +1222,7 @@ void Global2LocalIdx(int *global_idx,
 }
 
 // finds global data bounds
-void DataBounds(MPI_Comm comm,
-                float *data_mins,
+void DataBounds(float *data_mins,
                 float *data_maxs,
                 diy::Master& master)
 {
@@ -1241,6 +1230,7 @@ void DataBounds(MPI_Comm comm,
   float block_maxs[3]; // maxs of all local blocks
   int rank;
 
+  MPI_Comm comm = master.communicator();
   MPI_Comm_rank(comm, &rank);
 
   // array of pointers to all my local blocks

@@ -234,7 +234,7 @@ int main(int argc, char** argv)
   free(num_neighbors);
 
   // compute the density
-  dense(alg_type, comm, num_given_bounds, given_mins, given_maxs, project, proj_plane,
+  dense(alg_type, num_given_bounds, given_mins, given_maxs, project, proj_plane,
         mass, data_mins, data_maxs, grid_phys_mins, grid_phys_maxs, grid_step_size, eps,
         glo_num_idx, master);
 
@@ -244,7 +244,7 @@ int main(int argc, char** argv)
   // write file
   // NB: all blocks need to be in memory; WriteGrid is not diy2'ed yet
   times[OUTPUT_TIME] = MPI_Wtime();
-  WriteGrid(comm, maxblocks, tot_blocks, argv[2], project, glo_num_idx, eps, data_mins, data_maxs,
+  WriteGrid(maxblocks, tot_blocks, argv[2], project, glo_num_idx, eps, data_mins, data_maxs,
             num_given_bounds, given_mins, given_maxs, master, NULL);
   MPI_Barrier(comm);
   times[OUTPUT_TIME] = MPI_Wtime() - times[OUTPUT_TIME];

@@ -75,7 +75,7 @@ enum
 };
 
 // function prototypes
-void dense(alg alg_type, MPI_Comm comm, int num_given_bounds, float *given_mins,
+void dense(alg alg_type, int num_given_bounds, float *given_mins,
 	   float *given_maxs, bool project, float *proj_plane, float mass, float *data_mins,
            float *data_maxs, float *grid_phys_mins, float *grid_phys_maxs,
 	   float *grid_step_size, float eps, int *glo_num_idx, diy::Master& master);
@@ -115,18 +115,18 @@ void Global2LocalIdx(int *global_idx, int *local_idx, int *block_min_idx);
 void GridStepParams(int num_given_bounds, float *given_mins, float *given_maxs, float *data_mins,
                     float *data_maxs, float *grid_phys_mins, float *grid_phys_maxs,
 		    float *grid_step_size, int *glo_num_idx);
-void WriteGrid(MPI_Comm comm, int mblocks, int tblocks, char *outfile,
+void WriteGrid(int mblocks, int tblocks, char *outfile,
                bool project, int *glo_num_idx, float eps, float *data_mins,
 	       float *data_maxs, int num_given_bounds, float *given_mins, float *given_maxs,
                diy::Master& master, diy::Assigner* assigner);
-void ProjectGrid(MPI_Comm comm, int gnblocks, int *glo_num_idx,
+void ProjectGrid(int gnblocks, int *glo_num_idx,
                  float eps, float *data_mins, float *data_maxs, float *grid_phys_mins,
                  float *grid_step_size, diy::Master& master, diy::Assigner* assigner);
 void handle_error(int errcode, char *str, MPI_Comm comm);
 int index(int *block_grid_idx, int *block_num_idx, bool project, float *proj_plane);
 void idx2phys(int *grid_idx, float *pos, float *grid_step_size, float *grid_phys_mins);
 void phys2idx(float *pos, int *grid_idx, float *grid_step_size, float *grid_phys_mins);
-void DataBounds(MPI_Comm comm, float *data_mins, float *data_maxs, diy::Master& master);
+void DataBounds(float *data_mins, float *data_maxs, diy::Master& master);
 void dense_stats(double *times, MPI_Comm comm, float *grid_step_size, float *grid_phys_mins,
                   int *glo_num_idx);
 void DistributeScalarCIC(float *pt, float scalar, vector <int> &grid_idxs,
