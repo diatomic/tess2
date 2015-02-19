@@ -16,9 +16,9 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <vector>
-#include "tess/dense.hpp"
 #include "tess/tess.h"
 #include "tess/tess.hpp"
+#include "tess/dense.hpp"
 
 using namespace std;
 
@@ -97,6 +97,42 @@ void ParseArgs(int argc,
   }
 }
 
+void add_block(dblock_t*        b,
+               diy::Link*       link,
+               diy::Master&     master)
+{
+  // initialize the fields of the block that pnetcdf_read did not
+  // global domain will be initialized later inside dense()
+  b->density = NULL;
+  b->num_grid_pts = 0;
+
+  // add the block to the master
+  master.add(b->gid, b, link);
+}
+
+void* create_block()
+{
+  dblock_t* b = new dblock_t;
+  return b;
+}
+
+void destroy_block(void* b)
+{
+  delete static_cast<dblock_t*>(b);
+}
+
+void save_block(const void* b, diy::BinaryBuffer& bb)
+{
+  diy::save(bb, *static_cast<const dblock_t*>(b));
+}
+
+void load_block(void* b, diy::BinaryBuffer& bb)
+{
+  diy::load(bb, *static_cast<dblock_t*>(b));
+}
+
+
+
 int main(int argc, char** argv)
 {
   int tot_blocks;                             // global number of blocks
@@ -137,20 +173,19 @@ int main(int argc, char** argv)
   MPI_Comm_size(comm, &groupsize);
 
   // timing
-  double times[DENSE_MAX_TIMES]; // timing
+  double times[DENSE_MAX_TIMES];               // timing
   MPI_Barrier(comm);
   times[TOTAL_TIME] = MPI_Wtime();
   times[INPUT_TIME] = MPI_Wtime();
 
   // read the tessellation
   // pnetcdf is the only version for the density estimator (no diy version)
-  int *gids;                                  // block global ids
+  // NB: all blocks need to be in memory; pnetcdf_read is not diy2'ed yet
   int *num_neighbors;                         // number of neighbors for each local block
   int **neighbors;                            // neighbors of each local block
   int **neigh_procs;                          // processes of neighbors of each local block
-  gb_t **diy_neighs;                          // neighbors in diy global block format
-  pnetcdf_read(&nblocks, &tot_blocks, &dblocks, argv[1], comm,
-	       &num_neighbors, &neighbors, &neigh_procs);
+  pnetcdf_read(&nblocks, &tot_blocks, &dblocks, argv[1], comm, &num_neighbors, &neighbors,
+               &neigh_procs);
 
   int maxblocks;                              // max blocks in any process
   MPI_Allreduce(&nblocks, &maxblocks, 1, MPI_INT, MPI_MAX, comm);
@@ -158,20 +193,6 @@ int main(int argc, char** argv)
   MPI_Barrier(comm);
   times[INPUT_TIME] = MPI_Wtime() - times[INPUT_TIME];
   times[COMP_TIME] = MPI_Wtime();
-
-  // init diy
-  diy_neighs = new gb_t*[nblocks];
-  for (int i = 0; i < nblocks; i++) {
-    if (num_neighbors[i])
-      diy_neighs[i] = new gb_t[num_neighbors[i]];
-    for (int j = 0; j < num_neighbors[i]; j++) {
-      diy_neighs[i][j].gid = neighbors[i][j];
-      diy_neighs[i][j].proc = neigh_procs[i][j];
-    }
-  }
-
-  // TODO: data extents (are they needed?)
-  typedef     diy::ContinuousBounds         Bounds;
 
   // init diy
   int num_threads = 1;
@@ -186,27 +207,31 @@ int main(int argc, char** argv)
                                    &storage,
                                    &save_block,
                                    &load_block);
-  AddBlock                   create(master);
 
-  // TODO: will need an assigner to write the grid later
-
-  // TODO: set diy blocks and neighbors
-
-  // TODO: copy the blocks read from pnetcdf into diy blocks
+  // add block and its link
+  for (int i = 0; i < nblocks; i++)
+  {
+    diy::Link*   link = new diy::Link;
+    diy::BlockID neighbor;
+    for (int j = 0; j < num_neighbors[i]; j++)
+    {
+      neighbor.gid = neighbors[i][j];
+      neighbor.proc = neigh_procs[i][j];
+      link->add_neighbor(neighbor);
+    }
+    add_block(&dblocks[i], link, master);
+  }
 
   // cleanup temporary data
   for (int i = 0; i < nblocks; i++) {
     if (num_neighbors[i]) {
-      delete[] diy_neighs[i];
       free(neighbors[i]);
       free(neigh_procs[i]);
     }
   }
-  delete[] diy_neighs;
   free(neighbors);
   free(neigh_procs);
   free(num_neighbors);
-  free(gids);
 
   // compute the density
   dense(alg_type, comm, num_given_bounds, given_mins, given_maxs, project, proj_plane,
@@ -217,10 +242,10 @@ int main(int argc, char** argv)
   times[COMP_TIME] = MPI_Wtime() - times[COMP_TIME];
 
   // write file
-  // TODO: need an assigner but I don't have one when reading tessellation from file
+  // NB: all blocks need to be in memory; WriteGrid is not diy2'ed yet
   times[OUTPUT_TIME] = MPI_Wtime();
-//   WriteGrid(comm, maxblocks, argv[2], project, glo_num_idx, eps, data_mins, data_maxs,
-//             num_given_bounds, given_mins, given_maxs, master, assigner);
+  WriteGrid(comm, maxblocks, tot_blocks, argv[2], project, glo_num_idx, eps, data_mins, data_maxs,
+            num_given_bounds, given_mins, given_maxs, master, NULL);
   MPI_Barrier(comm);
   times[OUTPUT_TIME] = MPI_Wtime() - times[OUTPUT_TIME];
 

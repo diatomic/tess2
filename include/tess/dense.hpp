@@ -118,10 +118,10 @@ void GridStepParams(int num_given_bounds, float *given_mins, float *given_maxs, 
 void WriteGrid(MPI_Comm comm, int mblocks, int tblocks, char *outfile,
                bool project, int *glo_num_idx, float eps, float *data_mins,
 	       float *data_maxs, int num_given_bounds, float *given_mins, float *given_maxs,
-               diy::Master& master, diy::Assigner& assigner);
+               diy::Master& master, diy::Assigner* assigner);
 void ProjectGrid(MPI_Comm comm, int gnblocks, int *glo_num_idx,
                  float eps, float *data_mins, float *data_maxs, float *grid_phys_mins,
-                 float *grid_step_size, diy::Master& master, diy::Assigner& assigner);
+                 float *grid_step_size, diy::Master& master, diy::Assigner* assigner);
 void handle_error(int errcode, char *str, MPI_Comm comm);
 int index(int *block_grid_idx, int *block_num_idx, bool project, float *proj_plane);
 void idx2phys(int *grid_idx, float *pos, float *grid_step_size, float *grid_phys_mins);

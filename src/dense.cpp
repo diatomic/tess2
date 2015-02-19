@@ -762,7 +762,7 @@ void WriteGrid(MPI_Comm comm,
                float *given_mins,
                float *given_maxs,
                diy::Master& master,
-               diy::Assigner& assigner)
+               diy::Assigner* assigner)
 {
   MPI_Status status;
   int pts_written;
@@ -897,7 +897,7 @@ void ProjectGrid(MPI_Comm comm,
                  float *grid_phys_mins,
                  float *grid_step_size,
                  diy::Master& master,
-                 diy::Assigner& assigner)
+                 diy::Assigner* assigner)
 {
   // array of pointers to all my local blocks
   int nblocks = master.size();
@@ -975,8 +975,15 @@ void ProjectGrid(MPI_Comm comm,
     // rank of block
     int rank;
     MPI_Comm_rank(comm, &rank);
+
     // rank of root block
-    int root_rank = assigner.rank(block_info[block].root_gid);
+    int root_rank;
+    if (assigner)                                  // diy did the decomposition
+      root_rank = assigner->rank(block_info[block].root_gid);
+    // TODO: the following is a workaround until we have a block table to look up the rank
+    // the workaround only works for one block per process, when rank = gid
+    else                                           // decomposition was given to diy
+      root_rank = block_info[block].root_gid;
 
     if (rank != root_rank) // if block's rank and projected block's rank differ
     {

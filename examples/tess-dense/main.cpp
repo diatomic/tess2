@@ -219,15 +219,16 @@ int main(int argc, char *argv[])
   dense_times[COMP_TIME] = MPI_Wtime() - dense_times[COMP_TIME];
   dense_times[OUTPUT_TIME] = MPI_Wtime();
 
-  int maxblocks; // max blocks in any process
+  int maxblocks;                           // max blocks in any process
   MPI_Allreduce(&nblocks, &maxblocks, 1, MPI_INT, MPI_MAX, comm);
 
   // write file
+  // NB: all blocks need to be in memory; WriteGrid is not diy2'ed yet
   MPI_Barrier(comm);
   dense_time = MPI_Wtime() - dense_time;
   dense_times[OUTPUT_TIME] = MPI_Wtime();
   WriteGrid(comm, maxblocks, tot_blocks, outfile, project, glo_num_idx, eps, data_mins, data_maxs,
-            num_given_bounds, given_mins, given_maxs, master, assigner);
+            num_given_bounds, given_mins, given_maxs, master, &assigner);
   MPI_Barrier(comm);
   dense_times[OUTPUT_TIME] = MPI_Wtime() - dense_times[OUTPUT_TIME];
   dense_times[TOTAL_TIME] = MPI_Wtime() - dense_times[TOTAL_TIME];
