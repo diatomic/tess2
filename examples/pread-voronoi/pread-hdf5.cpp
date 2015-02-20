@@ -6,21 +6,28 @@
 #include "pread.h"
 #include <tess/swap.hpp>
 
+#ifndef H5_HAVE_PARALLEL
+#warning Parallel HDF5 not available, using serial version
+#endif
+
 void read_particles(MPI_Comm comm,
                     const char *infile, int rank, int size,
                     std::vector <float> &particles,
                     const std::vector <std::string>& coordinates)
 {
+  herr_t status;
+
+#ifdef H5_HAVE_PARALLEL
   MPI_Info  info        = MPI_INFO_NULL;
   hid_t     acc_tpl1    = H5Pcreate (H5P_FILE_ACCESS);
   assert(acc_tpl1 != -1);
   herr_t    ret         = H5Pset_fapl_mpio(acc_tpl1, comm, info);       // set up parallel access with communicator
   assert(ret != -1);
 
-  herr_t status;
-
-  //hid_t     file_id       = H5Fopen(infile, H5F_ACC_RDONLY, H5P_DEFAULT);
   hid_t     file_id       = H5Fopen(infile, H5F_ACC_RDONLY, acc_tpl1);
+#else
+  hid_t     file_id       = H5Fopen(infile, H5F_ACC_RDONLY, H5P_DEFAULT);
+#endif
   hid_t     dataset_id    = H5Dopen2(file_id, coordinates[0].c_str(), H5P_DEFAULT);
   hid_t     dataspace_id  = H5Dget_space(dataset_id);
 
@@ -59,5 +66,7 @@ void read_particles(MPI_Comm comm,
   }
 
   status = H5Fclose(file_id);
+#ifdef H5_HAVE_PARALLEL
   status = H5Pclose(acc_tpl1);
+#endif
 }
