@@ -94,9 +94,9 @@ int main(int argc, char *argv[])
   tess(master, quants, times);
 
   // output
-  tess_save(master, outfile, times, comm);
+  tess_save(master, outfile, times);
   timing(times, -1, TOT_TIME);
-  tess_stats(master, quants, times, comm);
+  tess_stats(master, quants, times);
 
   MPI_Finalize();
 

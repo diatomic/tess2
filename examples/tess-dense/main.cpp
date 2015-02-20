@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
   timing(tess_times, TOT_TIME, -1);
   tess(master, quants, tess_times);
   timing(tess_times, -1, TOT_TIME);
-  tess_stats(master, quants, tess_times, comm);
+  tess_stats(master, quants, tess_times);
 
   MPI_Barrier(comm);
   tess_time = MPI_Wtime() - tess_time;

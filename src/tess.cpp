@@ -76,7 +76,7 @@ void tess(diy::Master& master,
   timing(times, -1, DEL3_TIME);
 }
 
-void tess_save(diy::Master& master, const char* outfile, double* times, MPI_Comm mpi_comm)
+void tess_save(diy::Master& master, const char* outfile, double* times)
 {
   // All the foreach block functions are done. We now make a very dangerous assumption
   // that all blocks fit in memory because the remaining functions are done on all blocks
@@ -697,12 +697,11 @@ void wrap_pt(point_t& rp, int wrap_dir, Bounds& domain)
 
 //   collects statistics
 void tess_stats(diy::Master& master,
-                quants_t& quants,double* times,
-                MPI_Comm mpi_comm)
+                quants_t& quants,double* times)
 {
   int global_min_quants[MAX_QUANTS], global_max_quants[MAX_QUANTS];
-  MPI_Reduce(quants.min_quants, global_min_quants, MAX_QUANTS, MPI_INT, MPI_MIN, 0, mpi_comm);
-  MPI_Reduce(quants.max_quants, global_max_quants, MAX_QUANTS, MPI_INT, MPI_MAX, 0, mpi_comm);
+  MPI_Reduce(quants.min_quants, global_min_quants, MAX_QUANTS, MPI_INT, MPI_MIN, 0, master.communicator());
+  MPI_Reduce(quants.max_quants, global_max_quants, MAX_QUANTS, MPI_INT, MPI_MAX, 0, master.communicator());
 
   if (master.communicator().rank() == 0)
   {

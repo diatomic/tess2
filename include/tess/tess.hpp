@@ -41,8 +41,8 @@ typedef  diy::RegularContinuousLink  RCLink;
 using namespace std;
 
 void tess(diy::Master& master, quants_t& quants, double* times);
-void tess_save(diy::Master& master, const char* outfile, double* times, MPI_Comm mpi_comm);
-void tess_stats(diy::Master& master, quants_t& quants, double* times, MPI_Comm mpi_comm);
+void tess_save(diy::Master& master, const char* outfile, double* times);
+void tess_stats(diy::Master& master, quants_t& quants, double* times);
 void* create_block();
 void destroy_block(void* b);
 void save_block(const void* b, diy::BinaryBuffer& bb);

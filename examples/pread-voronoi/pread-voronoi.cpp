@@ -74,7 +74,6 @@ int main(int argc, char *argv[])
   string outfile; // output file name
   float mins[3], maxs[3]; // data global extents
   float minvol, maxvol; // volume range, -1.0 = unused
-  //double times[TESS_MAX_TIMES]; // timing
   float **particles; // particles[block_num][particle]
 		     //  where each particle is 3 values, px, py, pz
   int *num_particles; // number of particles in each block
@@ -84,7 +83,7 @@ int main(int argc, char *argv[])
   int rank,size; // MPI usual
   vector <float> p; // temporary particles
   std::vector<std::string>  coordinates; // coordinates to read
-  double times[MAX_TIMES]; // timing
+  double times[TESS_MAX_TIMES]; // timing
   quants_t quants; // quantity stats
 
   diy::mpi::environment	    env(argc, argv);
@@ -202,7 +201,7 @@ int main(int argc, char *argv[])
   if (mem_blocks == -1 || mem_blocks >= tot_blocks)
     tess_save(master, outfile.c_str(), times);
 
-  collect_stats(master, quants, times);
+  tess_stats(master, quants, times);
 
   return 0;
 
