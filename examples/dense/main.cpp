@@ -164,13 +164,12 @@ int main(int argc, char** argv)
 
   // read the tessellation
   diy::io::read_blocks(argv[1], world, assigner, master, &load_block_light);
-
-#if 0
+  tot_blocks = assigner.nblocks();
 
   // get global block quantities
   nblocks = master.size();                    // local number of blocks
   MPI_Allreduce(&nblocks, &maxblocks, 1, MPI_INT, MPI_MAX, comm);
-  MPI_Allreduce(&nblocks, &maxblocks, 1, MPI_INT, MPI_SUM, comm);
+  MPI_Allreduce(&nblocks, &tot_blocks, 1, MPI_INT, MPI_SUM, comm);
 
   // compute the density
   dense(alg_type, num_given_bounds, given_mins, given_maxs, project, proj_plane,
@@ -180,11 +179,13 @@ int main(int argc, char** argv)
   MPI_Barrier(comm);
   times[COMP_TIME] = MPI_Wtime() - times[COMP_TIME];
 
+
+
   // write file
   // NB: all blocks need to be in memory; WriteGrid is not diy2'ed yet
   times[OUTPUT_TIME] = MPI_Wtime();
   WriteGrid(maxblocks, tot_blocks, argv[2], project, glo_num_idx, eps, data_mins, data_maxs,
-            num_given_bounds, given_mins, given_maxs, master, assigner);
+            num_given_bounds, given_mins, given_maxs, master, &assigner);
   MPI_Barrier(comm);
   times[OUTPUT_TIME] = MPI_Wtime() - times[OUTPUT_TIME];
 
@@ -193,8 +194,6 @@ int main(int argc, char** argv)
   times[TOTAL_TIME] = MPI_Wtime() - times[TOTAL_TIME];
 
   dense_stats(times, comm, grid_step_size, grid_phys_mins, glo_num_idx);
-
-#endif
 
   MPI_Finalize();
 
