@@ -92,6 +92,7 @@ struct AddBlock
     b->tets = NULL;
     b->rem_gids = NULL;
     b->vert_to_tet = NULL;
+    b->num_grid_pts = 0;
     b->density = NULL;
 
     return b;
