@@ -46,7 +46,7 @@ exe=./dense
 # input file
 #infile="/projects/SSSPPg/tpeterka/128p4096b-vor.out.nc"
 #infile="../driver/vor.out.nc"
-infile="../tess-driver/del.out.nc"
+#infile="../tess-driver/del.out.nc"
 #infile="vor.out-100K-2b.nc"
 #infile="vor-99.out.nc"
 #infile="7445077095.out.nc"
@@ -56,6 +56,7 @@ infile="../tess-driver/del.out.nc"
 #infile="cnfw_2e5.out.nc"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/voronoi-results/nfw.out.nc"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/cic-results/cnfw_2e5.out.nc"
+infile="del.out"
 
 # output file
 outfile="dense.raw"

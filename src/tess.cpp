@@ -191,6 +191,8 @@ void save_block_light(const void* b_, diy::BinaryBuffer& bb)
   diy::save(bb, d.num_particles);
   diy::save(bb, d.particles, 3 * d.num_particles);
   diy::save(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+  diy::save(bb, d.num_grid_pts);
+  diy::save(bb, d.density, d.num_grid_pts);
  
   diy::save(bb, d.num_tets);
   diy::save(bb, d.tets, d.num_tets);
@@ -218,6 +220,8 @@ void load_block_light(void* b_, diy::BinaryBuffer& bb)
   if (d.num_particles - d.num_orig_particles)
     d.rem_gids = (int*)malloc((d.num_particles - d.num_orig_particles) * sizeof(int));
   diy::load(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+  diy::load(bb, d.num_grid_pts);
+  diy::load(bb, d.density, d.num_grid_pts);
 
   diy::load(bb, d.num_tets);
   d.tets = (tet_t*)malloc(d.num_tets * sizeof(tet_t));

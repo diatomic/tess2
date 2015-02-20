@@ -97,46 +97,11 @@ void ParseArgs(int argc,
   }
 }
 
-void add_block(dblock_t*        b,
-               diy::Link*       link,
-               diy::Master&     master)
-{
-  // initialize the fields of the block that pnetcdf_read did not
-  // global domain will be initialized later inside dense()
-  b->density = NULL;
-  b->num_grid_pts = 0;
-
-  // add the block to the master
-  master.add(b->gid, b, link);
-}
-
-void* create_block()
-{
-  dblock_t* b = new dblock_t;
-  return b;
-}
-
-void destroy_block(void* b)
-{
-  delete static_cast<dblock_t*>(b);
-}
-
-void save_block(const void* b, diy::BinaryBuffer& bb)
-{
-  diy::save(bb, *static_cast<const dblock_t*>(b));
-}
-
-void load_block(void* b, diy::BinaryBuffer& bb)
-{
-  diy::load(bb, *static_cast<dblock_t*>(b));
-}
-
-
-
 int main(int argc, char** argv)
 {
   int tot_blocks;                             // global number of blocks
   int nblocks;                                // my local number of blocks
+  int maxblocks;                              // max blocks in any process
   int rank, groupsize;                        // MPI usual
   MPI_Comm comm = MPI_COMM_WORLD;             // MPI communicator
   dblock_t *dblocks;                          // delaunay local blocks
@@ -178,18 +143,6 @@ int main(int argc, char** argv)
   times[TOTAL_TIME] = MPI_Wtime();
   times[INPUT_TIME] = MPI_Wtime();
 
-  // read the tessellation
-  // pnetcdf is the only version for the density estimator (no diy version)
-  // NB: all blocks need to be in memory; pnetcdf_read is not diy2'ed yet
-  int *num_neighbors;                         // number of neighbors for each local block
-  int **neighbors;                            // neighbors of each local block
-  int **neigh_procs;                          // processes of neighbors of each local block
-  pnetcdf_read(&nblocks, &tot_blocks, &dblocks, argv[1], comm, &num_neighbors, &neighbors,
-               &neigh_procs);
-
-  int maxblocks;                              // max blocks in any process
-  MPI_Allreduce(&nblocks, &maxblocks, 1, MPI_INT, MPI_MAX, comm);
-
   MPI_Barrier(comm);
   times[INPUT_TIME] = MPI_Wtime() - times[INPUT_TIME];
   times[COMP_TIME] = MPI_Wtime();
@@ -207,31 +160,17 @@ int main(int argc, char** argv)
                                    &storage,
                                    &save_block,
                                    &load_block);
+  diy::RoundRobinAssigner   assigner(world.size(), -1);  // tot_blocks set by read_blocks
 
-  // add block and its link
-  for (int i = 0; i < nblocks; i++)
-  {
-    diy::Link*   link = new diy::Link;
-    diy::BlockID neighbor;
-    for (int j = 0; j < num_neighbors[i]; j++)
-    {
-      neighbor.gid = neighbors[i][j];
-      neighbor.proc = neigh_procs[i][j];
-      link->add_neighbor(neighbor);
-    }
-    add_block(&dblocks[i], link, master);
-  }
+  // read the tessellation
+  diy::io::read_blocks(argv[1], world, assigner, master, &load_block_light);
 
-  // cleanup temporary data
-  for (int i = 0; i < nblocks; i++) {
-    if (num_neighbors[i]) {
-      free(neighbors[i]);
-      free(neigh_procs[i]);
-    }
-  }
-  free(neighbors);
-  free(neigh_procs);
-  free(num_neighbors);
+#if 0
+
+  // get global block quantities
+  nblocks = master.size();                    // local number of blocks
+  MPI_Allreduce(&nblocks, &maxblocks, 1, MPI_INT, MPI_MAX, comm);
+  MPI_Allreduce(&nblocks, &maxblocks, 1, MPI_INT, MPI_SUM, comm);
 
   // compute the density
   dense(alg_type, num_given_bounds, given_mins, given_maxs, project, proj_plane,
@@ -245,7 +184,7 @@ int main(int argc, char** argv)
   // NB: all blocks need to be in memory; WriteGrid is not diy2'ed yet
   times[OUTPUT_TIME] = MPI_Wtime();
   WriteGrid(maxblocks, tot_blocks, argv[2], project, glo_num_idx, eps, data_mins, data_maxs,
-            num_given_bounds, given_mins, given_maxs, master, NULL);
+            num_given_bounds, given_mins, given_maxs, master, assigner);
   MPI_Barrier(comm);
   times[OUTPUT_TIME] = MPI_Wtime() - times[OUTPUT_TIME];
 
@@ -254,6 +193,8 @@ int main(int argc, char** argv)
   times[TOTAL_TIME] = MPI_Wtime() - times[TOTAL_TIME];
 
   dense_stats(times, comm, grid_step_size, grid_phys_mins, glo_num_idx);
+
+#endif
 
   MPI_Finalize();
 
