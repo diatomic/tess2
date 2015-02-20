@@ -8,9 +8,6 @@
 // Argonne, IL 60439
 // tpeterka@mcs.anl.gov
 //
-// (C) 2013 by Argonne National Laboratory.
-// See COPYRIGHT in top-level directory.
-//
 //--------------------------------------------------------------------------
 #include <stdio.h>
 #include <stdlib.h>
@@ -102,7 +99,6 @@ int main(int argc, char** argv)
   int tot_blocks;                             // global number of blocks
   int nblocks;                                // my local number of blocks
   int maxblocks;                              // max blocks in any process
-  int rank, groupsize;                        // MPI usual
   MPI_Comm comm = MPI_COMM_WORLD;             // MPI communicator
   dblock_t *dblocks;                          // delaunay local blocks
   float eps = 0.0001;                         // epsilon for floating point values to be equal
@@ -134,8 +130,6 @@ int main(int argc, char** argv)
 
   // init
   MPI_Init(&argc, &argv);
-  MPI_Comm_rank(comm, &rank);
-  MPI_Comm_size(comm, &groupsize);
 
   // timing
   double times[DENSE_MAX_TIMES];               // timing
@@ -160,7 +154,7 @@ int main(int argc, char** argv)
                                    &storage,
                                    &save_block,
                                    &load_block);
-  diy::RoundRobinAssigner   assigner(world.size(), -1);  // tot_blocks set by read_blocks
+  diy::RoundRobinAssigner   assigner(world.size(), -1);  // tot_blocks found by read_blocks
 
   // read the tessellation
   diy::io::read_blocks(argv[1], world, assigner, master, &load_block_light);
@@ -179,13 +173,11 @@ int main(int argc, char** argv)
   MPI_Barrier(comm);
   times[COMP_TIME] = MPI_Wtime() - times[COMP_TIME];
 
-
-
   // write file
   // NB: all blocks need to be in memory; WriteGrid is not diy2'ed yet
   times[OUTPUT_TIME] = MPI_Wtime();
   WriteGrid(maxblocks, tot_blocks, argv[2], project, glo_num_idx, eps, data_mins, data_maxs,
-            num_given_bounds, given_mins, given_maxs, master, &assigner);
+            num_given_bounds, given_mins, given_maxs, master, assigner);
   MPI_Barrier(comm);
   times[OUTPUT_TIME] = MPI_Wtime() - times[OUTPUT_TIME];
 
@@ -193,7 +185,7 @@ int main(int argc, char** argv)
   MPI_Barrier(comm);
   times[TOTAL_TIME] = MPI_Wtime() - times[TOTAL_TIME];
 
-  dense_stats(times, comm, grid_step_size, grid_phys_mins, glo_num_idx);
+  dense_stats(times, master, grid_step_size, grid_phys_mins, glo_num_idx);
 
   MPI_Finalize();
 

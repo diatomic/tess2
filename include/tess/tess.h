@@ -40,53 +40,9 @@ enum
 {
   NUM_ORIG_PTS,
   NUM_FINAL_PTS,
-  NUM_TETS,MAX_QUANTS
+  NUM_TETS,
+  MAX_QUANTS
 };
-
-/* public */
-
-/* DEPRECATED */
-/* #ifdef __cplusplus */
-/* extern "C" */
-/* #endif */
-/* void tess_test(int tot_blocks, int mem_blocks, int *data_size, float jitter, float minvol, */
-/*                float maxvol, int wrap, int twalls_on,  double *all_times, char *outfile, */
-/*                MPI_Comm mpi_comm); */
-
-#if 0
-
-#ifdef __cplusplus
-extern "C"
-#endif
-struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter, float minvol,
-                                     float maxvol, int wrap, int twalls_on, double *times,
-				     MPI_Comm mpi_comm);
-
-#ifdef __cplusplus
-extern "C"
-#endif
-void tess_init(int num_blocks, int *gids, struct bb_t *bounds, struct gb_t **neighbors,
-	       int *num_neighbors, float *global_mins, float *global_maxs, int wrap,
-               int twalls_on, float minvol, float maxvol, MPI_Comm mpi_comm, double *times);
-
-#ifdef __cplusplus
-extern "C"
-#endif
-void tess_init_diy_exist(int num_blocks, float *global_mins, float *global_maxs, int wrap,
-                         int twalls_on, float minvol, float maxvol, MPI_Comm mpi_comm,
-                         double *all_times);
-
-#ifdef __cplusplus
-extern "C"
-#endif
-void tess_finalize();
-
-#ifdef __cplusplus
-extern "C"
-#endif
-void tess(int nblocks, float **particles, int *num_particles, char *out_file);
-
-#endif
 
 /* private */
 

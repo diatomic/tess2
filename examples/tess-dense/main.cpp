@@ -228,18 +228,16 @@ int main(int argc, char *argv[])
   dense_time = MPI_Wtime() - dense_time;
   dense_times[OUTPUT_TIME] = MPI_Wtime();
   WriteGrid(maxblocks, tot_blocks, outfile, project, glo_num_idx, eps, data_mins, data_maxs,
-            num_given_bounds, given_mins, given_maxs, master, &assigner);
+            num_given_bounds, given_mins, given_maxs, master, assigner);
   MPI_Barrier(comm);
   dense_times[OUTPUT_TIME] = MPI_Wtime() - dense_times[OUTPUT_TIME];
   dense_times[TOTAL_TIME] = MPI_Wtime() - dense_times[TOTAL_TIME];
   overall_time = MPI_Wtime() - overall_time;
 
-  dense_stats(dense_times, comm, grid_step_size, grid_phys_mins, glo_num_idx);
+  dense_stats(dense_times, master, grid_step_size, grid_phys_mins, glo_num_idx);
 
   // overall timing
-  int rank;
-  MPI_Comm_rank(comm, &rank);
-  if (rank == 0)
+  if (world.rank() == 0)
     fprintf(stderr, "Overall time = %.3lf s = %.3lf s tess + %.3lf s dense\n",
 	    overall_time, tess_time, dense_time);
 

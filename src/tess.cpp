@@ -193,7 +193,7 @@ void save_block_light(const void* b_, diy::BinaryBuffer& bb)
   diy::save(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
   diy::save(bb, d.num_grid_pts);
   diy::save(bb, d.density, d.num_grid_pts);
- 
+
   diy::save(bb, d.num_tets);
   diy::save(bb, d.tets, d.num_tets);
   diy::save(bb, d.vert_to_tet, d.num_particles);

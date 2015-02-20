@@ -759,7 +759,7 @@ void WriteGrid(int mblocks,
                float *given_mins,
                float *given_maxs,
                diy::Master& master,
-               diy::Assigner* assigner)
+               diy::Assigner& assigner)
 {
   MPI_Status status;
   int pts_written;
@@ -885,7 +885,7 @@ void ProjectGrid(int gnblocks,
                  float *grid_phys_mins,
                  float *grid_step_size,
                  diy::Master& master,
-                 diy::Assigner* assigner)
+                 diy::Assigner& assigner)
 {
   MPI_Comm comm = master.communicator();
 
@@ -968,12 +968,7 @@ void ProjectGrid(int gnblocks,
 
     // rank of root block
     int root_rank;
-    if (assigner)                                  // diy did the decomposition
-      root_rank = assigner->rank(block_info[block].root_gid);
-    // TODO: the following is a workaround until we have a block table to look up the rank
-    // the workaround only works for one block per process, when rank = gid
-    else                                           // decomposition was given to diy
-      root_rank = block_info[block].root_gid;
+    root_rank = assigner.rank(block_info[block].root_gid);
 
     if (rank != root_rank) // if block's rank and projected block's rank differ
     {
@@ -1281,16 +1276,17 @@ void DataBounds(float *data_mins,
 // print summary stats
 //
 // times: timing info
-// comm: MPI cmmunicator
+// master: diy master
 // grid_step_size: physical size of one grid space (x,y,z)
 // grid_phys_mins: physical min corner of global grid (x,y,z)
 // glo_num_idx: global size of the grid (i,j,k)
 void dense_stats(double *times,
-                 MPI_Comm comm,
+                 diy::Master& master,
                  float *grid_step_size,
                  float *grid_phys_mins,
                  int *glo_num_idx)
 {
+  MPI_Comm comm = master.communicator();
   int rank;
   MPI_Comm_rank(comm, &rank);
 

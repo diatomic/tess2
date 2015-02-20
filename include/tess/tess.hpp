@@ -178,6 +178,7 @@ namespace diy
         d.rem_gids = (int*)malloc((d.num_particles - d.num_orig_particles) * sizeof(int));
       diy::load(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
       diy::load(bb, d.num_grid_pts);
+      d.density = (float*)malloc(d.num_grid_pts * sizeof(float));
       diy::load(bb, d.density, d.num_grid_pts);
       // NB tets and vert_to_tet get recreated in each phase; not saved and reloaded
       d.num_tets = 0;

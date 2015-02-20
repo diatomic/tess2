@@ -95,12 +95,13 @@ endif			    (draw)
 # DIY
 find_path                   (DIY_INCLUDE_DIRS		diy/types.h)
 
+# DEPRECATED
 # PNetCDF
-find_path                   (PNetCDF_INCLUDE_DIR	pnetcdf.h)
-find_library                (PNetCDF_LIBRARY NAMES	pnetcdf)
-if			    (PNetCDF_LIBRARY)
- add_definitions	    (-DPNETCDF_IO)
-endif			    (PNetCDF_LIBRARY)
+# find_path                   (PNetCDF_INCLUDE_DIR	pnetcdf.h)
+# find_library                (PNetCDF_LIBRARY NAMES	pnetcdf)
+# if			    (PNetCDF_LIBRARY)
+#  add_definitions	    (-DPNETCDF_IO)
+# endif			    (PNetCDF_LIBRARY)
 
 # GenericIO
 if			    (hacc_test)

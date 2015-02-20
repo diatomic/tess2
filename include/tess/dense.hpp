@@ -24,7 +24,8 @@
 #include <vector>
 #include "delaunay.h"
 #include "mpi.h"
-#include "tess/io.h"
+// DEPRECATED
+// #include "tess/io.h"
 #include "tess/tet.h"
 #include "tess/tet-neighbors.h"
 #include "tess/tess.h"
@@ -118,16 +119,16 @@ void GridStepParams(int num_given_bounds, float *given_mins, float *given_maxs, 
 void WriteGrid(int mblocks, int tblocks, char *outfile,
                bool project, int *glo_num_idx, float eps, float *data_mins,
 	       float *data_maxs, int num_given_bounds, float *given_mins, float *given_maxs,
-               diy::Master& master, diy::Assigner* assigner);
+               diy::Master& master, diy::Assigner& assigner);
 void ProjectGrid(int gnblocks, int *glo_num_idx,
                  float eps, float *data_mins, float *data_maxs, float *grid_phys_mins,
-                 float *grid_step_size, diy::Master& master, diy::Assigner* assigner);
+                 float *grid_step_size, diy::Master& master, diy::Assigner& assigner);
 void handle_error(int errcode, char *str, MPI_Comm comm);
 int index(int *block_grid_idx, int *block_num_idx, bool project, float *proj_plane);
 void idx2phys(int *grid_idx, float *pos, float *grid_step_size, float *grid_phys_mins);
 void phys2idx(float *pos, int *grid_idx, float *grid_step_size, float *grid_phys_mins);
 void DataBounds(float *data_mins, float *data_maxs, diy::Master& master);
-void dense_stats(double *times, MPI_Comm comm, float *grid_step_size, float *grid_phys_mins,
+void dense_stats(double *times, diy::Master& master, float *grid_step_size, float *grid_phys_mins,
                   int *glo_num_idx);
 void DistributeScalarCIC(float *pt, float scalar, vector <int> &grid_idxs,
                          vector <float> &grid_scalars, float *grid_step_size,
