@@ -14,9 +14,12 @@
 // --------------------------------------------------------------------------
 
 #include "tess/dense.hpp"
-#ifdef TESS_OPENMP_FOUND
+#ifndef TESS_NO_OPENMP
 #include <omp.h>
 #endif
+
+// use multithreaded version of IterateCells
+// #define DENSE_OMP
 
 using namespace std;
 
@@ -316,7 +319,7 @@ void IterateCells(dblock_t* block,
     free(border);
 }
 
-#ifdef TESS_OPENMP_FOUND
+#ifndef TESS_NO_OPENMP
 
 // iterate over cells and assign single density to grid point
 // openMP version
@@ -345,7 +348,7 @@ void IterateCellsOMP(dblock_t* block,
                      float *data_maxs,
                      float eps,
                      float mass,
-                     const diy::Master::ProxyWithLink& cp);
+                     const diy::Master::ProxyWithLink& cp)
 {
   int nthreads;                                 // number of threads currently being used
   int mthreads = omp_get_max_threads();         // max threads that could be used
@@ -360,6 +363,9 @@ void IterateCellsOMP(dblock_t* block,
 #pragma omp parallel
   {
     nthreads = omp_get_num_threads();
+
+    // debug
+    // fprintf(stderr, "using OpenMP version, num threads = %d\n", nthreads);
 
     // objects defined inside the thread block are private to the thread
     int alloc_grid_pts = 0; // number of grid points allocated
@@ -417,13 +423,13 @@ void IterateCellsOMP(dblock_t* block,
 	  Global2LocalIdx(grid_pts[i].idx, block_grid_idx, block_min_idx);
 	  int idx = index(block_grid_idx, block_num_idx, project, proj_plane);
 #pragma omp atomic
-	  density[block][idx] += (grid_pts[i].mass / div);
+	  block->density[idx] += (grid_pts[i].mass / div);
 
 	  // consistency check and output stats
 #pragma omp atomic // only the next statement is atomic
 	  tot_mass += grid_pts[i].mass;
-	  if (density[block][idx] > max_dense)
-	    max_dense = density[block][idx];
+	  if (block->density[idx] > max_dense)
+	    max_dense = block->density[idx];
 	}
 
 	// or send grid points to neighboring blocks
