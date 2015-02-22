@@ -50,23 +50,19 @@ ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 if			    (${serial} MATCHES "CGAL")
     message		    ("Using CGAL")
     find_package            (CGAL)
-    find_package            (Boost)
     include                 (${CGAL_USE_FILE})
     add_definitions         (${CGAL_CXX_FLAGS_INIT})
-    include_directories     (${CGAL_INCLUDE_DIRS}
-                             SYSTEM ${Boost_INCLUDE_DIR})
+    include_directories     (${CGAL_INCLUDE_DIRS})
     set			    (libraries ${libraries} ${CGAL_LIBRARY} ${CGAL_3RD_PARTY_LIBRARIES})
     set 		    (CMAKE_EXE_LINKER_FLAGS "-dynamic ${CMAKE_EXE_LINKER_FLAGS}")
     # TODO: this should really be based on whether the compiler suffers from the bug in std::nth_element()
     add_definitions	    (-DTESS_CGAL_ALLOW_SPATIAL_SORT)
-    add_definitions	    (-DTESS_USE_CGAL)
   elseif		    (${serial} MATCHES "QHull")
     message		    ("Using QHull")
     find_path               (QHull_INCLUDE_DIRS		libqhull.h)
     find_library            (QHull_LIBRARY NAMES	qhullstatic)
     include_directories	    (${QHull_INCLUDE_DIRS})
     set			    (libraries ${libraries} ${QHull_LIBRARY})
-    add_definitions	    (-DTESS_USE_QHull)
 else			    ()
     message		    ("Uknown serial library: ${serial}")
 endif			    ()
@@ -112,7 +108,7 @@ endif			    (hacc_test)
 set                         (CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-isystem")
 include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 			     ${DIY_INCLUDE_DIRS}
-			     ${PNetCDF_INCLUDE_DIR}
+#			     ${PNetCDF_INCLUDE_DIR}
 			     ${GenericIO_INCLUDE_DIR}
                              SYSTEM ${MPI_INCLUDE_PATH}
                             )
@@ -120,7 +116,7 @@ include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 set			    (libraries
 			     ${libraries}
 			     ${DIY_LIBRARY}
-			     ${PNetCDF_LIBRARY}
+#			     ${PNetCDF_LIBRARY}
 			     ${GenericIO_LIBRARY}
 			     ${MPI_C_LIBRARIES}
 			     ${MPI_CXX_LIBRARIES}

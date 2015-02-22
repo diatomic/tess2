@@ -12,8 +12,10 @@
 #ifndef _TESS_HPP
 #define _TESS_HPP
 
+#include <string.h>
 #include <vector>
 #include <set>
+#include <limits>
 
 #include <diy/mpi.hpp>
 #include <diy/master.hpp>
