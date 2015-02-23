@@ -12,7 +12,7 @@
 #ifndef _TESS_HPP
 #define _TESS_HPP
 
-#include <string.h>
+#include <string>
 #include <vector>
 #include <set>
 #include <limits>
