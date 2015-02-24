@@ -37,9 +37,9 @@
 
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>
-#include "builtins.h"
-#define __builtin_ctzll(x) __cnttz8(x)
-#define __builtin_clzll(x) __cntlz8(x);
+// #include "builtins.h"
+// #define __builtin_ctzll(x) __cnttz8(x)
+// #define __builtin_clzll(x) __cntlz8(x);
 #endif
 
 using namespace std;
@@ -49,9 +49,9 @@ void tess(diy::Master& master,
           double* times)
 {
 #ifdef TIMING
-  if (master.threads() != 1)
-    fprintf(stderr, "Warning: timing() calls MPI directly; "
-            "it's not compatible with using multiple threads\n");
+  // if (master.threads() != 1)
+  //   fprintf(stderr, "Warning: timing() calls MPI directly; "
+  //           "it's not compatible with using multiple threads\n");
 #endif
 
   // compute first stage tessellation

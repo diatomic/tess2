@@ -225,13 +225,13 @@ int main(int argc, char *argv[])
   // write file
   // NB: all blocks need to be in memory; WriteGrid is not diy2'ed yet
   MPI_Barrier(comm);
-  dense_time = MPI_Wtime() - dense_time;
   dense_times[OUTPUT_TIME] = MPI_Wtime();
   WriteGrid(maxblocks, tot_blocks, outfile, project, glo_num_idx, eps, data_mins, data_maxs,
             num_given_bounds, given_mins, given_maxs, master, assigner);
   MPI_Barrier(comm);
   dense_times[OUTPUT_TIME] = MPI_Wtime() - dense_times[OUTPUT_TIME];
   dense_times[TOTAL_TIME] = MPI_Wtime() - dense_times[TOTAL_TIME];
+  dense_time = MPI_Wtime() - dense_time;
   overall_time = MPI_Wtime() - overall_time;
 
   dense_stats(dense_times, master, grid_step_size, grid_phys_mins, glo_num_idx);

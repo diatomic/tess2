@@ -46,7 +46,7 @@ void local_cells(struct dblock_t *b)
 }
 //----------------------------------------------------------------------------
 //
-// generates delaunay output from qhull
+// generates delaunay output
 //
 // facetlist: qhull list of convex hull facets
 // tet_verts: pointer to array of tet vertex indeices for this block

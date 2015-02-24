@@ -12,7 +12,12 @@
 #ifndef _TESS_HPP
 #define _TESS_HPP
 
+#ifdef BGQ
+#include <string.h>
+#else
 #include <string>
+#endif
+
 #include <vector>
 #include <set>
 #include <limits>

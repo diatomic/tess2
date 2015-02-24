@@ -360,6 +360,8 @@ void IterateCellsOMP(dblock_t* block,
   float div = (project ? grid_step_size[0] * grid_step_size[1] :
 	       grid_step_size[0] * grid_step_size[1] * grid_step_size[2]);
 
+  omp_set_num_threads(8);  // number of threads for BGQ must be set manually, 8 threads * 8 ppn
+
 #pragma omp parallel
   {
     nthreads = omp_get_num_threads();
