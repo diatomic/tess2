@@ -47,11 +47,6 @@ namespace diy
   {
     static void	    save(BinaryBuffer& bb, const Delaunay3D& Dt)
     {
-      // TODO: the CGAL:: functions are not linking correctly on BGQ
-      // Apparently cmake is not finding the right version of the library
-      // Disabling these functions for BGQ is a temporary workaround
-      // NB, this means we cannot run out of core on BGQ until this is fixed
-#ifndef BGQ
       std::ostringstream out;
       CGAL::set_mode(out, CGAL::IO::BINARY);
       out << Dt;
@@ -59,12 +54,10 @@ namespace diy
       size_t s = out.str().size();
       diy::save(bb, s);
       bb.save_binary(out.str().c_str(), out.str().size());
-#endif
     }
 
     static void	    load(BinaryBuffer& bb, Delaunay3D& Dt)
     {
-#ifndef BGQ
       size_t s;
       diy::load(bb, s);
 
@@ -85,7 +78,6 @@ namespace diy
       unsigned idx = 0;
       for(Vertex_iterator vit = Dt.finite_vertices_begin(); vit != Dt.finite_vertices_end(); ++vit)
 	vit->info() = idx++;
-#endif
     }
   };
 }
