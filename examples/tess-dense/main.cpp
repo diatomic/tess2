@@ -173,10 +173,10 @@ int main(int argc, char *argv[])
   diy::mpi::communicator    world(comm);
   diy::FileStorage          storage("./DIY.XXXXXX");
   diy::Master               master(world,
+				   num_threads,
+                                   mem_blocks,
                                    &create_block,
                                    &destroy_block,
-                                   mem_blocks,
-				   num_threads,
                                    &storage,
                                    &save_block,
                                    &load_block);

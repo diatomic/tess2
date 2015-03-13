@@ -139,10 +139,10 @@ int main(int argc, char *argv[])
   // initialize DIY and decompose domain
   diy::FileStorage          storage(prefix);
   diy::Master               master(world,
+				   num_threads,
+                                   mem_blocks,
                                    &create_block,
                                    &destroy_block,
-                                   mem_blocks,
-				   num_threads,
                                    &storage,
                                    &save_block,
                                    &load_block);

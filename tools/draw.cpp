@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
   diy::mpi::environment	    env(argc, argv);
   diy::mpi::communicator    world;
 
-  diy::Master               master(world,
+  diy::Master               master(world, -1, -1,
                                    &create_block,
                                    &destroy_block);
 
