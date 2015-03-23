@@ -18,6 +18,7 @@
 #include <diy/partners/swap.hpp>
 
 #include "../opts.h"
+#include "../memory.h"
 
 
 using namespace std;
@@ -200,6 +201,21 @@ int main(int argc, char *argv[])
     tess_save(master, outfile.c_str(), times);
 
   tess_stats(master, quants, times);
+
+  size_t max_storage = storage.max_size(),
+	 sum_max_storage;
+  diy::mpi::reduce(world, max_storage, sum_max_storage, 0, std::plus<size_t>());
+
+  size_t hwm = proc_status_value("VmHWM"),
+	 max_hwm;
+  diy::mpi::reduce(world, hwm, max_hwm, 0, diy::mpi::maximum<size_t>());
+
+  if (rank == 0)
+  {
+    fprintf(stderr, "Sum of max storage:  %lu\n", sum_max_storage);
+    fprintf(stderr, "Max high water mark: %lu\n", max_hwm);
+  }
+
 
   return 0;
 

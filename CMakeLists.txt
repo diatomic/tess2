@@ -122,14 +122,12 @@ include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 
 set			    (libraries
 			     ${libraries}
-			     ${DIY_LIBRARY}
 #			     ${PNetCDF_LIBRARY}
 			     ${GenericIO_LIBRARY}
 			     ${MPI_C_LIBRARIES}
 			     ${MPI_CXX_LIBRARIES}
 			     ${CMAKE_THREAD_LIBS_INIT}
 			    )
-
 if                          (debug)
     find_library            (LIBDW_LIBRARY NAMES dw)
     if                      (LIBDW_LIBRARY)
