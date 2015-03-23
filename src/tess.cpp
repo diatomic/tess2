@@ -47,6 +47,13 @@
 
 using namespace std;
 
+void tess(diy::Master& master)
+{
+  double times[TESS_MAX_TIMES]; // timing
+  quants_t quants; // quantity stats
+  tess(master);
+}
+
 void tess(diy::Master& master,
           quants_t& quants,
           double* times)
@@ -162,6 +169,12 @@ void tess_exchange(diy::Master& master, const diy::Assigner& assigner)
   int k = 2;
   diy::RegularSwapPartners  partners(3, assigner.nblocks(), k, false);
   diy::reduce(master, assigner, partners, redistribute);
+}
+
+void tess_save(diy::Master& master, const char* outfile)
+{
+  double times[TESS_MAX_TIMES]; // timing
+  tess(master);
 }
 
 void tess_save(diy::Master& master, const char* outfile, double* times)

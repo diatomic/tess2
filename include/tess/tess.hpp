@@ -47,8 +47,10 @@ typedef  diy::RegularContinuousLink  RCLink;
 
 using namespace std;
 
+void tess(diy::Master& master);
 void tess(diy::Master& master, quants_t& quants, double* times);
 void tess_exchange(diy::Master& master, const diy::Assigner& assigner);
+void tess_save(diy::Master& master, const char* outfile);
 void tess_save(diy::Master& master, const char* outfile, double* times);
 void tess_stats(diy::Master& master, quants_t& quants, double* times);
 void* create_block();
