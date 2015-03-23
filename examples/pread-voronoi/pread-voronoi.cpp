@@ -254,6 +254,8 @@ void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapP
 			b->particles[3*i + cur_dim],
 			b->box.min[cur_dim], b->box.max[cur_dim]
 		);
+      if (loc == out_points.size())
+	loc -= 1;
 
       out_points[loc].push_back(b->particles[3*i]);
       out_points[loc].push_back(b->particles[3*i + 1]);
