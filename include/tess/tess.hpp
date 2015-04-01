@@ -160,11 +160,23 @@ namespace diy
         static_cast<vector <set <int> >*>(d.sent_particles);
       diy::save(bb, *sent_particles);
 
+      diy::save(bb, d.complete);
+
 #ifdef TESS_USE_CGAL
-      const Delaunay3D* Dt = static_cast<Delaunay3D*>(d.Dt);
-      diy::save(bb, *Dt);
+      if (!d.complete)
+      {
+	const Delaunay3D* Dt = static_cast<Delaunay3D*>(d.Dt);
+	diy::save(bb, *Dt);
+      }
       //fprintf(stderr, "Delaunay saved with %lu vertices\n", Dt->number_of_vertices());
 #endif
+
+      if (d.complete)
+      {
+	diy::save(bb, d.num_tets);
+	diy::save(bb, d.tets, d.num_tets);
+	diy::save(bb, d.vert_to_tet, d.num_particles);
+      }
 
       // debug
 //       fprintf(stderr, "Done saving block gid %d\n", d.gid);
@@ -200,12 +212,28 @@ namespace diy
         d.vert_to_tet = (int*)malloc(d.num_particles * sizeof(int));
       diy::load(bb, *(static_cast<vector <int>*>(d.convex_hull_particles)));
       diy::load(bb, *(static_cast<vector <set <int> >*>(d.sent_particles)));
+      
+      diy::load(bb, d.complete);
 
 #ifdef TESS_USE_CGAL
-      Delaunay3D* Dt = static_cast<Delaunay3D*>(d.Dt);
-      diy::load(bb, *Dt);
-      //fprintf(stderr, "Delaunay loaded with %lu vertices\n", Dt->number_of_vertices());
+      if (!d.complete)
+      {
+	Delaunay3D* Dt = static_cast<Delaunay3D*>(d.Dt);
+	diy::load(bb, *Dt);
+	//fprintf(stderr, "Delaunay loaded with %lu vertices\n", Dt->number_of_vertices());
+      }
 #endif
+
+      if (d.complete)
+      {
+	diy::load(bb, d.num_tets);
+	d.tets = (tet_t*)malloc(d.num_tets * sizeof(tet_t));
+	diy::load(bb, d.tets, d.num_tets);
+	d.vert_to_tet = NULL;
+	if (d.num_particles)
+	  d.vert_to_tet = (int*)malloc(d.num_particles * sizeof(int));
+	diy::load(bb, d.vert_to_tet, d.num_particles);
+      }
 
       // debug
 //       fprintf(stderr, "Done loading block gid %d\n", d.gid);

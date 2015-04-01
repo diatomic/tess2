@@ -211,6 +211,7 @@ void* create_block()
   dblock_t* b = new dblock_t;
   b->sent_particles = new std::vector<int>;
   b->convex_hull_particles = new std::vector< std::set<int> >;
+  b->complete = 0;
   init_delaunay_data_structure(b);
   return b;
 }
@@ -276,6 +277,7 @@ void save_block_light(const void* b_, diy::BinaryBuffer& bb)
   diy::save(bb, d.num_grid_pts);
   diy::save(bb, d.density, d.num_grid_pts);
 
+  diy::save(bb, d.complete);
   diy::save(bb, d.num_tets);
   diy::save(bb, d.tets, d.num_tets);
   diy::save(bb, d.vert_to_tet, d.num_particles);
@@ -306,6 +308,7 @@ void load_block_light(void* b_, diy::BinaryBuffer& bb)
   d.density = new float[d.num_grid_pts];
   diy::load(bb, d.density, d.num_grid_pts);
 
+  diy::load(bb, d.complete);
   diy::load(bb, d.num_tets);
   d.tets = (tet_t*)malloc(d.num_tets * sizeof(tet_t));
   diy::load(bb, d.tets, d.num_tets);
@@ -465,6 +468,8 @@ void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
 
   // create all final cells
   local_cells(b);
+
+  b->complete = 1;
 
   // collect quantities
   if (first_time || b->num_orig_particles < quants->min_quants[NUM_ORIG_PTS])

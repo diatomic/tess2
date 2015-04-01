@@ -200,10 +200,7 @@ int main(int argc, char *argv[])
 
   tess(master, quants, times);
   
-  // NB: Cannot save when not all blocks are in memory because the save/load
-  //     provided to the master don't save/restore tets.
-  //if (mem_blocks == -1 || mem_blocks >= tot_blocks)
-    tess_save(master, outfile.c_str(), times);
+  tess_save(master, outfile.c_str(), times);
 
   timing(times, -1, TOT_TIME);
   tess_stats(master, quants, times);
