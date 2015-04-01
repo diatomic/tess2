@@ -72,6 +72,8 @@ void tess(diy::Master& master,
   timing(times, NEIGH1_TIME, DEL1_TIME);
   master.exchange();
 
+ if (master.limit() == -1)
+ {
   // compute second stage tessellation
   timing(times, DEL2_TIME, NEIGH1_TIME);
   master.foreach(&delaunay2);
@@ -79,6 +81,12 @@ void tess(diy::Master& master,
   // exchange particles
   timing(times, NEIGH2_TIME, DEL2_TIME);
   master.exchange();
+ } else
+ {
+  // record zero times
+  timing(times, DEL2_TIME, NEIGH1_TIME);
+  timing(times, NEIGH2_TIME, DEL2_TIME);
+ }
 
   // compute third stage tessellation
   timing(times, DEL3_TIME, NEIGH2_TIME);
@@ -164,11 +172,19 @@ void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapP
     b->box.max[cur_dim] = new_max;
 }
 
-void tess_exchange(diy::Master& master, const diy::Assigner& assigner)
+void tess_exchange(diy::Master& master, const diy::Assigner& assigner, double* times)
 {
+  timing(times, EXCH_TIME, -1);
   int k = 2;
   diy::RegularSwapPartners  partners(3, assigner.nblocks(), k, false);
   diy::reduce(master, assigner, partners, redistribute);
+  timing(times, -1, EXCH_TIME);
+}
+
+void tess_exchange(diy::Master& master, const diy::Assigner& assigner)
+{
+  double times[TESS_MAX_TIMES];
+  tess_exchange(master, assigner);
 }
 
 void tess_save(diy::Master& master, const char* outfile)
@@ -179,47 +195,12 @@ void tess_save(diy::Master& master, const char* outfile)
 
 void tess_save(diy::Master& master, const char* outfile, double* times)
 {
-  // All the foreach block functions are done. We now make a very dangerous assumption
-  // that all blocks fit in memory because the remaining functions are done on all blocks
-  // turn off output if all blocks are not resident in core
-
-  // array of pointers to all my local blocks
-  dblock_t** dblocks = new dblock_t*[master.size()];
-  for (int i = 0; i < (int)master.size(); i++)
-    dblocks[i] = master.block<dblock_t>(i);
-
   // write output
   timing(times, OUT_TIME, -1);
   if (outfile[0])
-  {
-    char out_ncfile[256];
-    int *num_nbrs = new int[master.size()];
-    gb_t **nbrs = new gb_t*[master.size()];
-    const diy::Master& m = master;
-    for (int i = 0; i < (int)master.size(); i++)
-    {
-      diy::Link* l = m.link(i);
-      num_nbrs[i] = l->size();
-      nbrs[i] = new gb_t[num_nbrs[i]];
-      for (int j = 0; j < num_nbrs[i]; j++)
-        nbrs[i][j] = l->target(j);
-    }
-//     strncpy(out_ncfile, outfile, sizeof(out_ncfile) - 4);
-//     out_ncfile[sizeof(out_ncfile) - 4] = 0;
-//     strcat(out_ncfile, ".nc");
-//     pnetcdf_write(master.size(), dblocks, out_ncfile, master.communicator(), num_nbrs, nbrs);
     diy::io::write_blocks(outfile, master.communicator(), master, &save_block_light);
-    for (int i = 0; i < (int)master.size(); i++)
-      delete[] nbrs[i];
-    delete[] nbrs;
-    delete[] num_nbrs;
-  }
 
   timing(times, -1, OUT_TIME);
-
-  // cleanup array of block points only used for writing all blocks using existing writer
-  // actual blocks cleaned up with the destroy_block() callback function
-  delete[] dblocks;
 }
 
 //
@@ -458,8 +439,8 @@ void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*)
   local_cells(b);
 
   // debug
-//   fprintf(stderr, "phase 2 gid %d num_tets %d num_particles %d \n",
-//           b->gid, b->num_tets, b->num_particles);
+  //fprintf(stderr, "phase 2 gid %d num_tets %d num_particles %d \n",
+  //        b->gid, b->num_tets, b->num_particles);
 
   incomplete_cells_final(b, cp);
 
@@ -547,12 +528,22 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
       // add to list of convex hull particles
       convex_hull_particles->push_back(p);
 
-      // incomplete cell goes to the closest neighbor
-      diy::Direction nearest_dir =
-    	nearest_neighbor(&(dblock->particles[3 * p]), dblock->mins, dblock->maxs);
-      // TODO: helper functions will be moved to standalone
-      if (l->direction(nearest_dir) != -1)
-	(*sent_particles)[p].insert(l->direction(nearest_dir));
+      if (cp.master()->limit() == -1)
+      {
+	// incomplete cell goes to the closest neighbor
+	diy::Direction nearest_dir =
+	  nearest_neighbor(&(dblock->particles[3 * p]), dblock->mins, dblock->maxs);
+	// TODO: helper functions will be moved to standalone
+	if (l->direction(nearest_dir) != -1)
+	  (*sent_particles)[p].insert(l->direction(nearest_dir));
+      } else
+      {
+	// if not all blocks fit in memory, we'll do one phase, so send convex
+	// hull particles to everybody
+	for (unsigned i = 0; i < l->size(); ++i)
+	  if (l->target(i).gid != cp.gid())
+	    (*sent_particles)[p].insert(i);
+      }
     }
   }
 
@@ -807,6 +798,7 @@ void tess_stats(diy::Master& master,
   if (master.communicator().rank() == 0)
   {
     fprintf(stderr, "----------------- global stats ------------------\n");
+    fprintf(stderr, "particle exchange time        = %.3lf s\n", times[EXCH_TIME]);
     fprintf(stderr, "first delaunay time           = %.3lf s\n",
 	    times[DEL1_TIME]);
     fprintf(stderr, "  (%.3lf s local cell + %.3lf s incomplete cell)\n",
@@ -824,8 +816,10 @@ void tess_stats(diy::Master& master,
     fprintf(stderr, "total time                    = %.3lf s\n",
 	    times[TOT_TIME]);
     fprintf(stderr, "All times printed in one row:\n");
-    fprintf(stderr, "%.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
-	    times[DEL1_TIME], times[NEIGH1_TIME], times[DEL2_TIME], times[NEIGH2_TIME],
+    fprintf(stderr, "%.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
+	    times[EXCH_TIME],
+	    times[DEL1_TIME], times[NEIGH1_TIME],
+	    times[DEL2_TIME], times[NEIGH2_TIME],
 	    times[DEL3_TIME], times[OUT_TIME], times[TOT_TIME]);
     fprintf(stderr, "-------------------------------------------------\n");
     fprintf(stderr, "original particles = [%d, %d]\n", global_min_quants[NUM_ORIG_PTS],

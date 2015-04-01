@@ -238,6 +238,8 @@ int main(int argc, char** argv) {
   tot_blocks = nblocks = master.size();
   ::master = &master;
 
+  fprintf(stderr, "Blocks read: %d\n", tot_blocks);
+
   // get overall data extent
   for (int i = 0; i < nblocks; i++) {
     if (i == 0) {
@@ -269,6 +271,8 @@ int main(int argc, char** argv) {
 
   // package rendering data
   PrepRenderingData();
+
+  fprintf(stderr, "Rednering data prepped");
 
   // start glut
   glutInit(&argc, argv);

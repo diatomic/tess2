@@ -25,6 +25,7 @@
 enum
 {
   TOT_TIME,
+  EXCH_TIME,
   LOC1_TIME,
   INC1_TIME,
   DEL1_TIME,

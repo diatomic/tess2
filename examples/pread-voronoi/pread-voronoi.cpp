@@ -134,6 +134,9 @@ int main(int argc, char *argv[])
 
   if (outfile == "!")
     outfile = "";
+  
+  timing(times, -1, -1);
+  timing(times, TOT_TIME, -1);
 
   // initialize DIY and decompose domain
   diy::FileStorage          storage(prefix);
@@ -166,7 +169,7 @@ int main(int argc, char *argv[])
 #endif
 
   // sort and distribute particles to all blocks
-  tess_exchange(master, assigner);
+  tess_exchange(master, assigner, times);
   printf("%d: particles exchanged\n", rank);
 
 #if 0	    // debug
@@ -193,15 +196,19 @@ int main(int argc, char *argv[])
 #endif
 
   // debug purposes only: checks if the particles got into the right blocks
-  master.foreach(&verify_particles);
+  //master.foreach(&verify_particles);
 
   tess(master, quants, times);
   
-  if (mem_blocks == -1 || mem_blocks >= tot_blocks)
+  // NB: Cannot save when not all blocks are in memory because the save/load
+  //     provided to the master don't save/restore tets.
+  //if (mem_blocks == -1 || mem_blocks >= tot_blocks)
     tess_save(master, outfile.c_str(), times);
 
+  timing(times, -1, TOT_TIME);
   tess_stats(master, quants, times);
 
+  // Storage + memory stats
   size_t max_storage = storage.max_size(),
 	 sum_max_storage;
   diy::mpi::reduce(world, max_storage, sum_max_storage, 0, std::plus<size_t>());
