@@ -26,6 +26,7 @@
 struct point_t {
   float x, y, z;              /* coordinates */
   int gid;                    /* owner block global id */
+  int lid;		      /* point id within its block */
 };
 
 /* CLP  - struct walls - using general equation of plane
@@ -58,6 +59,7 @@ struct dblock_t {
   int num_tets;              /* number of delaunay tetrahedra */
   struct tet_t* tets;        /* delaunay tets */
   int* rem_gids;             /* owners of remote particles */
+  int* rem_lids;	     /* "local ids" of the remote particles */
   int* vert_to_tet;          /* a tet that contains the vertex */
 
   /* sent particles and convex hull particles

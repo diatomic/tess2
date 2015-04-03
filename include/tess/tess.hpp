@@ -102,6 +102,7 @@ struct AddBlock
     b->num_tets = 0;
     b->tets = NULL;
     b->rem_gids = NULL;
+    b->rem_lids = NULL;
     b->vert_to_tet = NULL;
     b->num_grid_pts = 0;
     b->density = NULL;
@@ -150,6 +151,7 @@ namespace diy
       diy::save(bb, d.num_particles);
       diy::save(bb, d.particles, 3 * d.num_particles);
       diy::save(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+      diy::save(bb, d.rem_lids, d.num_particles - d.num_orig_particles);
       diy::save(bb, d.num_grid_pts);
       diy::save(bb, d.density, d.num_grid_pts);
       // NB tets and vert_to_tet get recreated in each phase; not saved and reloaded
@@ -198,9 +200,14 @@ namespace diy
         d.particles = (float*)malloc(d.num_particles * 3 * sizeof(float));
       diy::load(bb, d.particles, 3 * d.num_particles);
       d.rem_gids = NULL;
+      d.rem_lids = NULL;
       if (d.num_particles - d.num_orig_particles)
+      {
         d.rem_gids = (int*)malloc((d.num_particles - d.num_orig_particles) * sizeof(int));
+        d.rem_lids = (int*)malloc((d.num_particles - d.num_orig_particles) * sizeof(int));
+      }
       diy::load(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+      diy::load(bb, d.rem_lids, d.num_particles - d.num_orig_particles);
       diy::load(bb, d.num_grid_pts);
       d.density = (float*)malloc(d.num_grid_pts * sizeof(float));
       diy::load(bb, d.density, d.num_grid_pts);

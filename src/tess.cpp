@@ -221,14 +221,11 @@ void destroy_block(void* b_)
   dblock_t* b = static_cast<dblock_t*>(b_);
 
   // particles and tets
-  if (b->particles)
-    free(b->particles);
-  if (b->tets)
-    free(b->tets);
-  if (b->rem_gids)
-    free(b->rem_gids);
-  if (b->vert_to_tet)
-    free(b->vert_to_tet);
+  if (b->particles) 	free(b->particles);
+  if (b->tets)		free(b->tets);
+  if (b->rem_gids)	free(b->rem_gids);
+  if (b->rem_lids)	free(b->rem_lids);
+  if (b->vert_to_tet)	free(b->vert_to_tet);
 
   // density
   if (b->density)
@@ -274,6 +271,7 @@ void save_block_light(const void* b_, diy::BinaryBuffer& bb)
   diy::save(bb, d.num_particles);
   diy::save(bb, d.particles, 3 * d.num_particles);
   diy::save(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+  diy::save(bb, d.rem_lids, d.num_particles - d.num_orig_particles);
   diy::save(bb, d.num_grid_pts);
   diy::save(bb, d.density, d.num_grid_pts);
 
@@ -301,9 +299,14 @@ void load_block_light(void* b_, diy::BinaryBuffer& bb)
     d.particles = (float*)malloc(d.num_particles * 3 * sizeof(float));
   diy::load(bb, d.particles, 3 * d.num_particles);
   d.rem_gids = NULL;
+  d.rem_lids = NULL;
   if (d.num_particles - d.num_orig_particles)
+  {
     d.rem_gids = (int*)malloc((d.num_particles - d.num_orig_particles) * sizeof(int));
+    d.rem_lids = (int*)malloc((d.num_particles - d.num_orig_particles) * sizeof(int));
+  }
   diy::load(bb, d.rem_gids, d.num_particles - d.num_orig_particles);
+  diy::load(bb, d.rem_lids, d.num_particles - d.num_orig_particles);
   diy::load(bb, d.num_grid_pts);
   d.density = new float[d.num_grid_pts];
   diy::load(bb, d.density, d.num_grid_pts);
@@ -584,6 +587,7 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
       rp.y   = dblock->particles[3 * p + 1];
       rp.z   = dblock->particles[3 * p + 2];
       rp.gid = dblock->gid;
+      rp.lid = p;
       wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
       cp.enqueue(l->target(*it), rp);
     }
@@ -671,6 +675,7 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
                   "Not sure whther this is a sign of trouble, but in any case its remote gid "
                   "will not be assigned correctly\n", p, dblock->gid);
         rp.gid = dblock->gid;
+        rp.lid = p;
         wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
         cp.enqueue(cp.link()->target(*it), rp);
       }
@@ -698,6 +703,7 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
   {
     b->particles = (float *)realloc(b->particles, (b->num_particles + numpts) * 3 * sizeof(float));
     b->rem_gids  = (int*)realloc(b->rem_gids, (n + numpts) * sizeof(int));
+    b->rem_lids  = (int*)realloc(b->rem_lids, (n + numpts) * sizeof(int));
   }
 
   // copy received particles
@@ -714,6 +720,7 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
       b->particles[3 * b->num_particles + 1] = pts[j].y;
       b->particles[3 * b->num_particles + 2] = pts[j].z;
       b->rem_gids[n] = pts[j].gid;
+      b->rem_lids[n] = pts[j].lid;
 
       b->num_particles++;
       n++;
@@ -1215,6 +1222,7 @@ void wall_particles(struct dblock_t *dblock)
 
     realloc_size      = dblock->num_particles + new_points.size() / 3 - dblock->num_orig_particles;
     dblock->rem_gids  = (int*) realloc(dblock->rem_gids, realloc_size * sizeof(int));
+    dblock->rem_lids  = (int*) realloc(dblock->rem_lids, realloc_size * sizeof(int));
 
     // copy new particles
     for (size_t j = 0; j < new_points.size(); j += 3)
@@ -1223,6 +1231,7 @@ void wall_particles(struct dblock_t *dblock)
       dblock->particles[3 * dblock->num_particles + 1] = new_points[j + 1];
       dblock->particles[3 * dblock->num_particles + 2] = new_points[j + 2];
       dblock->rem_gids[dblock->num_particles - dblock->num_orig_particles] = -1;
+      dblock->rem_lids[dblock->num_particles - dblock->num_orig_particles] = -1;
       dblock->num_particles++;
     }
   }
