@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
     >> Option(     "maxvol",    maxvol,       "minvol cutoff")
   ;
   wrap_ = ops >> Present('w', "wrap", "Use periodic boundary conditions");
+  bool single = ops >> Present('1', "single", "use single-phase version of the algorithm");
 
   coordinates.resize(3);
   if (  ops >> Present('h', "help", "show help") ||
@@ -198,7 +199,7 @@ int main(int argc, char *argv[])
   // debug purposes only: checks if the particles got into the right blocks
   //master.foreach(&verify_particles);
 
-  tess(master, quants, times);
+  tess(master, quants, times, single);
   
   tess_save(master, outfile.c_str(), times);
 

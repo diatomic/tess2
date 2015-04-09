@@ -47,16 +47,17 @@
 
 using namespace std;
 
-void tess(diy::Master& master)
+void tess(diy::Master& master, bool single)
 {
   double times[TESS_MAX_TIMES]; // timing
   quants_t quants; // quantity stats
-  tess(master);
+  tess(master, quants, times, single);
 }
 
 void tess(diy::Master& master,
           quants_t& quants,
-          double* times)
+          double* times,
+	  bool single)
 {
 #ifdef TIMING
   // if (master.threads() != 1)
@@ -72,7 +73,7 @@ void tess(diy::Master& master,
   timing(times, NEIGH1_TIME, DEL1_TIME);
   master.exchange();
 
- if (master.limit() == -1)
+ if (!single)
  {
   // compute second stage tessellation
   timing(times, DEL2_TIME, NEIGH1_TIME);
