@@ -418,9 +418,9 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
   double* times = (double*)misc_args;
 
   // create local delaunay cells
-  timing(times, LOC1_TIME, -1);
+  //timing(times, LOC1_TIME, -1);
   local_cells(b);
-  timing(times, INC1_TIME, LOC1_TIME);
+  //timing(times, INC1_TIME, LOC1_TIME);
 
   // debug
 //   fprintf(stderr, "phase 1 gid %d num_tets %d num_particles %d \n",
@@ -428,7 +428,7 @@ void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
 
   // determine which cells are incomplete or too close to neighbor
   incomplete_cells_initial(b, cp);
-  timing(times, -1, INC1_TIME);
+  //timing(times, -1, INC1_TIME);
 
   // cleanup block
   reset_block(b);
