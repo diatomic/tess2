@@ -167,8 +167,10 @@ namespace diy
 #ifdef TESS_USE_CGAL
       if (!d.complete)
       {
+#if 0
 	const Delaunay3D* Dt = static_cast<Delaunay3D*>(d.Dt);
 	diy::save(bb, *Dt);
+#endif
       }
       //fprintf(stderr, "Delaunay saved with %lu vertices\n", Dt->number_of_vertices());
 #endif
@@ -225,9 +227,11 @@ namespace diy
 #ifdef TESS_USE_CGAL
       if (!d.complete)
       {
+#if 0
 	Delaunay3D* Dt = static_cast<Delaunay3D*>(d.Dt);
 	diy::load(bb, *Dt);
 	//fprintf(stderr, "Delaunay loaded with %lu vertices\n", Dt->number_of_vertices());
+#endif
       }
 #endif
 
