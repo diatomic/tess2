@@ -16,9 +16,6 @@
 # Argonne, IL 60439
 # tpeterka@mcs.anl.gov
 #
-# All rights reserved. May not be used, modified, or copied
-# without permission
-#
 #----------------------------------------------------------------------------
 ARCH=MAC_OSX
 #ARCH=LINUX
@@ -40,7 +37,7 @@ if [ $num_nodes -lt 1 ]; then
 fi
 
 # executable
-exe=${HOME}/tess/examples/tess-dense/tess-dense
+exe=./tess-dense
 
 # total number of blocks in the domain
 tb=$[$num_procs * 1]

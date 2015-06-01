@@ -16,9 +16,6 @@
 # Argonne, IL 60439
 # tpeterka@mcs.anl.gov
 #
-# All rights reserved. May not be used, modified, or copied
-# without permission
-#
 #----------------------------------------------------------------------------
 ARCH=MAC_OSX
 #ARCH=LINUX
