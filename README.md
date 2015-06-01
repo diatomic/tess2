@@ -59,7 +59,7 @@ Edit TESS_TEST: select ARCH, num_procs, dsize (number of particles)
 
 ```
 ./TESS_TEST
-../../tools/draw del.out.nc 0
+../../tools/draw del.out
 ```
 
 Mouse interaction with drawing: mouse move to rotate, ‘z’ + mouse up, down to zoom, ‘t’ to toggle voronoi tessellation, ‘y’ to toggle delaunay tessellation, ‘f’ to toggle shaded rendering
