@@ -8,9 +8,6 @@
 // Argonne, IL 60439
 // tpeterka@mcs.anl.gov
 //
-// All rights reserved. May not be used, modified, or copied
-// without permission
-//
 //--------------------------------------------------------------------------
 #include "mpi.h"
 #include <assert.h>
@@ -29,14 +26,14 @@
 using namespace std;
 
 void GetArgs(int argc, char **argv, char *infile, char *outfile,
-	     float *minvol, float *maxvol, int *wrap, int *bf, 
+	     float *minvol, float *maxvol, int *wrap, int *bf,
 	     int *sample_rate);
 void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
-	     int* &gids, float** &particles, int* &num_particles, bb_t* &bb, 
+	     int* &gids, float** &particles, int* &num_particles, bb_t* &bb,
 	     int&tot_blocks, int& nblocks, float *data_mins, float *data_maxs,
 	     int *block_dims, int sample_rate);
-void Redistribute(int *bf, int* &gids, 
-		  float** &particles, int* &num_particles, bb_t* &bb, 
+void Redistribute(int *bf, int* &gids,
+		  float** &particles, int* &num_particles, bb_t* &bb,
 		  int& tot_blocks, int& nblocks, MPI_Comm comm);
 void Pt2Child(float *pt, int *bf, float *mins, float *maxs, int *idx);
 void GetNeighbors(int *gids, bb_t *bb, bool wrap, int nblocks, int *block_dims,
@@ -45,10 +42,6 @@ void GetNeighbors(int *gids, bb_t *bb, bool wrap, int nblocks, int *block_dims,
 void ijk2gid(int *ijk, int& gid, int *block_dims, bool wrap, int *bf,
 	     int *old_block_dims);
 void gid2ijk(int gid, int *ijk, int *bf, int *old_block_dims);
-
-// DEPRECATED
-// void bb2ijk(bb_t bb, int *ijk, int *block_dims, 
-// 	    float *data_mins, float *data_maxs);
 
 int main(int argc, char *argv[]) {
 
@@ -69,7 +62,7 @@ int main(int argc, char *argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &groupsize);
 
-  GetArgs(argc, argv, infile, outfile, &minvol, &maxvol, &wrap, bf, 
+  GetArgs(argc, argv, infile, outfile, &minvol, &maxvol, &wrap, bf,
 	  &sample_rate);
 
   // following are allocated by ReadGIO
@@ -77,7 +70,7 @@ int main(int argc, char *argv[]) {
   bb_t *bb; // block bounds
   gb_t **neighbors; // block neighbors
   int *num_neighbors; // number of neighbors in each block
-  float **particles; // particles[block_num][particle] 
+  float **particles; // particles[block_num][particle]
 		     //  where each particle is 3 values, px, py, pz
   int *num_particles; // number of particles in each block
   float data_mins[3]; // physical global data minimum
@@ -91,7 +84,7 @@ int main(int argc, char *argv[]) {
   reader->OpenAndReadHeader();
 
   // read generic I/O data
-  ReadGIO(reader, rank, groupsize, gids, particles, num_particles, bb, 
+  ReadGIO(reader, rank, groupsize, gids, particles, num_particles, bb,
 	  tot_blocks, nblocks, data_mins, data_maxs, block_dims,
 	  sample_rate);
 
@@ -112,7 +105,7 @@ int main(int argc, char *argv[]) {
 
   // redistribute particles
   if (bf[0] > 1 || bf[1] > 1 || bf[2] > 1)
-    Redistribute(bf, gids, particles, num_particles, 
+    Redistribute(bf, gids, particles, num_particles,
 		 bb, tot_blocks, nblocks, MPI_COMM_WORLD);
 
   // adjust block dims for redistribution and save a copy of the original
@@ -128,17 +121,17 @@ int main(int argc, char *argv[]) {
   if (rank == 0)
     fprintf(stderr, "data_mins[%.1f %.1f %.1f] data_maxs[%.1f %.1f %.1f] "
 	    "block_dims[%d %d %d]\n",
-	    data_mins[0], data_mins[1], data_mins[2], 
-	    data_maxs[0], data_maxs[1], data_maxs[2], 
+	    data_mins[0], data_mins[1], data_mins[2],
+	    data_maxs[0], data_maxs[1], data_maxs[2],
 	    block_dims[0], block_dims[1], block_dims[2]);
 
 
   // find neighboring blocks
-  GetNeighbors(gids, bb, wrap, nblocks, block_dims, neighbors, num_neighbors, 
+  GetNeighbors(gids, bb, wrap, nblocks, block_dims, neighbors, num_neighbors,
 	       data_mins, data_maxs, bf, old_block_dims);
 
   // initialize, run, cleanup tess
-  tess_init(nblocks, gids, bb, neighbors, num_neighbors, data_mins, data_maxs, 
+  tess_init(nblocks, gids, bb, neighbors, num_neighbors, data_mins, data_maxs,
   	    wrap, 0, minvol, maxvol, MPI_COMM_WORLD, times);
   tess(particles, num_particles, outfile);
   tess_finalize();
@@ -168,7 +161,7 @@ int main(int argc, char *argv[]) {
 // gets command line args
 //
 void GetArgs(int argc, char **argv, char *infile, char *outfile,
-	     float *minvol, float *maxvol, int *wrap, int *bf, 
+	     float *minvol, float *maxvol, int *wrap, int *bf,
 	     int *sample_rate) {
 
   assert(argc >= 10);
@@ -206,7 +199,7 @@ void GetArgs(int argc, char **argv, char *infile, char *outfile,
 // sample_rate: 1 out of every sample_rate particles will be kept
 //
 void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
-	     int* &gids, float** &particles, int* &num_particles, bb_t* &bb, 
+	     int* &gids, float** &particles, int* &num_particles, bb_t* &bb,
 	     int& tot_blocks, int& nblocks, float *data_mins, float *data_maxs,
 	     int *block_dims, int sample_rate) {
 
@@ -259,7 +252,7 @@ void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
     bb[b].max[0] = max[0];
     bb[b].max[1] = max[1];
     bb[b].max[2] = max[2];
-    
+
     // number of particles in this block
     // note the reader wants gid, not lid
     num_particles[b] = reader->GetNumberOfElements(gids[b]);
@@ -267,7 +260,7 @@ void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
     // debug
 //     fprintf(stderr, "gid %d num_particles = %d min [%.1f %.1f %.1f] "
 // 	    "max [%.1f %.1f %.1f]\n",
-// 	    gids[b], num_particles[b], 
+// 	    gids[b], num_particles[b],
 // 	    bb[b].min[0], bb[b].min[1], bb[b].min[2],
 // 	    bb[b].max[0], bb[b].max[1], bb[b].max[2]);
 
@@ -276,14 +269,14 @@ void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
     int idpadsize = gio::CRCSize / sizeof(int64_t);
 
     // allocate application arrays to store variables plus CRCs
-    float* x = new float[num_particles[b] + floatpadsize]; 
-    float* y = new float[num_particles[b] + floatpadsize]; 
+    float* x = new float[num_particles[b] + floatpadsize];
+    float* y = new float[num_particles[b] + floatpadsize];
     float* z = new float[num_particles[b] + floatpadsize];
     int64_t *id = new int64_t[num_particles[b] + idpadsize];
 
     // clear variables and then register application arrays with the reader
-    reader->AddVariable("x", x, gio::GenericIOBase::ValueHasExtraSpace); 
-    reader->AddVariable("y", y, gio::GenericIOBase::ValueHasExtraSpace); 
+    reader->AddVariable("x", x, gio::GenericIOBase::ValueHasExtraSpace);
+    reader->AddVariable("y", y, gio::GenericIOBase::ValueHasExtraSpace);
     reader->AddVariable("z", z, gio::GenericIOBase::ValueHasExtraSpace);
     reader->AddVariable("id", id, gio::GenericIOBase::ValueHasExtraSpace);
 
@@ -343,8 +336,8 @@ void ReadGIO(gio::GenericIOReader *reader, int rank, int groupsize,
 // nblocks: local number of blocks (input and output)
 // MPI communicator
 //
-void Redistribute(int *bf, int* &gids, 
-		  float** &particles, int* &num_particles, bb_t* &bb, 
+void Redistribute(int *bf, int* &gids,
+		  float** &particles, int* &num_particles, bb_t* &bb,
 		  int& tot_blocks, int& nblocks, MPI_Comm comm) {
 
   int rank, groupsize; // MPI usual
@@ -372,7 +365,7 @@ void Redistribute(int *bf, int* &gids,
 
     // for all particles
     for (int i = 0; i < num_particles[b]; i++) {
-    
+
       // determine child block for the particle
       int cid[3]; // child index (i,j,k) 0 to bf -1 in each dimension
       Pt2Child(&particles[b][3 * i], bf, bb[b].min, bb[b].max, cid);
@@ -380,10 +373,10 @@ void Redistribute(int *bf, int* &gids,
       // debug
       //       fprintf(stderr, "pt [%.3f %.3f %.3f] in bb min [%.1f %.1f %f] "
       // 	      "max [%.1f %.1f %.1f] belongs in cid [%d %d %d]\n",
-      // 	      particles[b][3 * i], particles[b][3 * i + 1], 
-      // 	      particles[b][3 * i + 2], 
-      // 	      bb[b].min[0], bb[b].min[1], bb[b].min[2], 
-      // 	      bb[b].max[0], bb[b].max[1], bb[b].max[2], 
+      // 	      particles[b][3 * i], particles[b][3 * i + 1],
+      // 	      particles[b][3 * i + 2],
+      // 	      bb[b].min[0], bb[b].min[1], bb[b].min[2],
+      // 	      bb[b].max[0], bb[b].max[1], bb[b].max[2],
       // 	      cid[0], cid[1], cid[2]);
 
       // child is column-major ordering (z fastest) of cid
@@ -396,7 +389,7 @@ void Redistribute(int *bf, int* &gids,
 
     } // for all particles
 
-    // parent appends child block bounds to particle arrays for 
+    // parent appends child block bounds to particle arrays for
     // any children receiving particles
     for (int i = 0; i < bf[0]; i++) {
       for (int j = 0; j < bf[1]; j++) {
@@ -406,17 +399,17 @@ void Redistribute(int *bf, int* &gids,
 	  if (ps[child].size() && (i || j || k)) {
 	    // get child bounds
 	    float child_min[3], child_max[3];
-	    child_min[0] = bb[b].min[0] + 
+	    child_min[0] = bb[b].min[0] +
 	      i * (bb[b].max[0] - bb[b].min[0]) / bf[0];
-	    child_min[1] = bb[b].min[1] + 
+	    child_min[1] = bb[b].min[1] +
 	      j * (bb[b].max[1] - bb[b].min[1]) / bf[1];
-	    child_min[2] = bb[b].min[2] + 
+	    child_min[2] = bb[b].min[2] +
 	      k * (bb[b].max[2] - bb[b].min[2]) / bf[2];
-	    child_max[0] = child_min[0] + 
+	    child_max[0] = child_min[0] +
 	      (bb[b].max[0] - bb[b].min[0]) / bf[0];
-	    child_max[1] = child_min[1] + 
+	    child_max[1] = child_min[1] +
 	      (bb[b].max[1] - bb[b].min[1]) / bf[1];
-	    child_max[2] = child_min[2] + 
+	    child_max[2] = child_min[2] +
 	      (bb[b].max[2] - bb[b].min[2]) / bf[2];
 	    ps[child].push_back(child_min[0]);
 	    ps[child].push_back(child_min[1]);
@@ -459,7 +452,7 @@ void Redistribute(int *bf, int* &gids,
     } // for all children
 
     // shrink particles to the remaining ones, ie those in child 0
-    particles[b] = (float *)realloc(particles[b], 
+    particles[b] = (float *)realloc(particles[b],
 				    ps[0].size() * sizeof(float));
     for (int j = 0; j < (int)ps[0].size(); j++)
       particles[b][j] = ps[0][j];
@@ -473,7 +466,7 @@ void Redistribute(int *bf, int* &gids,
     // debug
 //     fprintf(stderr, "+++ gid %d num_particles = %d min [%.1f %.1f %.1f] "
 // 	    "max [%.1f %.1f %.1f]\n",
-// 	    gids[b], num_particles[b], 
+// 	    gids[b], num_particles[b],
 // 	    bb[b].min[0], bb[b].min[1], bb[b].min[2],
 // 	    bb[b].max[0], bb[b].max[1], bb[b].max[2]);
 
@@ -530,7 +523,7 @@ void Redistribute(int *bf, int* &gids,
       bb[b].max[2] = particles[b][num_particles[b] * 3 + 5];
 
       // shrink the particle array back to just the particles
-      particles[b] = (float *)realloc(particles[b], 
+      particles[b] = (float *)realloc(particles[b],
 				      num_particles[b] * 3 * sizeof(float));
 
     }
@@ -570,7 +563,7 @@ void Redistribute(int *bf, int* &gids,
 // wrap: whether wrapping is used
 // block_dims: number of blocks in each dimension
 // neighbors: neighbors of local blocks (output) alocated by thie function
-// num_neihghbors: number of neighbors of local blocks (output) allocated by 
+// num_neihghbors: number of neighbors of local blocks (output) allocated by
 //   this function
 // data_mins, data_maxs: global data extents
 // bf: blocking factor of new distribution
@@ -602,7 +595,7 @@ void GetNeighbors(int *gids, bb_t *bb, bool wrap, int nblocks, int *block_dims,
     gid2ijk(gids[b], ijk, bf, old_block_dims);
 
     // debug
-//     fprintf(stderr, "gid %d has ijk [%d %d %d]\n", 
+//     fprintf(stderr, "gid %d has ijk [%d %d %d]\n",
 // 	    gids[b], ijk[0], ijk[1], ijk[2]);
 
     // for all neighbor directions
@@ -644,7 +637,7 @@ void GetNeighbors(int *gids, bb_t *bb, bool wrap, int nblocks, int *block_dims,
 	    // debug
 // 	    fprintf(stderr, "gid %d neig %d ijk [%d %d %d] has "
 // 		    "(gid %d, proc %d, dir %0x)\n",
-// 		    gids[b], num_neighbors[b], neigh_ijk[0], neigh_ijk[1], 
+// 		    gids[b], num_neighbors[b], neigh_ijk[0], neigh_ijk[1],
 // 		    neigh_ijk[2], neigh_gid, neigh_proc, neigh_dir);
 
 	    num_neighbors[b]++;
@@ -711,13 +704,13 @@ void ijk2gid(int *ijk, int& gid, int *block_dims, bool wrap, int *bf,
   pk = k / bf[2];
 
   // gid of parent
-  int p_gid = pi * old_block_dims[1] * old_block_dims[2] + 
+  int p_gid = pi * old_block_dims[1] * old_block_dims[2] +
     pj * old_block_dims[2] + pk;
-  
+
   // debug
 //   if (i == 0 && j == 0 && k == 1)
 //     fprintf(stderr, "ci,cj,ck = [%d %d %d] pi,pj,pk = [%d %d %d] "
-// 	    "p_gid = %d c_gid = %d\n", 
+// 	    "p_gid = %d c_gid = %d\n",
 // 	    ci, cj, ck, pi, pj, pk, p_gid, c_gid);
 
   // convert ci, cj, ck to a linearly ordered (k fastest) child gid
@@ -769,8 +762,8 @@ void gid2ijk(int gid, int *ijk, int *bf, int *old_block_dims) {
   else {
 
     // gid of parent
-    int p_gid = 
-      (gid - old_block_dims[0] * old_block_dims[1] * old_block_dims[2]) / 
+    int p_gid =
+      (gid - old_block_dims[0] * old_block_dims[1] * old_block_dims[2]) /
       (bf[0] * bf[1] * bf[2] - 1);
 
     // i,j,k of parent
@@ -783,7 +776,7 @@ void gid2ijk(int gid, int *ijk, int *bf, int *old_block_dims) {
     pk *= bf[2];
 
     // gid of child within its family
-    int c_gid = 
+    int c_gid =
       gid - p_gid * (bf[0] * bf[1] * bf[2] - 1) -
       old_block_dims[0] * old_block_dims[1] * old_block_dims[2] + 1;
 
@@ -815,7 +808,7 @@ void gid2ijk(int gid, int *ijk, int *bf, int *old_block_dims) {
 // // block_dims: number of blocks in each dimension
 // // data_mins, data_maxs: global data extents
 // //
-// void bb2ijk(bb_t bb, int *ijk, int *block_dims, 
+// void bb2ijk(bb_t bb, int *ijk, int *block_dims,
 // 	     float *data_mins, float *data_maxs) {
 
 //   float block_size[3]; // physical block size

@@ -28,7 +28,6 @@
 
 #include "tess/tess.h"
 #include "tess/tess.hpp"
-#include "tess/io.h"
 #include "tess/tet.h"
 #include "tess/tet-neighbors.h"
 

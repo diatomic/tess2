@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include "delaunay.h"
 #include "swap.hpp"
-#include "utils.h"
 
 /* timing and quantity stats */
 enum

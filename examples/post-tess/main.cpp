@@ -1,3 +1,17 @@
+//------------------------------------------------------------------------------
+//
+// driver for tessllating particles in postprocessing
+//
+// TODO: This code has not been converted over to DIY2 yet
+// Do not use as is
+//
+// Tom Peterka
+// Argonne National Laboratory
+// 9700 S. Cass Ave.
+// Argonne, IL 60439
+// tpeterka@mcs.anl.gov
+//
+//--------------------------------------------------------------------------
 #include "mpi.h"
 #include <assert.h>
 #include "tess/tess.h"
@@ -12,16 +26,16 @@ void read_text_particles(char *infile, vector <float> &particles, float *mins,
 			 float *maxs);
 void read_double_particles(char *infile, vector <float> &particles, float *mins,
 			   float *maxs, bool swap = false);
-void read_float_interleaved_particles(char *infile, vector <float> &particles, 
+void read_float_interleaved_particles(char *infile, vector <float> &particles,
 				      float *mins, float *maxs,
 				      bool swap = false);
-void SortParticles(vector <float> p, float *mins, float *maxs, 
+void SortParticles(vector <float> p, float *mins, float *maxs,
 		   float **particles, int *num_particles);
 int Pt2Gid(float *pt, float *mins, float *maxs);
 
 int main(int argc, char *argv[]) {
 
-  // input file type 
+  // input file type
   // 0 = text
   // 1 = float x's followed by y's followed by z's
   // 2 = float interleaved x y z
@@ -35,7 +49,7 @@ int main(int argc, char *argv[]) {
   float mins[3], maxs[3]; // data global extents
   float minvol, maxvol; // volume range, -1.0 = unused
   double times[TESS_MAX_TIMES]; // timing
-  float **particles; // particles[block_num][particle] 
+  float **particles; // particles[block_num][particle]
 		     //  where each particle is 3 values, px, py, pz
   int *num_particles; // number of particles in each block
   int nblocks; // my local number of blocks; todo
@@ -51,7 +65,7 @@ int main(int argc, char *argv[]) {
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  GetArgs(argc, argv, tot_blocks, infile, outfile, &minvol, &maxvol, 
+  GetArgs(argc, argv, tot_blocks, infile, outfile, &minvol, &maxvol,
 	  &intype, &swap, &wrap);
 
   // root read points in serial
@@ -264,7 +278,7 @@ void read_double_particles(char *infile, vector <float> &particles, float *mins,
     particles.push_back(z[i]);
 
     // debug
-//     fprintf(stderr, "%.3f %.3f %.3f\n", 
+//     fprintf(stderr, "%.3f %.3f %.3f\n",
 // 	    particles[particles.size() - 3],
 // 	    particles[particles.size() - 2],
 // 	    particles[particles.size() - 1]);
@@ -290,8 +304,8 @@ void read_double_particles(char *infile, vector <float> &particles, float *mins,
 //
 // crrently reads all particles into one block
 //
-void read_float_interleaved_particles(char *infile, vector <float> &particles, 
-				      float *mins, float *maxs, 
+void read_float_interleaved_particles(char *infile, vector <float> &particles,
+				      float *mins, float *maxs,
 				      bool swap) {
 
   FILE *fd;
@@ -341,7 +355,7 @@ void read_float_interleaved_particles(char *infile, vector <float> &particles,
     }
 
     // debug
-//     fprintf(stderr, "%.3f %.3f %.3f\n", 
+//     fprintf(stderr, "%.3f %.3f %.3f\n",
 // 	    particles[particles.size() - 3],
 // 	    particles[particles.size() - 2],
 // 	    particles[particles.size() - 1]);
@@ -373,13 +387,13 @@ void SortParticles(vector <float> p, float *mins, float *maxs,
   if (DIY_Gid(0, 0) == 0) {
 
     // particle vectors for each block
-    ps = new vector<float>[DIY_Num_gids(0)]; 
+    ps = new vector<float>[DIY_Num_gids(0)];
 
     // sort particles into individual vectors for each block
 
     // for all particles
     for (int i = 0; i < (int)p.size() / 3; i++) {
-    
+
       int gid = Pt2Gid(&p[3 * i], mins, maxs);
       // debug
 //       fprintf(stderr, "pt [%.3f %.3f %.3f] belongs in gid %d\n",
@@ -472,7 +486,7 @@ int Pt2Gid(float *pt, float *mins, float *maxs) {
   idx[2] = (idx[2] >= dim_nblocks[2] ? dim_nblocks[2] - 1 : idx[2]);
 
   // gid is row-major ordering of idx
-  return(idx[0] + idx[1] * dim_nblocks[0] + 
+  return(idx[0] + idx[1] * dim_nblocks[0] +
 	 idx[2] * (dim_nblocks[0] * dim_nblocks[1]));
 
 }
