@@ -6,18 +6,7 @@
 //----------------------------------------------------------------------------
 // Initialize and destroy Delaunay data structures used by CGAL.
 // We keep them persistent for later incremental insertion of additional points.
-// 
-
-// DEPRECATED
-// void* init_delaunay_data_structures(int nblocks)
-// {
-//   return new Delaunay3D[nblocks];
-// }
-// void clean_delaunay_data_structures(void* ds)
-// {
-//   Delaunay3D* dds = (Delaunay3D*) ds;
-//   delete[] dds;
-// }
+//
 
 void init_delaunay_data_structure(dblock_t* b)
 {
@@ -61,14 +50,14 @@ int gen_delaunay_output(Delaunay3D &Dt, int** tet_verts) {
   *tet_verts = (int *)malloc(numfacets * 4 * sizeof(int));
 
   // process the tets
-  for(Cell_iterator cit = Dt.finite_cells_begin(); 
+  for(Cell_iterator cit = Dt.finite_cells_begin();
       cit != Dt.finite_cells_end(); ++cit) {
 
     for (int i = 0; i < 4; ++i)
       (*tet_verts)[v++] = cit->vertex(i)->info();
 
   }
-  
+
   assert(numfacets == v / 4); // sanity
 
   return numfacets;
@@ -112,7 +101,7 @@ void gen_tets(Delaunay3D& Dt, tet_t* tets)
   for(All_cell_iterator cit = Dt.all_cells_begin();
 			cit != Dt.all_cells_end(); ++cit)
     cit->info() = -1;
-  
+
   // Record tet vertices (and indices in info())
   int idx = 0;
   for(Cell_iterator cit = Dt.finite_cells_begin();
@@ -123,7 +112,7 @@ void gen_tets(Delaunay3D& Dt, tet_t* tets)
       tets[idx].verts[i] = cit->vertex(i)->info();
     ++idx;
   }
-  
+
   // Record tet adjacency information
   idx = 0;
   for(Cell_iterator cit = Dt.finite_cells_begin();

@@ -1,8 +1,7 @@
-add_subdirectory	    (test-tess)
+add_subdirectory	    (tess)
 add_subdirectory	    (dense)
 add_subdirectory	    (tess-dense)
-#add_subdirectory	    (post-tess)
 if                          (pread)
   add_subdirectory	    (pread-voronoi)
 endif                       (pread)
-#add_subdirectory	    (hacc-post-tess)
+

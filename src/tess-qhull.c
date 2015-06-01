@@ -21,7 +21,7 @@ void clean_delaunay_data_structure(struct dblock_t* b)
 
   dblock: local block
 */
-void local_cells(struct dblock_t *dblock) 
+void local_cells(struct dblock_t *dblock)
 {
   boolT ismalloc = False;    /* True if qhull should free points in
 				qh_freeqhull() or reallocation */
@@ -36,7 +36,7 @@ void local_cells(struct dblock_t *dblock)
   assert(dev_null != NULL);
 
   /* deep copy from float to double (qhull API is double) */
-  double *pts = 
+  double *pts =
     (double *)malloc(dblock->num_particles * 3 * sizeof(double));
   for (j = 0; j < 3 * dblock->num_particles; j++)
     pts[j] = dblock->particles[j];
@@ -82,7 +82,7 @@ void local_cells(struct dblock_t *dblock)
   generates delaunay output from qhull
 
   facetlist: qhull list of convex hull facets
-  tet_verts: pointer to array of tet vertex indices for this block 
+  tet_verts: pointer to array of tet vertex indices for this block
   (allocated by this function, user's responsibility to free)
 
 */

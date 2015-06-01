@@ -31,7 +31,7 @@ void circumcenter(float* center, tet_t* tet, float* particles)
 	*b = &particles[3*tet->verts[1]],
 	*c = &particles[3*tet->verts[2]],
 	*d = &particles[3*tet->verts[3]];
-  
+
   // center everything at d
   float t[3], u[3], v[3];
   for (int i = 0; i < 3; ++i) {
@@ -46,7 +46,7 @@ void circumcenter(float* center, tet_t* tet, float* particles)
   // God help us if den is close to 0
   // (this will happen for nearly flat tets)
   float den = 2*determinant(t,u,v);
-  
+
   float uv[3], vt[3], tu[3];
   cross(uv, u, v);
   cross(vt, v, t);
@@ -314,7 +314,7 @@ int complete(int	    v,
 
   return 1; // returning int instead of bool
 }
- 
+
 /**
  * Fills edge_link with all the tets containing edge (u,v),
  * the tets are inserted in circular order, starting from ut

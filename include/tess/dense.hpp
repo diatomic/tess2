@@ -8,9 +8,6 @@
 // Argonne, IL 60439
 // tpeterka@mcs.anl.gov
 //
-// (C) 2013 by Argonne National Laboratory.
-// See COPYRIGHT in top-level directory.
-//
 //--------------------------------------------------------------------------
 #ifndef _DENSE_H
 #define _DENSE_H

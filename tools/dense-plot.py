@@ -2,16 +2,13 @@
 
 #---------------------------------------------------------------------------
 #
-# plots 2D density 
+# plots 2D density
 #
 # Tom Peterka
 # Argonne National Laboratory
 # 9700 S. Cass Ave.
 # Argonne, IL 60439
 # tpeterka@mcs.anl.gov
-#
-# (C) 2013 by Argonne National Laboratory.
-# See COPYRIGHT in top-level directory.
 #
 #--------------------------------------------------------------------------
 

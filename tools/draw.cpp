@@ -8,9 +8,6 @@
 // Argonne, IL 60439
 // tpeterka@mcs.anl.gov
 //
-// (C) 2011 by Argonne National Laboratory.
-// See COPYRIGHT in top-level directory.
-//
 //--------------------------------------------------------------------------
 
 #include <stdio.h>
@@ -23,7 +20,6 @@
 #include "tess/tet.h"
 #include <math.h>
 #include "mpi.h"
-#include "tess/io.h"
 #include "tess/volume.h"
 
 #include "tess/tess.hpp"

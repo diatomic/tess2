@@ -8,9 +8,6 @@
 // Argonne, IL 60439
 // tpeterka@mcs.anl.gov
 //
-// (C) 2011 by Argonne National Laboratory.
-// See COPYRIGHT in top-level directory.
-//
 //---------------------------------------------------------------------------
 
 #ifndef __SWAP
