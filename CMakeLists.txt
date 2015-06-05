@@ -73,6 +73,9 @@ endif			    ()
 
 # MPI
 find_package                (MPI REQUIRED)
+if                          (NOT bgq)
+  set                       (libraries                  ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
+endif                       (NOT bgq)
 
 # Threads
 find_package		    (Threads)
@@ -114,8 +117,6 @@ include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 set			    (libraries
 			     ${libraries}
 			     ${GenericIO_LIBRARY}
-			     ${MPI_C_LIBRARIES}
-			     ${MPI_CXX_LIBRARIES}
 			     ${CMAKE_THREAD_LIBS_INIT}
 			    )
 if                          (debug)
