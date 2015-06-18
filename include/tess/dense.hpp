@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 #include <vector>
 #include "delaunay.h"
 #include "mpi.h"

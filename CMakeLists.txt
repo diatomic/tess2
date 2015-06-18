@@ -74,7 +74,7 @@ endif			    ()
 # MPI
 find_package                (MPI REQUIRED)
 if                          (NOT bgq)
-  set                       (libraries                  ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
+    set                     (libraries ${libraries}    ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
 endif                       (NOT bgq)
 
 # Threads

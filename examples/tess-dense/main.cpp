@@ -4,6 +4,7 @@
 //
 #include "mpi.h"
 #include <assert.h>
+#include <string.h>
 #include "tess/tess.h"
 #include "tess/tess.hpp"
 #include "tess/dense.hpp"

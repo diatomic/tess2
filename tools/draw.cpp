@@ -268,8 +268,6 @@ int main(int argc, char** argv) {
   // package rendering data
   PrepRenderingData();
 
-  fprintf(stderr, "Rednering data prepped");
-
   // start glut
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
