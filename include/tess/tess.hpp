@@ -53,6 +53,7 @@ void tess_exchange(diy::Master& master, const diy::Assigner& assigner);
 void tess_exchange(diy::Master& master, const diy::Assigner& assigner, double* times);
 void tess_save(diy::Master& master, const char* outfile);
 void tess_save(diy::Master& master, const char* outfile, double* times);
+void tess_load(diy::Master& master, diy::Assigner& assigner, const char* infile);
 void tess_stats(diy::Master& master, quants_t& quants, double* times);
 void* create_block();
 void destroy_block(void* b);
