@@ -1,10 +1,10 @@
-# Parallel Delaunay and Voronoi Tessellation and Density Estimation
+## Parallel Delaunay and Voronoi Tessellation and Density Estimation
 
-# Licensing
+## Licensing
 
 Tess is released as open source software under a BSD style [license](./COPYING).
 
-# Installation
+## Installation
 
 (for tess based on qhull)
 
@@ -44,7 +44,7 @@ make
 make install
 ```
 
-# Execution
+## Execution
 
 1. Test tessellation only
 
