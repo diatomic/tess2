@@ -9,7 +9,7 @@ Tess is released as open source software under a BSD style [license](./COPYING).
 (for tess based on qhull)
 
 
-1. Install Dependencies
+Build Dependencies
 
 a. DIY
 
@@ -26,25 +26,22 @@ cd qhull-2012.1-src
 make
 ```
 
-2. Install Tess
+Build Tess
 
 ```
 git clone https://github.com/diatomic/tess2
-cd tess2
-```
 
-Configure using cmake:
-
-```
 cmake /path/to/tess \
 -DCMAKE_CXX_COMPILER=mpicxx \
 -DCMAKE_C_COMPILER=mpicc \
+-DCMAKE_INSTALL_PREFIX=/path/to/tess2/install \
 -Dserial=QHull \
 -DDIY_INCLUDE_DIRS=/path/to/diy/include \
 -DQHull_INCLUDE_DIRS=/path/to/qhull/include \
 -DQHull_LIBRARY=/path/to/qhull/lib
 
 make
+make install
 ```
 
 # Execution
@@ -52,14 +49,14 @@ make
 1. Test tessellation only
 
 ```
-cd examples/tess
+cd path/to/tess2/install/examples/tess
 ```
 
 Edit TESS_TEST: select ARCH, num_procs, dsize (number of particles)
 
 ```
 ./TESS_TEST
-../../tools/draw del.out
+path/to/tess2/install/tools/draw del.out
 ```
 
 Mouse interaction with drawing: mouse move to rotate, ‘z’ + mouse up, down to zoom, ‘t’ to toggle voronoi tessellation, ‘y’ to toggle delaunay tessellation, ‘f’ to toggle shaded rendering
@@ -69,14 +66,14 @@ Mouse interaction with drawing: mouse move to rotate, ‘z’ + mouse up, down t
 (from tess top level directory)
 
 ```
-cd examples/tess-dense
+cd path/to/tess2/install/examples/tess-dense
 ```
 
 Edit TESS_DENSE_TEST; select ARCH, num_procs, dsize (number of particles), gsize (number of grid points)
 
 ```
 ./TESS_DENSE_TEST
-../../tools/dense-plot.py --raw=dense.raw --numpts=512
+path/to/tess2/install/tools/dense-plot.py --raw=dense.raw --numpts=512
 ```
 (assuming outfile was dense.raw and gsize was 512 512 512 in TESS_DENSE_TEST)
 

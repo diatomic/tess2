@@ -11,3 +11,8 @@ elseif			(${serial} MATCHES "QHull")
 else			()
     message		("Uknown serial library: ${serial}")
 endif			()
+
+install                 (TARGETS tess
+                        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/
+                        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+                        GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)

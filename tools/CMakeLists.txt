@@ -6,3 +6,13 @@ endif			(draw)
 
 add_executable		(stats stats.cpp)
 target_link_libraries	(stats tess ${libraries})
+
+install                 (TARGETS draw stats
+                        DESTINATION ${CMAKE_INSTALL_PREFIX}/tools/
+                        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+                        GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
+
+install                 (FILES dense-plot.py
+                        DESTINATION ${CMAKE_INSTALL_PREFIX}/tools/
+                        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+                        GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)

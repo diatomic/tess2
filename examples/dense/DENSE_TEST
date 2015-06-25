@@ -53,7 +53,7 @@ exe=./dense
 #infile="cnfw_2e5.out.nc"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/nfw/voronoi-results/nfw.out.nc"
 #infile="${HOME}/hacc/voronoi/density-estimator/tests/cnfw/cic-results/cnfw_2e5.out.nc"
-infile="del.out"
+infile="./del.out"
 
 # output file
 outfile="dense.raw"

@@ -11,6 +11,16 @@ if                          (HDF5_FOUND)
   add_executable            (pread-voronoi pread-voronoi.cpp pread-hdf5.cpp)
   target_link_libraries	    (pread-voronoi tess ${libraries} ${HDF5_libraries})
 
+  install                   (TARGETS pread-voronoi
+                            DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
+                            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+                            GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
+
+  install                   (FILES PREAD_VORONOI
+                            DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
+                            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+                            GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
+
 else			    (HDF5_FOUND)
 
   find_path                 (HDF5_INCLUDE_DIR   hdf5.h)
@@ -24,6 +34,17 @@ else			    (HDF5_FOUND)
 
     add_executable          (pread-voronoi pread-voronoi.cpp pread-hdf5.cpp)
     target_link_libraries   (pread-voronoi tess ${libraries} ${HDF5_libraries})
+
+    install                 (TARGETS pread-voronoi
+                            DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
+                            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+                            GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
+
+    install                 (FILES PREAD_VORONOI
+                            DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
+                            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+                            GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
+
   endif                     (HDF5_LIBRARY)
 
 endif			    (HDF5_FOUND)
