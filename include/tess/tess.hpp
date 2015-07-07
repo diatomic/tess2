@@ -90,7 +90,7 @@ struct AddBlock
     RCLink*        l = new RCLink(link);
     diy::Master&   m = const_cast<diy::Master&>(master);
 
-    int lid = m.add(gid, b, l);
+    m.add(gid, b, l);
 
     // init block fields
     b->gid = gid;
