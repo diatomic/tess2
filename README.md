@@ -11,13 +11,13 @@ Tess is released as open source software under a BSD style [license](./COPYING).
 
 Build Dependencies
 
-a. DIY
+a. [DIY2](https://github.com/diatomic/diy2)
 
 ```
 git clone https://github.com/diatomic/diy2
 ```
 
-b. Qhull
+b. [Qhull](http://qhull.org/)
 
 ```
 wget http://www.qhull.org/download/qhull-2012.1-src.tgz
@@ -43,6 +43,9 @@ cmake /path/to/tess \
 make
 make install
 ```
+
+Optionally, Tess can use [CGAL](http://www.cgal.org/) instead of Qhull. To do so,
+pass `-Dserial=CGAL` as the choice to `cmake`.
 
 ## Execution
 
