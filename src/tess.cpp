@@ -184,18 +184,18 @@ void tess_exchange(diy::Master& master, const diy::Assigner& assigner)
   tess_exchange(master, assigner);
 }
 
-void tess_save(diy::Master& master, const char* outfile)
+void tess_save(diy::Master& master, const char* outfile, const diy::MemoryBuffer& extra)
 {
   double times[TESS_MAX_TIMES]; // timing
   tess_save(master, outfile, times);
 }
 
-void tess_save(diy::Master& master, const char* outfile, double* times)
+void tess_save(diy::Master& master, const char* outfile, double* times, const diy::MemoryBuffer& extra)
 {
   // write output
   timing(times, OUT_TIME, -1);
   if (outfile[0])
-    diy::io::write_blocks(outfile, master.communicator(), master, &save_block_light);
+    diy::io::write_blocks(outfile, master.communicator(), master, extra, &save_block_light);
 
   timing(times, -1, OUT_TIME);
 }
@@ -203,6 +203,11 @@ void tess_save(diy::Master& master, const char* outfile, double* times)
 void tess_load(diy::Master& master, diy::Assigner& assigner, const char* infile)
 {
   diy::io::read_blocks(infile, master.communicator(), assigner, master, &load_block_light);
+}
+
+void tess_load(diy::Master& master, diy::Assigner& assigner, const char* infile, diy::MemoryBuffer& extra)
+{
+  diy::io::read_blocks(infile, master.communicator(), assigner, master, extra, &load_block_light);
 }
 
 //
