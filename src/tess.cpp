@@ -174,7 +174,7 @@ void tess_exchange(diy::Master& master, const diy::Assigner& assigner, double* t
   timing(times, EXCH_TIME, -1);
   int k = 2;
   diy::RegularSwapPartners  partners(3, assigner.nblocks(), k, false);
-  diy::reduce(master, assigner, partners, redistribute);
+  diy::reduce(master, assigner, partners, &redistribute);
   timing(times, -1, EXCH_TIME);
 }
 
