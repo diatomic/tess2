@@ -573,7 +573,14 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
 
     // find nearby blocks within radius of circumcenter
     set<int> dests; // destination neighbor edges for this point
-    near(*l, center, rad, std::inserter(dests, dests.end()), dblock->data_bounds);
+    for (int i = 0; i < l->size(); ++i)
+    {
+      diy::ContinuousBounds neigh_bounds = l->bounds(i);
+      diy::wrap_bounds(neigh_bounds, l->wrap() & l->direction(i), dblock->data_bounds, l->dimension());
+
+      if (diy::distance(3, neigh_bounds, center) <= rad)
+	dests.insert(i);
+    }
 
     // all 4 verts go these dests
     for (int v = 0; v < 4; v++)
@@ -658,7 +665,14 @@ void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWit
 
         // find nearby blocks within radius of circumcenter
         set<int> near_candts; // candidate destination neighbor edges for this point
-        near(*l, center, rad, std::inserter(near_candts, near_candts.end()), dblock->data_bounds);
+	for (int i = 0; i < l->size(); ++i)
+	{
+	  diy::ContinuousBounds neigh_bounds = l->bounds(i);
+	  diy::wrap_bounds(neigh_bounds, l->wrap() & l->direction(i), dblock->data_bounds, l->dimension());
+
+	  if (diy::distance(3, neigh_bounds, center) <= rad)
+	    near_candts.insert(i);
+	}
 
     	// remove the nearby neighbors we've already sent to
         for (set<int>::iterator it = near_candts.begin(); it != near_candts.end(); it++)
