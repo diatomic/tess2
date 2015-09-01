@@ -1,6 +1,6 @@
 # Buld tess library
 
-set			(TESS_SOURCES tess.cpp swap.cpp tet.cpp dense.cpp volume.cpp)
+set			(TESS_SOURCES tess.cpp tess-regular.cpp tess-kdtree.cpp swap.cpp tet.cpp dense.cpp volume.cpp)
 
 if			(${serial} MATCHES "CGAL")
   add_library		(tess SHARED ${TESS_SOURCES} tess-cgal.cpp)

@@ -51,6 +51,8 @@ void tess(diy::Master& master, bool single = false);
 void tess(diy::Master& master, quants_t& quants, double* times, bool single = false);
 void tess_exchange(diy::Master& master, const diy::Assigner& assigner);
 void tess_exchange(diy::Master& master, const diy::Assigner& assigner, double* times);
+void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, bool wrap);
+void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, double* times, bool wrap);
 void tess_save(diy::Master& master, const char* outfile, const diy::MemoryBuffer& extra = diy::MemoryBuffer());
 void tess_save(diy::Master& master, const char* outfile, double* times, const diy::MemoryBuffer& extra = diy::MemoryBuffer());
 void tess_load(diy::Master& master, diy::Assigner& assigner, const char* infile);

@@ -115,6 +115,7 @@ int main(int argc, char *argv[])
   ;
   wrap_ = ops >> Present('w', "wrap", "Use periodic boundary conditions");
   bool single = ops >> Present('1', "single", "use single-phase version of the algorithm");
+  bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
 
   coordinates.resize(3);
   if (  ops >> Present('h', "help", "show help") ||
@@ -170,7 +171,10 @@ int main(int argc, char *argv[])
 #endif
 
   // sort and distribute particles to all blocks
-  tess_exchange(master, assigner, times);
+  if (kdtree)
+    tess_kdtree_exchange(master, assigner, times, wrap_);
+  else
+    tess_exchange(master, assigner, times);
   printf("%d: particles exchanged\n", rank);
 
 #if 0	    // debug
