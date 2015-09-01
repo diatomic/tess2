@@ -134,6 +134,23 @@ int main(int argc, char *argv[])
     return 1;
   }
 
+  if (kdtree)
+  {
+    if (!single)
+    {
+      if (rank == 0)
+	std::cout << "kdtree can only be used with a single-phase version of the algorithm\n";
+      return 1;
+    }
+
+    if (mem_blocks != -1)
+    {
+      if (rank == 0)
+	std::cout << "kdtree doesn't yet support the out-of-core mode\n";
+      return 1;
+    }
+  }
+
   if (outfile == "!")
     outfile = "";
   
