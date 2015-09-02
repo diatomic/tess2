@@ -59,11 +59,11 @@ void tess(diy::Master& master,
 #endif
 
   // compute first stage tessellation
-  timing(times, DEL1_TIME, -1);
+  timing(times, DEL1_TIME, -1, master.communicator());
   master.foreach(&delaunay1, times);
 
   // exchange particles
-  timing(times, NEIGH1_TIME, DEL1_TIME);
+  timing(times, NEIGH1_TIME, DEL1_TIME, master.communicator());
   master.exchange();
 
   //fprintf(stderr, "Done with exchange\n");
@@ -71,23 +71,23 @@ void tess(diy::Master& master,
  if (!single)
  {
   // compute second stage tessellation
-  timing(times, DEL2_TIME, NEIGH1_TIME);
+  timing(times, DEL2_TIME, NEIGH1_TIME, master.communicator());
   master.foreach(&delaunay2);
 
   // exchange particles
-  timing(times, NEIGH2_TIME, DEL2_TIME);
+  timing(times, NEIGH2_TIME, DEL2_TIME, master.communicator());
   master.exchange();
  } else
  {
   // record zero times
-  timing(times, DEL2_TIME, NEIGH1_TIME);
-  timing(times, NEIGH2_TIME, DEL2_TIME);
+  timing(times, DEL2_TIME, NEIGH1_TIME, master.communicator());
+  timing(times, NEIGH2_TIME, DEL2_TIME, master.communicator());
  }
 
   // compute third stage tessellation
-  timing(times, DEL3_TIME, NEIGH2_TIME);
+  timing(times, DEL3_TIME, NEIGH2_TIME, master.communicator());
   master.foreach(&delaunay3, &quants);
-  timing(times, -1, DEL3_TIME);
+  timing(times, -1, DEL3_TIME, master.communicator());
 }
 
 void tess_save(diy::Master& master, const char* outfile, const diy::MemoryBuffer& extra)
@@ -99,11 +99,11 @@ void tess_save(diy::Master& master, const char* outfile, const diy::MemoryBuffer
 void tess_save(diy::Master& master, const char* outfile, double* times, const diy::MemoryBuffer& extra)
 {
   // write output
-  timing(times, OUT_TIME, -1);
+  timing(times, OUT_TIME, -1, master.communicator());
   if (outfile[0])
     diy::io::write_blocks(outfile, master.communicator(), master, extra, &save_block_light);
 
-  timing(times, -1, OUT_TIME);
+  timing(times, -1, OUT_TIME, master.communicator());
 }
 
 void tess_load(diy::Master& master, diy::Assigner& assigner, const char* infile)
@@ -799,13 +799,13 @@ void fill_vert_to_tet(dblock_t* dblock)
 }
 //
 // starts / stops timing
-// (does a barrier on MPI_COMM_WORLD)
+// (does a barrier on comm)
 //
 // times: timing data
 // start: index of timer to start (-1 if not used)
 // stop: index of timer to stop (-1 if not used)
 //
-void timing(double* times, int start, int stop)
+void timing(double* times, int start, int stop, MPI_Comm comm)
 {
   if (start < 0 && stop < 0)
   {
@@ -815,7 +815,7 @@ void timing(double* times, int start, int stop)
 
 #ifdef TIMING
 
-  MPI_Barrier(MPI_COMM_WORLD);
+  MPI_Barrier(comm);
   if (start >= 0)
     times[start] = MPI_Wtime();
   if (stop >= 0)
@@ -826,12 +826,12 @@ void timing(double* times, int start, int stop)
 //
 // memory profile, prints max reseident usage of all procs
 //
-void get_mem(int breakpoint)
+void get_mem(int breakpoint, MPI_Comm comm)
 {
 #ifdef MEMORY
 
   int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_rank(comm, &rank);
 
 #ifdef BGQ
 
@@ -856,7 +856,7 @@ void get_mem(int breakpoint)
   double heap_mem = double(heapmax) / to_mb;
   double max_heap_mem;
   MPI_Reduce(&heap_mem, &max_heap_mem, 1, MPI_DOUBLE, MPI_MAX, 0,
-	     MPI_COMM_WORLD);
+	     comm);
   if (rank == 0)
     fprintf(stderr, "%d: BGQ max memory = %.0lf MB\n",
 	    breakpoint, max_heap_mem);
@@ -875,7 +875,7 @@ void get_mem(int breakpoint)
   float res = r_usage.ru_maxrss;
   float mem = res / (float)to_mb;
   float max_mem;
-  MPI_Reduce(&mem, &max_mem, 1, MPI_FLOAT, MPI_MAX, 0, MPI_COMM_WORLD);
+  MPI_Reduce(&mem, &max_mem, 1, MPI_FLOAT, MPI_MAX, 0, comm);
   if (rank == 0)
     fprintf(stderr, "%d: max memory = %0.1f MB\n", breakpoint, max_mem);
 

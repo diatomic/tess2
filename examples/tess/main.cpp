@@ -89,13 +89,13 @@ int main(int argc, char *argv[])
 
   // tessellate
   quants_t quants;
-  timing(times, -1, -1);
-  timing(times, TOT_TIME, -1);
+  timing(times, -1, -1, world);
+  timing(times, TOT_TIME, -1, world);
   tess(master, quants, times);
 
   // output
   tess_save(master, outfile, times);
-  timing(times, -1, TOT_TIME);
+  timing(times, -1, TOT_TIME, world);
   tess_stats(master, quants, times);
 
   MPI_Finalize();

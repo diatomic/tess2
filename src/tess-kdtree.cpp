@@ -86,7 +86,7 @@ void extract_kdtree_block(KDTreeBlock* b, const diy::Master::ProxyWithLink& cp, 
 
 void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, double* times, bool wrap)
 {
-  timing(times, EXCH_TIME, -1);
+  timing(times, EXCH_TIME, -1, master.communicator());
 
   diy::Master kdtree_master(master.communicator(),  master.threads(), -1);
   WrapMaster wrap_master = { &kdtree_master, wrap };
@@ -99,7 +99,7 @@ void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, do
   kdtree_master.foreach<KDTreeBlock>(&extract_kdtree_block, &master);
   master.set_expected(kdtree_master.expected());
 
-  timing(times, -1, EXCH_TIME);
+  timing(times, -1, EXCH_TIME, master.communicator());
 }
 
 void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, bool wrap)

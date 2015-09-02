@@ -61,12 +61,6 @@ void local_cells(struct dblock_t *dblock)
 
   fill_vert_to_tet(dblock);
 
-  /* mem check */
-#ifdef MEM
-  int dwell = 10;
-  get_mem(-1, dwell);
-#endif
-
   /* clean up qhull */
   qh_freeqhull(!qh_ALL);                 /* free long memory */
   qh_memfreeshort(&curlong, &totlong);  /* free short memory */

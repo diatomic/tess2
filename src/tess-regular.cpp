@@ -9,11 +9,11 @@ void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapP
 
 void tess_exchange(diy::Master& master, const diy::Assigner& assigner, double* times)
 {
-  timing(times, EXCH_TIME, -1);
+  timing(times, EXCH_TIME, -1, master.communicator());
   int k = 2;
   diy::RegularSwapPartners  partners(3, assigner.nblocks(), k, false);
   diy::reduce(master, assigner, partners, &redistribute);
-  timing(times, -1, EXCH_TIME);
+  timing(times, -1, EXCH_TIME, master.communicator());
 }
 
 void tess_exchange(diy::Master& master, const diy::Assigner& assigner)

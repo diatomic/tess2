@@ -199,10 +199,10 @@ int main(int argc, char *argv[])
   MPI_Barrier(comm);
   tess_time = MPI_Wtime();
   quants_t quants;
-  timing(tess_times, -1, -1);
-  timing(tess_times, TOT_TIME, -1);
+  timing(tess_times, -1, -1, world);
+  timing(tess_times, TOT_TIME, -1, world);
   tess(master, quants, tess_times);
-  timing(tess_times, -1, TOT_TIME);
+  timing(tess_times, -1, TOT_TIME, world);
   tess_stats(master, quants, tess_times);
 
   MPI_Barrier(comm);

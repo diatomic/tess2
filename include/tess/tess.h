@@ -73,7 +73,7 @@ void fill_vert_to_tet(struct dblock_t *dblock);
 #ifdef __cplusplus
 extern "C"
 #endif
-void get_mem(int breakpoint);
+void get_mem(int breakpoint, MPI_Comm comm);
 
 void print_block(struct dblock_t *dblock, int gid);
 void print_particles(float *particles, int num_particles, int gid);
@@ -86,6 +86,6 @@ void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall);
 void add_mirror_particles(int nblocks, float **mirror_particles, int *num_mirror_particles,
                           float **particles, int *num_particles, int *num_orig_particles,
 			  int **gids, int **nids, unsigned char **dirs);
-void timing(double* times, int start, int stop);
+void timing(double* times, int start, int stop, MPI_Comm comm);
 
 #endif

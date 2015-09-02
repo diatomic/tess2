@@ -154,8 +154,8 @@ int main(int argc, char *argv[])
   if (outfile == "!")
     outfile = "";
   
-  timing(times, -1, -1);
-  timing(times, TOT_TIME, -1);
+  timing(times, -1, -1, world);
+  timing(times, TOT_TIME, -1, world);
 
   // initialize DIY and decompose domain
   diy::FileStorage          storage(prefix);
@@ -224,7 +224,7 @@ int main(int argc, char *argv[])
   
   tess_save(master, outfile.c_str(), times);
 
-  timing(times, -1, TOT_TIME);
+  timing(times, -1, TOT_TIME, world);
   tess_stats(master, quants, times);
 
   // Storage + memory stats
