@@ -16,7 +16,7 @@ if                          (HDF5_FOUND)
                             PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
                             GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
 
-  install                   (FILES PREAD_VORONOI
+  install                   (FILES PREAD_VORONOI unit-cube.h5
                             DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
                             PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
                             GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
@@ -40,7 +40,7 @@ else			    (HDF5_FOUND)
                             PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
                             GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
 
-    install                 (FILES PREAD_VORONOI
+    install                 (FILES PREAD_VORONOI unit-cube.h5
                             DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
                             PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
                             GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)

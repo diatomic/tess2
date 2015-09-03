@@ -107,6 +107,7 @@ find_path                   (GenericIO_INCLUDE_DIR	GenericIO.h)
 find_library                (GenericIO_LIBRARY NAMES	GenericIO)
 endif			    (hacc_test)
 
+# Include path
 set                         (CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-isystem")
 include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 			     ${DIY_INCLUDE_DIRS}
