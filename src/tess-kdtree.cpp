@@ -1,8 +1,6 @@
 #include <vector>
 #include <cstdio>
 
-#include <boost/array.hpp>
-
 #include <diy/algorithms.hpp>
 
 #include "tess/tess.h"
@@ -10,7 +8,12 @@
 
 struct KDTreeBlock
 {
-  typedef boost::array<float,3>	    Point;
+  struct Point
+  {
+    float&	    operator[](unsigned i)		{ return data[i]; }
+    const float&    operator[](unsigned i) const	{ return data[i]; }
+    float	    data[3];
+  };
   std::vector<Point>		    points;
 };
 
