@@ -77,12 +77,19 @@ void extract_kdtree_block(KDTreeBlock* b, const diy::Master::ProxyWithLink& cp, 
     d->particles[3*i + 2] = b->points[i][2];
   }
 
-  fprintf(stderr, "[%d]: %d particles copied out\n", cp.gid(), d->num_orig_particles);
+  //fprintf(stderr, "[%d]: %d particles copied out\n", cp.gid(), d->num_orig_particles);
 
   // steal the link
   diy::RegularContinuousLink* tess_link   = static_cast<diy::RegularContinuousLink*>(tess_master->link(tess_lid));
   diy::RegularContinuousLink* kdtree_link = static_cast<diy::RegularContinuousLink*>(cp.link());
   tess_link->swap(*kdtree_link);
+
+  d->box  = tess_link->bounds();
+  for (int i = 0; i < 3; ++i)
+  {
+    d->mins[i] = tess_link->bounds().min[i];
+    d->maxs[i] = tess_link->bounds().max[i];
+  }
 
   delete b;     // safe to do since kdtree_master doesn't own the blocks (no create/destroy supplied)
 }
