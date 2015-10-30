@@ -45,6 +45,7 @@ add_definitions             (${cxx_flags})
 # OSX flags
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     add_definitions	    (-DMAC_OSX)
+    set			    (CMAKE_MACOSX_RPATH	    on) 
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 # QHull vs. CGAL
