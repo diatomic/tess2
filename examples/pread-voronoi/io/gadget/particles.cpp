@@ -2,16 +2,21 @@
 #include <stdexcept>
 #include "particles.h"
 
+#include <diy/mpi.hpp>
+#include <diy/serialization.hpp>
+
 
 ssize_t
 io::gadget::
-read_particles(MPI_Comm,
+read_particles(MPI_Comm comm_,
                const char *infile, int rank, int size,
                std::vector<float>& particles,
                const std::vector<std::string>& coordinates)
 {
     typedef         std::vector<float>                              PointContainer;
     typedef         std::vector<size_t>                             IntVector;
+
+    diy::mpi::communicator comm(comm_);
 
     IntVector                   individual_count_, cumulative_count_;
     std::vector<std::string>    data_files_;
@@ -28,83 +33,97 @@ read_particles(MPI_Comm,
     for(size_t i = 0; i < coordinates.size(); ++i)
         coordinates_.push_back(boost::lexical_cast<unsigned>(coordinates[i]));
 
-    bf::path p(filename_);
-    if (!bf::exists(p))
-      throw std::runtime_error("Could not open the directory: " + boost::lexical_cast<std::string>(p));
-
-    for (bf::directory_iterator cur = bf::directory_iterator(p); cur != bf::directory_iterator(); ++cur)
-        data_files_.push_back(cur->path().string());
-    boost::sort(data_files_);
-
-    for(size_t i = 0; i < data_files_.size(); ++i)
+    if (comm.rank() == 0)
     {
-	const std::string& fn = data_files_[i];
-        std::string gadget2;
-        struct GadgetHeader header;
-        format = GADGET_1;
-        swap = false;
+      bf::path p(filename_);
+      if (!bf::exists(p))
+	throw std::runtime_error("Could not open the directory: " + boost::lexical_cast<std::string>(p));
 
-        std::ifstream igStr(fn.c_str(), std::ios::in | std::ios::binary);
-        std::ifstream* gStr = &igStr;
-        if (gStr->fail())
-        {
-            std::cout << "File: " << fn << " cannot be opened" << std::endl;
-            exit(-1);
-        }
+      for (bf::directory_iterator cur = bf::directory_iterator(p); cur != bf::directory_iterator(); ++cur)
+	  data_files_.push_back(cur->path().string());
+      boost::sort(data_files_);
 
-        // Set the gadget format type by reading the first 4 byte integer
-        // If it is not "256" or "65536" then gadget-2 format with 16 bytes in front
-        readData(swap, (void*) &blockSize, GADGET_SKIP, 1, gStr);
-        if (blockSize != GADGET_HEADER_SIZE && blockSize != GADGET_HEADER_SIZE_SWP)
-        {
-          format = GADGET_2;
-          gadget2 = readString(gStr, GADGET_2_SKIP - GADGET_SKIP);
-          readData(swap, (void*) &blockSize, GADGET_SKIP, 1, gStr);
-        }
+      for(size_t i = 0; i < data_files_.size(); ++i)
+      {
+	  const std::string& fn = data_files_[i];
+	  std::string gadget2;
+	  struct GadgetHeader header;
+	  format = GADGET_1;
+	  swap = false;
 
-        // Set the swap type
-        if (blockSize != GADGET_HEADER_SIZE)
-        {
-          swap = true;
-          blockSize = GADGET_HEADER_SIZE;
-        }
+	  std::ifstream igStr(fn.c_str(), std::ios::in | std::ios::binary);
+	  std::ifstream* gStr = &igStr;
+	  if (gStr->fail())
+	  {
+	      std::cout << "File: " << fn << " cannot be opened" << std::endl;
+	      exit(-1);
+	  }
 
-        // Read the Gadget header
-        readData(swap, (void*) &header.npart[0],
-                               sizeof(int), NUM_GADGET_TYPES, gStr);
-        readData(swap, (void*) &header.mass[0],
-                               sizeof(double), NUM_GADGET_TYPES, gStr);
-        readData(swap, (void*) &header.time, sizeof(double), 1, gStr);
-        readData(swap, (void*) &header.redshift, sizeof(double), 1, gStr);
-        readData(swap, (void*) &header.flag_sfr, sizeof(int), 1, gStr);
-        readData(swap, (void*) &header.flag_feedback, sizeof(int), 1, gStr);
-        readData(swap, (void*) &header.npartTotal[0],
-                               sizeof(int), NUM_GADGET_TYPES, gStr);
-        readData(swap, (void*) &header.flag_cooling, sizeof(int), 1, gStr);
-        readData(swap, (void*) &header.num_files, sizeof(int), 1, gStr);
-        readData(swap, (void*) &header.BoxSize, sizeof(double), 1, gStr);
-        readData(swap, (void*) &header.Omega0, sizeof(double), 1, gStr);
-        readData(swap, (void*) &header.OmegaLambda, sizeof(double), 1, gStr);
-        readData(swap, (void*) &header.HubbleParam, sizeof(double), 1, gStr);
-        readData(swap, (void*) &header.flag_stellarage, sizeof(int), 1, gStr);
-        readData(swap, (void*) &header.flag_metals, sizeof(int), 1, gStr);
-        readData(swap, (void*) &header.HighWord[0],
-                               sizeof(int), NUM_GADGET_TYPES, gStr);
-        readData(swap, (void*) &header.flag_entropy, sizeof(int), 1, gStr);
-        std::string fill = readString(gStr, 60);
-        strcpy(&header.fill[0], fill.c_str());
+	  // Set the gadget format type by reading the first 4 byte integer
+	  // If it is not "256" or "65536" then gadget-2 format with 16 bytes in front
+	  readData(swap, (void*) &blockSize, GADGET_SKIP, 1, gStr);
+	  if (blockSize != GADGET_HEADER_SIZE && blockSize != GADGET_HEADER_SIZE_SWP)
+	  {
+	    format = GADGET_2;
+	    gadget2 = readString(gStr, GADGET_2_SKIP - GADGET_SKIP);
+	    readData(swap, (void*) &blockSize, GADGET_SKIP, 1, gStr);
+	  }
 
-        // Read the Gadget header size to verify block
-        readData(swap, (void*) &blockSize2, GADGET_SKIP, 1, gStr);
-        if (blockSize != blockSize2)
-            std::cout << "Error reading header: end position is wrong" << std::endl;
+	  // Set the swap type
+	  if (blockSize != GADGET_HEADER_SIZE)
+	  {
+	    swap = true;
+	    blockSize = GADGET_HEADER_SIZE;
+	  }
 
-        // Every type particle will have location, velocity and tag so sum up
-        long int particleCount = 0;
-        for (int i = 0; i < NUM_GADGET_TYPES; i++)
-          particleCount += header.npart[i];
+	  // Read the Gadget header
+	  readData(swap, (void*) &header.npart[0],
+				 sizeof(int), NUM_GADGET_TYPES, gStr);
+	  readData(swap, (void*) &header.mass[0],
+				 sizeof(double), NUM_GADGET_TYPES, gStr);
+	  readData(swap, (void*) &header.time, sizeof(double), 1, gStr);
+	  readData(swap, (void*) &header.redshift, sizeof(double), 1, gStr);
+	  readData(swap, (void*) &header.flag_sfr, sizeof(int), 1, gStr);
+	  readData(swap, (void*) &header.flag_feedback, sizeof(int), 1, gStr);
+	  readData(swap, (void*) &header.npartTotal[0],
+				 sizeof(int), NUM_GADGET_TYPES, gStr);
+	  readData(swap, (void*) &header.flag_cooling, sizeof(int), 1, gStr);
+	  readData(swap, (void*) &header.num_files, sizeof(int), 1, gStr);
+	  readData(swap, (void*) &header.BoxSize, sizeof(double), 1, gStr);
+	  readData(swap, (void*) &header.Omega0, sizeof(double), 1, gStr);
+	  readData(swap, (void*) &header.OmegaLambda, sizeof(double), 1, gStr);
+	  readData(swap, (void*) &header.HubbleParam, sizeof(double), 1, gStr);
+	  readData(swap, (void*) &header.flag_stellarage, sizeof(int), 1, gStr);
+	  readData(swap, (void*) &header.flag_metals, sizeof(int), 1, gStr);
+	  readData(swap, (void*) &header.HighWord[0],
+				 sizeof(int), NUM_GADGET_TYPES, gStr);
+	  readData(swap, (void*) &header.flag_entropy, sizeof(int), 1, gStr);
+	  std::string fill = readString(gStr, 60);
+	  strcpy(&header.fill[0], fill.c_str());
 
-        individual_count_.push_back(particleCount);
+	  // Read the Gadget header size to verify block
+	  readData(swap, (void*) &blockSize2, GADGET_SKIP, 1, gStr);
+	  if (blockSize != blockSize2)
+	      std::cout << "Error reading header: end position is wrong" << std::endl;
+
+	  // Every type particle will have location, velocity and tag so sum up
+	  long int particleCount = 0;
+	  for (int i = 0; i < NUM_GADGET_TYPES; i++)
+	    particleCount += header.npart[i];
+
+	  individual_count_.push_back(particleCount);
+      }
+
+      diy::MemoryBuffer	bb;
+      diy::save(bb, data_files_);
+      diy::save(bb, individual_count_);
+      diy::mpi::broadcast(comm, bb.buffer, 0);
+    } else
+    {
+      diy::MemoryBuffer bb;
+      diy::mpi::broadcast(comm, bb.buffer, 0);
+      diy::load(bb, data_files_);
+      diy::load(bb, individual_count_);
     }
 
     size_t total = 0;

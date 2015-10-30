@@ -17,7 +17,7 @@ namespace io
 namespace gadget
 {
 
-ssize_t read_particles(MPI_Comm,
+ssize_t read_particles(MPI_Comm comm,
                        const char *infile, int rank, int size,
                        std::vector<float>& particles,
                        const std::vector<std::string>& coordinates);
