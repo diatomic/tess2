@@ -104,7 +104,7 @@ read_particles(MPI_Comm comm_,
 	  // Read the Gadget header size to verify block
 	  readData(swap, (void*) &blockSize2, GADGET_SKIP, 1, gStr);
 	  if (blockSize != blockSize2)
-	      std::cout << "Error reading header: end position is wrong" << std::endl;
+	      throw std::runtime_error("Error reading header: end position is wrong");
 
 	  // Every type particle will have location, velocity and tag so sum up
 	  long int particleCount = 0;
@@ -117,6 +117,10 @@ read_particles(MPI_Comm comm_,
       diy::MemoryBuffer	bb;
       diy::save(bb, data_files_);
       diy::save(bb, individual_count_);
+      diy::save(bb, format);
+      diy::save(bb, swap);
+      diy::save(bb, blockSize);
+      diy::save(bb, blockSize2);
       diy::mpi::broadcast(comm, bb.buffer, 0);
     } else
     {
@@ -124,6 +128,10 @@ read_particles(MPI_Comm comm_,
       diy::mpi::broadcast(comm, bb.buffer, 0);
       diy::load(bb, data_files_);
       diy::load(bb, individual_count_);
+      diy::load(bb, format);
+      diy::load(bb, swap);
+      diy::load(bb, blockSize);
+      diy::load(bb, blockSize2);
     }
 
     size_t total = 0;
