@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
 
   if (outfile == "!")
     outfile = "";
-  
+
   timing(times, -1, -1, world);
   timing(times, TOT_TIME, -1, world);
 
@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
   //master.foreach(&verify_particles);
 
   tess(master, quants, times, single);
-  
+
   tess_save(master, outfile.c_str(), times);
 
   timing(times, -1, TOT_TIME, world);

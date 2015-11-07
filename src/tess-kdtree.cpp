@@ -95,7 +95,7 @@ void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, do
   int bins = 1024;	// histogram bins; TODO: make a function argument
   diy::ContinuousBounds domain = master.block<dblock_t>(master.loaded_block())->data_bounds;
   diy::kdtree(kdtree_master, assigner, 3, domain, &KDTreeBlock::points, bins, wrap);
-  
+
   kdtree_master.foreach<KDTreeBlock>(&extract_kdtree_block, &master);
   master.set_expected(kdtree_master.expected());
 
