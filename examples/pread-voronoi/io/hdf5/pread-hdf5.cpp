@@ -10,10 +10,12 @@
 #warning Parallel HDF5 not available, using serial version
 #endif
 
-void read_particles(MPI_Comm comm,
-                    const char *infile, int rank, int size,
-                    std::vector <float> &particles,
-                    const std::vector <std::string>& coordinates)
+size_t
+io::hdf5::
+read_particles(MPI_Comm comm,
+               const char *infile, int rank, int size,
+               std::vector <float> &particles,
+               const std::vector <std::string>& coordinates)
 {
   herr_t status;
 
@@ -69,4 +71,6 @@ void read_particles(MPI_Comm comm,
 #ifdef H5_HAVE_PARALLEL
   status = H5Pclose(acc_tpl1);
 #endif
+
+  return count;
 }

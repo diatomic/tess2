@@ -8,7 +8,10 @@
 #include "tess/tess.h"
 #include "tess/tess.hpp"
 
-#include "pread.h"
+#include "io/hdf5/pread.h"
+#ifdef TESS_GADGET_IO
+#include "io/gadget/particles.h"
+#endif
 
 #include <diy/mpi.hpp>
 #include <diy/master.hpp>
@@ -43,7 +46,18 @@ struct AddAndRead: public AddBlock
 
     // read points
     std::vector<float>	particles;
-    read_particles(master.communicator(), infile, gid, nblocks, particles, coordinates);
+
+#ifdef TESS_GADGET_IO
+    std::string infn(infile);
+    if (infn.size() > 7 && infn.substr(0,7) == "gadget:")
+    {
+        std::string infilename = std::string(infile).substr(7);
+        io::gadget::read_particles(master.communicator(), infilename.c_str(), gid, nblocks, particles, coordinates);
+    } else	// assume HDF5
+#endif
+        io::hdf5::read_particles(master.communicator(), infile, gid, nblocks, particles, coordinates);
+
+    //read_particles(master.communicator(), infile, gid, nblocks, particles, coordinates);
     //printf("%d: Read %lu particles\n", gid, particles.size()/3);
 
     b->num_particles = particles.size()/3;

@@ -1,3 +1,11 @@
+option			    (gadget		"Gadget IO support"	on)
+if			    (gadget)
+  find_package		    (Boost COMPONENTS filesystem)
+  include_directories       (SYSTEM ${Boost_INCLUDE_DIR})
+  set			    (io_sources ${io_sources} io/gadget/particles.cpp)
+  add_definitions	    (-DTESS_GADGET_IO)
+endif			    (gadget)
+
 find_package                (HDF5 QUIET)
 
 if                          (HDF5_FOUND)
@@ -8,8 +16,13 @@ if                          (HDF5_FOUND)
   set_target_properties	    (hdf5 PROPERTIES IMPORTED_LOCATION ${HDF5_hdf5_LIBRARY})
   set			    (HDF5_libraries     hdf5)
 
-  add_executable            (pread-voronoi pread-voronoi.cpp pread-hdf5.cpp)
+  set			    (io_sources ${io_sources} io/hdf5/pread-hdf5.cpp)
+
+  add_executable            (pread-voronoi pread-voronoi.cpp ${io_sources})
   target_link_libraries	    (pread-voronoi tess ${libraries} ${HDF5_libraries})
+  if			    (gadget)
+    target_link_libraries   (pread-voronoi ${Boost_FILESYSTEM_LIBRARY})
+  endif			    (gadget)
 
   install                   (TARGETS pread-voronoi
                             DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
