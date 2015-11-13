@@ -22,13 +22,16 @@ namespace io
 
     namespace hacc
     {
+        void read_domain(MPI_Comm            comm_,
+                         const char*         infile,
+                         Bounds&             domain);
+
         void read_particles(MPI_Comm            comm_,
                             const char*         infile,
                             int                 rank,
                             int                 size,
                             std::vector<float>& particles,
-                            int                 sample_rate,
-                            Bounds*             data_bounds);
+                            int                 sample_rate);
 
         namespace detail
         {
@@ -37,8 +40,7 @@ namespace io
                             vector<float>&        x,
                             vector<float>&        y,
                             vector<float>&        z,
-                            vector<int64_t>&      id,
-                            Bounds*               data_bounds);
+                            vector<int64_t>&      id);
         }
     }
 }

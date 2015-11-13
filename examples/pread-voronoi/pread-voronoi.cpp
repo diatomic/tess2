@@ -39,14 +39,12 @@ struct AddAndRead: public AddBlock
                int				nblocks_,
                const char*			infile_,
                const std::vector<std::string>&  coordinates_,
-               int                              sample_rate_ = 1,  // only for hacc
-               Bounds*                          data_bounds_ = 0): // only for hacc
+               int                              sample_rate_ = 1) :  // only used for hacc
         AddBlock(m),
         nblocks(nblocks_),
         infile(infile_),
         coordinates(coordinates_),
-        sample_rate(sample_rate_),
-        data_bounds(data_bounds_)               {}
+        sample_rate(sample_rate_)               {}
 
     void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
                      const RCLink& link) const
@@ -80,17 +78,7 @@ struct AddAndRead: public AddBlock
                                      gid,
                                      nblocks,
                                      particles,
-                                     sample_rate,
-                                     data_bounds);
-            for (int i = 0; i < 3; ++i)
-            {
-                b->data_bounds.min[i] = data_bounds->min[i];
-                b->data_bounds.max[i] = data_bounds->max[i];
-                b->box.min[i]         = data_bounds->min[i];
-                b->box.max[i]         = data_bounds->max[i];
-                b->mins[i]            = data_bounds->min[i];
-                b->maxs[i]            = data_bounds->max[i];
-            }
+                                     sample_rate);
 #else
             io::hdf5::read_particles(master.communicator(),
                                      infile,
@@ -100,22 +88,17 @@ struct AddAndRead: public AddBlock
                                      coordinates);
 #endif
 
-            //read_particles(master.communicator(), infile, gid, nblocks, particles, coordinates);
-            //fprintf(stderr, "%d: Read %lu particles\n", gid, particles.size()/3);
-
             b->num_particles = particles.size()/3;
             b->num_orig_particles = b->num_particles;
             b->particles     = (float *)malloc(particles.size() * sizeof(float));
             for (size_t i = 0; i < particles.size(); ++i)
                 b->particles[i] = particles[i];
 
-#ifndef TESS_HACC_IO
             for (int i = 0; i < 3; ++i)
             {
                 b->box.min[i] = domain.min[i];
                 b->box.max[i] = domain.max[i];
             }
-#endif
         }
 
     int					nblocks;
@@ -132,42 +115,42 @@ struct AddAndRead: public AddBlock
 
 struct DedupPoint
 {
-  float data[3];
-  bool	    operator<(const DedupPoint& other) const	    { return std::lexicographical_compare(data, data + 3, other.data, other.data + 3); }
-  bool	    operator==(const DedupPoint& other) const	    { return std::equal(data, data + 3, other.data); }
+    float data[3];
+    bool	    operator<(const DedupPoint& other) const	    { return std::lexicographical_compare(data, data + 3, other.data, other.data + 3); }
+    bool	    operator==(const DedupPoint& other) const	    { return std::equal(data, data + 3, other.data); }
 };
 void deduplicate(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
 {
-  dblock_t* b = static_cast<dblock_t*>(b_);
+    dblock_t* b = static_cast<dblock_t*>(b_);
 
-  // simple static_assert to ensure sizeof(Point) == sizeof(float[3]);
-  // necessary to make this hack work
-  typedef int static_assert_Point_size[sizeof(DedupPoint) == sizeof(float[3]) ? 1 : -1];
-  DedupPoint* bg  = (DedupPoint*) &b->particles[0];
-  DedupPoint* end = (DedupPoint*) &b->particles[3*b->num_particles];
-  std::sort(bg,end);
+    // simple static_assert to ensure sizeof(Point) == sizeof(float[3]);
+    // necessary to make this hack work
+    typedef int static_assert_Point_size[sizeof(DedupPoint) == sizeof(float[3]) ? 1 : -1];
+    DedupPoint* bg  = (DedupPoint*) &b->particles[0];
+    DedupPoint* end = (DedupPoint*) &b->particles[3*b->num_particles];
+    std::sort(bg,end);
 
-  DuplicateCountMap* count = (DuplicateCountMap*) aux;
-  DedupPoint* out = bg + 1;
-  for (DedupPoint* it = bg + 1; it != end; ++it)
-  {
-    if (*it == *(it - 1))
-        (*count)[out - bg - 1]++;
-    else
+    DuplicateCountMap* count = (DuplicateCountMap*) aux;
+    DedupPoint* out = bg + 1;
+    for (DedupPoint* it = bg + 1; it != end; ++it)
     {
-        *out = *it;
-        ++out;
+        if (*it == *(it - 1))
+            (*count)[out - bg - 1]++;
+        else
+        {
+            *out = *it;
+            ++out;
+        }
     }
-  }
-  b->num_orig_particles = b->num_particles = out - bg;
+    b->num_orig_particles = b->num_particles = out - bg;
 
-  if (!count->empty())
-  {
-      size_t total = 0;
-      for (DuplicateCountMap::const_iterator it = count->begin(); it != count->end(); ++it)
-          total += it->second;
-      std::cout << b->gid << ": Found " << count->size() << " particles that appear more than once, with " << total << " total extra copies\n";
-  }
+    if (!count->empty())
+    {
+        size_t total = 0;
+        for (DuplicateCountMap::const_iterator it = count->begin(); it != count->end(); ++it)
+            total += it->second;
+        std::cout << b->gid << ": Found " << count->size() << " particles that appear more than once, with " << total << " total extra copies\n";
+    }
 }
 
 int main(int argc, char *argv[])
@@ -177,17 +160,9 @@ int main(int argc, char *argv[])
     int mem_blocks; // number of blocks to keep in memory
     string infile; // input file name
     string outfile; // output file name
-    // DEPRECATED
-    // float mins[3], maxs[3]; // data global extents
     float minvol, maxvol; // volume range, -1.0 = unused
-    float **particles; // particles[block_num][particle]
-    //  where each particle is 3 values, px, py, pz
-    int *num_particles; // number of particles in each block
-    int dim = 3; // 3d always
-    int block_given[3] = {0, 0, 0}; // constraints on blocking (none)
     int wrap_; // whether wraparound neighbors are used
     int rank,size; // MPI usual
-    vector <float> p; // temporary particles
     std::vector<std::string>  coordinates; // coordinates to read
     double times[TESS_MAX_TIMES]; // timing
     quants_t quants; // quantity stats
@@ -314,7 +289,6 @@ int main(int argc, char *argv[])
                                      &storage,
                                      &save_block,
                                      &load_block);
-    //diy::RoundRobinAssigner   assigner(world.size(), tot_blocks);
     diy::ContiguousAssigner   assigner(world.size(), tot_blocks);
 
 #ifdef TESS_HACC_IO
@@ -322,8 +296,10 @@ int main(int argc, char *argv[])
                                               tot_blocks,
                                               infile.c_str(),
                                               coordinates,
-                                              sample_rate,
-                                              &domain);
+                                              sample_rate);
+    io::hacc::read_domain(master.communicator(),
+                          infile.c_str(),
+                          domain);
 #else
     AddAndRead		      create_and_read(master,
                                               tot_blocks,
@@ -341,40 +317,19 @@ int main(int argc, char *argv[])
         wrap.assign(3, true);
     diy::decompose(3, rank, domain, assigner, create_and_read, share_face, wrap, ghosts);
 
-  // sort and distribute particles to all blocks
-  if (kdtree)
-    tess_kdtree_exchange(master, assigner, times, wrap_);
-  else
-    tess_exchange(master, assigner, times);
-  if (rank == 0)
-    printf("particles exchanged\n");
+    // sort and distribute particles to all blocks
+    if (kdtree)
+        tess_kdtree_exchange(master, assigner, times, wrap_);
+    else
+        tess_exchange(master, assigner, times);
+    if (rank == 0)
+        printf("particles exchanged\n");
 
-  DuplicateCountMap count;
-  master.foreach(&deduplicate, &count);
-
-#if 0	    // debug
-    for (unsigned i = 0; i < master.size(); ++i)
-        fprintf(stderr, "%d [%d]: %d\n",
-                world.rank(), master.gid(i), master.block<dblock_t>(i)->num_particles);
-#endif
-
-#if 0	    // debug
-    for (unsigned i = 0; i < master.size(); ++i)
-    {
-        fprintf(stderr, "%d: %d\n", i, master.block<dblock_t>(i)->num_particles);
-        fprintf(stderr, "%d: %f %f %f\n", i,
-               master.block<dblock_t>(i)->box.min[0],
-               master.block<dblock_t>(i)->box.min[1],
-               master.block<dblock_t>(i)->box.min[2]);
-        fprintf(stderr, "%d: %f %f %f\n", i,
-               master.block<dblock_t>(i)->box.max[0],
-               master.block<dblock_t>(i)->box.max[1],
-               master.block<dblock_t>(i)->box.max[2]);
-    }
-#endif
+    DuplicateCountMap count;
+    master.foreach(&deduplicate, &count);
 
     // debug purposes only: checks if the particles got into the right blocks
-    master.foreach(&verify_particles);
+    // master.foreach(&verify_particles);
 
     tess(master, quants, times, single);
 
@@ -406,19 +361,6 @@ int main(int argc, char *argv[])
 void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
     dblock_t* b = static_cast<dblock_t*>(b_);
-
-    fprintf(stderr, "block mins: [%.1f %.1f %.1f] maxs [%.1f %.1f %.1f]\n",
-            b->mins[0], b->mins[1], b->mins[2], b->maxs[0], b->maxs[1], b->maxs[2]);
-    fprintf(stderr, "block box mins: [%.1f %.1f %.1f] maxs [%.1f %.1f %.1f]\n",
-            b->box.min[0], b->box.min[1], b->box.min[2],
-            b->box.max[0], b->box.max[1], b->box.max[2]);
-
-    // TODO: where should mins, maxs be updated?
-    for (int j = 0; j < 3; j++)
-    {
-        b->mins[j] = b->box.min[j];
-        b->maxs[j] = b->box.max[j];
-    }
 
     for (size_t i = 0; i < b->num_particles; ++i)
     {
