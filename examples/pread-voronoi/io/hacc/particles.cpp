@@ -103,14 +103,11 @@ read_gio(MPI_Comm              comm_,
         gids[b] = comm.rank() * tot_blocks / comm.size() + b;
 
     // read local blocks
-    // TODO: skip the copy if there is only one block
-    size_t ofst = 0;
+    size_t tot_p = 0;                        // total number particles so far
     for (int b = 0; b < nblocks; b++) {
-        // clear reader variables
-        reader->ClearVariables();
+        reader->ClearVariables();            // clear reader variables
 
-        //  block bounds, NB, the reader wants lid, not gid
-        double min[3], max[3];
+        double min[3], max[3];               // block bounds, NB, the reader wants lid, not gid
         reader->GetBlockBounds(b, min, max);
 
         // number of particles in this block, NB, the reader wants gid now
@@ -121,34 +118,47 @@ read_gio(MPI_Comm              comm_,
         int idpadsize    = gio::CRCSize / sizeof(int64_t);
 
         // particles
-        vector<float>   x0(num_particles  + floatpadsize);
-        vector<float>   y0(num_particles  + floatpadsize);
-        vector<float>   z0(num_particles  + floatpadsize);
-        vector<int64_t> id0(num_particles + idpadsize);
-
-        // clear variables and then register application arrays with the reader
-        reader->AddVariable("x",  &x0[0],  gio::GenericIOBase::ValueHasExtraSpace);
-        reader->AddVariable("y",  &y0[0],  gio::GenericIOBase::ValueHasExtraSpace);
-        reader->AddVariable("z",  &z0[0],  gio::GenericIOBase::ValueHasExtraSpace);
-        reader->AddVariable("id", &id0[0], gio::GenericIOBase::ValueHasExtraSpace);
-
-        // read the particles
-        reader->ReadBlock(gids[b]);
-
-        // append particles from current block together to all particles for this process
-        x.resize(x.size()   + num_particles);
-        y.resize(y.size()   + num_particles);
-        z.resize(z.size()   + num_particles);
-        id.resize(id.size() + num_particles);
-        for (size_t i = 0; i < num_particles; i++)
+        if (nblocks > 1)
         {
-            x[ofst  + i] = x0[i];
-            y[ofst  + i] = y0[i];
-            z[ofst  + i] = z0[i];
-            id[ofst + i] = id0[i];
-        }
-        ofst += num_particles;
-    }
-    return x.size();
-}
+            vector<float>   x0(num_particles  + floatpadsize);
+            vector<float>   y0(num_particles  + floatpadsize);
+            vector<float>   z0(num_particles  + floatpadsize);
+            vector<int64_t> id0(num_particles + idpadsize);
+            reader->AddVariable("x",  &x0[0],  gio::GenericIOBase::ValueHasExtraSpace);
+            reader->AddVariable("y",  &y0[0],  gio::GenericIOBase::ValueHasExtraSpace);
+            reader->AddVariable("z",  &z0[0],  gio::GenericIOBase::ValueHasExtraSpace);
+            reader->AddVariable("id", &id0[0], gio::GenericIOBase::ValueHasExtraSpace);
 
+            reader->ReadBlock(gids[b]);      // read the particles
+
+            // append particles from current block together to all particles for this process
+            x.resize(x.size()   + num_particles);
+            y.resize(y.size()   + num_particles);
+            z.resize(z.size()   + num_particles);
+            id.resize(id.size() + num_particles);
+            for (size_t i = 0; i < num_particles; i++)
+            {
+                x[tot_p  + i] = x0[i];
+                y[tot_p  + i] = y0[i];
+                z[tot_p  + i] = z0[i];
+                id[tot_p + i] = id0[i];
+            }
+            tot_p += num_particles;
+        }
+        else
+        {
+            x.resize(num_particles  + floatpadsize);
+            y.resize(num_particles  + floatpadsize);
+            z.resize(num_particles  + floatpadsize);
+            id.resize(num_particles + idpadsize);
+            reader->AddVariable("x",  &x[0],  gio::GenericIOBase::ValueHasExtraSpace);
+            reader->AddVariable("y",  &y[0],  gio::GenericIOBase::ValueHasExtraSpace);
+            reader->AddVariable("z",  &z[0],  gio::GenericIOBase::ValueHasExtraSpace);
+            reader->AddVariable("id", &id[0], gio::GenericIOBase::ValueHasExtraSpace);
+
+            reader->ReadBlock(gids[b]);      // read the particles
+            tot_p = num_particles;
+        }
+    }
+    return tot_p;
+}

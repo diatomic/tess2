@@ -191,27 +191,29 @@ int main(int argc, char *argv[])
 
     Options ops(argc, argv);
 
-#ifdef TESS_HACC_IO
-
     ops
+        >> Option('b', "blocks",    tot_blocks,   "Total number of blocks to use")
         >> Option('t', "threads",   num_threads,  "Number of threads to use")
         >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
         >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
+        >> Option(     "minvol",    minvol,       "minvol cutoff")
+        >> Option(     "maxvol",    maxvol,       "minvol cutoff")
         ;
     wrap_ = ops >> Present('w', "wrap", "Use periodic boundary conditions");
     bool single = ops >> Present('1', "single", "use single-phase version of the algorithm");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
 
+#ifdef TESS_HACC_IO
+
     if ( ops >> Present('h', "help", "show help") ||
-         !(ops >> PosOption(infile) >> PosOption(outfile) >> PosOption(minvol) >>
-           PosOption(maxvol) >> PosOption(wrap_) >> PosOption(bf[0]) >> PosOption(bf[1]) >>
-           PosOption(bf[2]) >> PosOption(sample_rate))
+         !(ops >> PosOption(infile) >> PosOption(outfile)
+           >> PosOption(bf[0]) >> PosOption(bf[1]) >> PosOption(bf[2])
+           >> PosOption(sample_rate))
         )
     {
         if (rank == 0)
         {
-            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile minvol maxvol wrap bf "
-                    "sr th mb opts\n", argv[0]);
+            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile minvol bf sr\n", argv[0]);
             std::cout << ops;
         }
         return 1;
@@ -224,18 +226,6 @@ int main(int argc, char *argv[])
                 infile.c_str(), outfile.c_str(), minvol, maxvol, wrap_, bf[0], bf[1], bf[2],
                 sample_rate, num_threads, mem_blocks, single, kdtree);
 # else
-
-    ops
-        >> Option('b', "blocks",    tot_blocks,   "Total number of blocks to use")
-        >> Option('t', "threads",   num_threads,  "Number of threads to use")
-        >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
-        >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
-        >> Option(     "minvol",    minvol,       "minvol cutoff")
-        >> Option(     "maxvol",    maxvol,       "minvol cutoff")
-        ;
-    wrap_ = ops >> Present('w', "wrap", "Use periodic boundary conditions");
-    bool single = ops >> Present('1', "single", "use single-phase version of the algorithm");
-    bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
 
     coordinates.resize(3);
     if (  ops >> Present('h', "help", "show help") ||

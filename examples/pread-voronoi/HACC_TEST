@@ -52,13 +52,6 @@ outfile="del.out"
 #outfile="/projects/SSSPPg/tpeterka/hacc-vor.out"
 #outfile="!"
 
-#volume range (-1.0: unused)
-minv=-1.0
-maxv=-1.0
-
-# wrapped neighbors 0 or 1
-wrap=0
-
 # redistribution blocking factor (1 1 1 if not used)
 bf="1 1 1"
 
@@ -66,15 +59,16 @@ bf="1 1 1"
 sr=1
 
 # options: single-phase and kd-tree
-# opts="--single --kdtree"
-opts="--single"
+# possibilities are --wrap --single --kdtree --minvol <minvol> --maxvol <maxvol>
+opts="--single --kdtree"
+# opts="--single"
 
 #------
 #
 # program arguments
 #
 
-args="$infile $outfile $minv $maxv $wrap $bf $sr $opts"
+args="$opts $infile $outfile $bf $sr"
 
 #------
 #
