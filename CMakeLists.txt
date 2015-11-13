@@ -6,7 +6,8 @@ option                      (debug          "Build tess with debugging on"		    
 option                      (timing	    "Build tess with timing"			    ON)
 option                      (memory	    "Build tess with memory profiling"		    OFF)
 option			    (draw	    "Build draw"				    ON)
-option			    (hacc_test	    "Build HACC test"				    OFF)
+# hacc_test being deprecated; included in pread instead
+# option			    (hacc_test	    "Build HACC test"				    OFF)
 option			    (bgq	    "Build on BG/Q"				    OFF)
 option			    (pread          "Build pread-voronoi example (requires HDF5)"   OFF)
 option                      (diy_thread     "Enable diy threading"                          OFF)
@@ -102,24 +103,25 @@ endif			    (draw)
 # DIY
 find_path                   (DIY_INCLUDE_DIRS		diy/types.h)
 
+# DEPRECATED, moved into pread-voronoi
 # GenericIO
-if			    (hacc_test)
-find_path                   (GenericIO_INCLUDE_DIR	GenericIO.h)
-find_library                (GenericIO_LIBRARY NAMES	GenericIO)
-endif			    (hacc_test)
+# if			    (hacc_test)
+# find_path                   (GenericIO_INCLUDE_DIR	GenericIO.h)
+# find_library                (GenericIO_LIBRARY NAMES	GenericIO)
+# endif			    (hacc_test)
 
 # Include path
 set                         (CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-isystem")
 include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
 			     ${DIY_INCLUDE_DIRS}
-			     ${GenericIO_INCLUDE_DIR}
+			     # ${GenericIO_INCLUDE_DIR} # DEPRECATED, moved into pread-voroni
                              SYSTEM ${MPI_INCLUDE_PATH}
                             )
 
 # Libraries
 set			    (libraries
 			     ${libraries}
-			     ${GenericIO_LIBRARY}
+			     # ${GenericIO_LIBRARY} # DEPRECATED, moved into pread-voronoi
 			     ${CMAKE_THREAD_LIBS_INIT}
 			    )
 if                          (debug)

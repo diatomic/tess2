@@ -1,7 +1,5 @@
-if			(hacc_test)
 add_executable          (hacc-delaunay main.cpp ${DEBUG_SOURCES})
 target_link_libraries   (hacc-delaunay tess ${libraries})
-endif			(hacc_test)
 
 install                 (TARGETS hacc-delaunay
                         DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/hacc-post-tess/
