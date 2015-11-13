@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <cmath>
 #include <iostream>
+#include <algorithm>
 
 #include "tess/tess.h"
 #include "tess/tess.hpp"
@@ -26,6 +27,7 @@
 #include "../opts.h"
 #include "../memory.h"
 
+typedef     std::map<size_t, int>       DuplicateCountMap;
 
 using namespace std;
 
@@ -122,6 +124,51 @@ struct AddAndRead: public AddBlock
     int                                 sample_rate; // for hacc only
     Bounds*                             data_bounds; // global data bounds (for hacc only)
 };
+
+/**
+ * Deduplicate functionality: get rid of duplicate points, since downstream
+ * code can't handle them.
+ */
+
+struct DedupPoint
+{
+  float data[3];
+  bool	    operator<(const DedupPoint& other) const	    { return std::lexicographical_compare(data, data + 3, other.data, other.data + 3); }
+  bool	    operator==(const DedupPoint& other) const	    { return std::equal(data, data + 3, other.data); }
+};
+void deduplicate(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
+{
+  dblock_t* b = static_cast<dblock_t*>(b_);
+
+  // simple static_assert to ensure sizeof(Point) == sizeof(float[3]);
+  // necessary to make this hack work
+  typedef int static_assert_Point_size[sizeof(DedupPoint) == sizeof(float[3]) ? 1 : -1];
+  DedupPoint* bg  = (DedupPoint*) &b->particles[0];
+  DedupPoint* end = (DedupPoint*) &b->particles[3*b->num_particles];
+  std::sort(bg,end);
+
+  DuplicateCountMap* count = (DuplicateCountMap*) aux;
+  DedupPoint* out = bg + 1;
+  for (DedupPoint* it = bg + 1; it != end; ++it)
+  {
+    if (*it == *(it - 1))
+        (*count)[out - bg - 1]++;
+    else
+    {
+        *out = *it;
+        ++out;
+    }
+  }
+  b->num_orig_particles = b->num_particles = out - bg;
+
+  if (!count->empty())
+  {
+      size_t total = 0;
+      for (DuplicateCountMap::const_iterator it = count->begin(); it != count->end(); ++it)
+          total += it->second;
+      std::cout << b->gid << ": Found " << count->size() << " particles that appear more than once, with " << total << " total extra copies\n";
+  }
+}
 
 int main(int argc, char *argv[])
 {
@@ -294,6 +341,17 @@ int main(int argc, char *argv[])
         wrap.assign(3, true);
     diy::decompose(3, rank, domain, assigner, create_and_read, share_face, wrap, ghosts);
 
+  // sort and distribute particles to all blocks
+  if (kdtree)
+    tess_kdtree_exchange(master, assigner, times, wrap_);
+  else
+    tess_exchange(master, assigner, times);
+  if (rank == 0)
+    printf("particles exchanged\n");
+
+  DuplicateCountMap count;
+  master.foreach(&deduplicate, &count);
+
 #if 0	    // debug
     for (unsigned i = 0; i < master.size(); ++i)
         fprintf(stderr, "%d [%d]: %d\n",
@@ -314,13 +372,6 @@ int main(int argc, char *argv[])
                master.block<dblock_t>(i)->box.max[2]);
     }
 #endif
-
-    // sort and distribute particles to all blocks
-    if (kdtree)
-        tess_kdtree_exchange(master, assigner, times, wrap_);
-    else
-        tess_exchange(master, assigner, times);
-    fprintf(stderr, "%d: particles exchanged\n", rank);
 
     // debug purposes only: checks if the particles got into the right blocks
     master.foreach(&verify_particles);
