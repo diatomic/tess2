@@ -52,16 +52,13 @@ outfile="del.out"
 #outfile="/projects/SSSPPg/tpeterka/hacc-vor.out"
 #outfile="!"
 
-# redistribution blocking factor (1 1 1 if not used)
-bf="1 1 1"
-
 # sample rate (1 = keep every particle, 10 = keep every 10th particle)
 sr=1
 
 # options: single-phase and kd-tree
 # possibilities are --wrap --single --kdtree --minvol <minvol> --maxvol <maxvol> --blocks <totblocks>
-opts="--single --blocks 64"
-# opts="--single --kdtree --blocks 64"
+# opts="--single --blocks 64"
+opts="--single --kdtree --blocks 64"
 
 #------
 #
