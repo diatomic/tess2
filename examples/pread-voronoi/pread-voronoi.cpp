@@ -73,12 +73,13 @@ struct AddAndRead: public AddBlock
                                          particles,
                                          coordinates);
 #elif defined TESS_HACC_IO
-            io::hacc::read_particles(master.communicator(),
-                                     infile,
-                                     gid,
-                                     nblocks,
-                                     particles,
-                                     sample_rate);
+            // only read a new genericio block once for each mpi rank
+            // following test assumes contiguous assignment, not round robin
+            if (gid % (nblocks / master.communicator().size()) == 0)
+                io::hacc::read_particles(master.communicator(),
+                                         infile,
+                                         particles,
+                                         sample_rate);
 #else
             io::hdf5::read_particles(master.communicator(),
                                      infile,
@@ -167,7 +168,6 @@ int main(int argc, char *argv[])
     double times[TESS_MAX_TIMES]; // timing
     quants_t quants; // quantity stats
     int sample_rate; // keep every one out of this many particles
-    int bf[3];       // block multiplication factors for x,,z
 
     diy::mpi::environment     env(argc, argv);
     diy::mpi::communicator    world;
@@ -206,10 +206,7 @@ int main(int argc, char *argv[])
 #ifdef TESS_HACC_IO
 
     if ( ops >> Present('h', "help", "show help") ||
-         !(ops >> PosOption(infile) >> PosOption(outfile)
-           >> PosOption(bf[0]) >> PosOption(bf[1]) >> PosOption(bf[2])
-           >> PosOption(sample_rate))
-        )
+         !(ops >> PosOption(infile) >> PosOption(outfile) >> PosOption(sample_rate)) )
     {
         if (rank == 0)
         {
@@ -220,11 +217,11 @@ int main(int argc, char *argv[])
     }
 
     // debug
-    if (rank == 0)
-        fprintf(stderr, "infile %s outfile %s minv %.1f maxv %.1f wrap %d bf %d %d %d sr %d "
-                "th %d mb %d opts %d %d\n",
-                infile.c_str(), outfile.c_str(), minvol, maxvol, wrap_, bf[0], bf[1], bf[2],
-                sample_rate, num_threads, mem_blocks, single, kdtree);
+    // if (rank == 0)
+    //     fprintf(stderr, "infile %s outfile %s minv %.1f maxv %.1f wrap %d sr %d "
+    //             "th %d mb %d opts %d %d tb %d\n",
+    //             infile.c_str(), outfile.c_str(), minvol, maxvol, wrap_,
+    //             sample_rate, num_threads, mem_blocks, single, kdtree, tot_blocks);
 # else
 
     coordinates.resize(3);
@@ -279,6 +276,7 @@ int main(int argc, char *argv[])
                                      &storage,
                                      &save_block,
                                      &load_block);
+    // NB: AddAndRead for hacc assumes contiguous; don't switch to round robin
     diy::ContiguousAssigner   assigner(world.size(), tot_blocks);
 
 #ifdef TESS_HACC_IO

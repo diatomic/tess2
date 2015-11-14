@@ -28,8 +28,6 @@ namespace io
 
         void read_particles(MPI_Comm            comm_,
                             const char*         infile,
-                            int                 rank,
-                            int                 size,
                             std::vector<float>& particles,
                             int                 sample_rate);
 

@@ -7,9 +7,9 @@
 
 void
 io::hacc::
-read_domain(MPI_Comm            comm_,
-            const char*         infile,
-            Bounds&             domain)
+read_domain(MPI_Comm            comm_,       // MPI comm
+            const char*         infile,      // input file name
+            Bounds&             domain)      // output global domain bounds
 {
     gio::GenericIOReader *reader = new gio::GenericIOMPIReader();
     reader->SetFileName(infile);
@@ -32,12 +32,10 @@ read_domain(MPI_Comm            comm_,
 
 void
 io::hacc::
-read_particles(MPI_Comm            comm_,
-               const char*         infile,
-               int                 rank,
-               int                 size,
-               std::vector<float>& particles,
-               int                 sample_rate)
+read_particles(MPI_Comm            comm_,       // MPI comm
+               const char*         infile,      // input file name
+               std::vector<float>& particles,   // output particles
+               int                 sample_rate) // output sample rate
 {
     // intialize reader
     gio::GenericIOReader *reader = new gio::GenericIOMPIReader();
@@ -67,12 +65,6 @@ read_particles(MPI_Comm            comm_,
         }
     }
 
-    // debug
-    diy::mpi::communicator comm(comm_);
-    if (nu < num_particles)
-        fprintf(stderr, "%lu duplicate particles found and removed in rank %d\n",
-                num_particles - nu, comm.rank());
-
     // cleanup
     reader->Close();
     delete reader;
@@ -80,85 +72,41 @@ read_particles(MPI_Comm            comm_,
 
 size_t
 io::hacc::detail::
-read_gio(MPI_Comm              comm_,
-         gio::GenericIOReader* reader,
-         vector<float>&        x,
-         vector<float>&        y,
-         vector<float>&        z,
-         vector<int64_t>&      id)
+read_gio(MPI_Comm              comm_,        // MPI comm
+         gio::GenericIOReader* reader,       // generic io reader
+         vector<float>&        x,            // output x coords
+         vector<float>&        y,            // output y coords
+         vector<float>&        z,            // output z coords
+         vector<int64_t>&      id)           // output particle ids
 {
     diy::mpi::communicator comm(comm_);
-    double min[3], max[3]; // local block bounds
 
-    // total number of blocks and local blocks
-    int tot_blocks = reader->GetTotalNumberOfBlocks();
-    int max_blocks = ceilf((float)tot_blocks / comm.size()); // max in any process
-    vector<int>gids(max_blocks);
+    // genericio can only handle one block per process
+    // even though in theory I should be able to concatenate multiple genericio block reads
+    // it returns 0 particles when there are not enough mpi ranks for genericio blocks
+    assert(comm.size() == reader->GetTotalNumberOfBlocks());
 
-    // contiguous block distribution is fine for now; will be redistributed anyway
-    int nblocks = (comm.rank() < comm.size() - 1) ?
-        nblocks = tot_blocks / comm.size() :
-        nblocks = tot_blocks - (comm.size() - 1) * tot_blocks / comm.size();
-    for (int b = 0; b < nblocks; ++b)
-        gids[b] = comm.rank() * tot_blocks / comm.size() + b;
+    // read local genericio blocks
+    reader->ClearVariables();            // clear reader variables
 
-    // read local blocks
-    size_t tot_p = 0;                        // total number particles so far
-    for (int b = 0; b < nblocks; b++) {
-        reader->ClearVariables();            // clear reader variables
+    // number of particles in this block
+    size_t num_particles = reader->GetNumberOfElements(comm.rank());
 
-        double min[3], max[3];               // block bounds, NB, the reader wants lid, not gid
-        reader->GetBlockBounds(b, min, max);
+    // padsize CRC for floats
+    int floatpadsize = gio::CRCSize / sizeof(float);
+    int idpadsize    = gio::CRCSize / sizeof(int64_t);
 
-        // number of particles in this block, NB, the reader wants gid now
-        int num_particles = reader->GetNumberOfElements(gids[b]);
+    // particles
+    x.resize(num_particles  + floatpadsize);
+    y.resize(num_particles  + floatpadsize);
+    z.resize(num_particles  + floatpadsize);
+    id.resize(num_particles + idpadsize);
+    reader->AddVariable("x",  &x[0],  gio::GenericIOBase::ValueHasExtraSpace);
+    reader->AddVariable("y",  &y[0],  gio::GenericIOBase::ValueHasExtraSpace);
+    reader->AddVariable("z",  &z[0],  gio::GenericIOBase::ValueHasExtraSpace);
+    reader->AddVariable("id", &id[0], gio::GenericIOBase::ValueHasExtraSpace);
 
-        // padsize CRC for floats
-        int floatpadsize = gio::CRCSize / sizeof(float);
-        int idpadsize    = gio::CRCSize / sizeof(int64_t);
+    reader->ReadBlock(comm.rank());      // read the particles
 
-        // particles
-        if (nblocks > 1)
-        {
-            vector<float>   x0(num_particles  + floatpadsize);
-            vector<float>   y0(num_particles  + floatpadsize);
-            vector<float>   z0(num_particles  + floatpadsize);
-            vector<int64_t> id0(num_particles + idpadsize);
-            reader->AddVariable("x",  &x0[0],  gio::GenericIOBase::ValueHasExtraSpace);
-            reader->AddVariable("y",  &y0[0],  gio::GenericIOBase::ValueHasExtraSpace);
-            reader->AddVariable("z",  &z0[0],  gio::GenericIOBase::ValueHasExtraSpace);
-            reader->AddVariable("id", &id0[0], gio::GenericIOBase::ValueHasExtraSpace);
-
-            reader->ReadBlock(gids[b]);      // read the particles
-
-            // append particles from current block together to all particles for this process
-            x.resize(x.size()   + num_particles);
-            y.resize(y.size()   + num_particles);
-            z.resize(z.size()   + num_particles);
-            id.resize(id.size() + num_particles);
-            for (size_t i = 0; i < num_particles; i++)
-            {
-                x[tot_p  + i] = x0[i];
-                y[tot_p  + i] = y0[i];
-                z[tot_p  + i] = z0[i];
-                id[tot_p + i] = id0[i];
-            }
-            tot_p += num_particles;
-        }
-        else
-        {
-            x.resize(num_particles  + floatpadsize);
-            y.resize(num_particles  + floatpadsize);
-            z.resize(num_particles  + floatpadsize);
-            id.resize(num_particles + idpadsize);
-            reader->AddVariable("x",  &x[0],  gio::GenericIOBase::ValueHasExtraSpace);
-            reader->AddVariable("y",  &y[0],  gio::GenericIOBase::ValueHasExtraSpace);
-            reader->AddVariable("z",  &z[0],  gio::GenericIOBase::ValueHasExtraSpace);
-            reader->AddVariable("id", &id[0], gio::GenericIOBase::ValueHasExtraSpace);
-
-            reader->ReadBlock(gids[b]);      // read the particles
-            tot_p = num_particles;
-        }
-    }
-    return tot_p;
+    return num_particles;
 }

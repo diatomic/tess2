@@ -59,9 +59,9 @@ bf="1 1 1"
 sr=1
 
 # options: single-phase and kd-tree
-# possibilities are --wrap --single --kdtree --minvol <minvol> --maxvol <maxvol>
-opts="--single --kdtree"
-# opts="--single"
+# possibilities are --wrap --single --kdtree --minvol <minvol> --maxvol <maxvol> --blocks <totblocks>
+opts="--single --blocks 64"
+# opts="--single --kdtree --blocks 64"
 
 #------
 #
