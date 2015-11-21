@@ -65,7 +65,7 @@ opts="--single --kdtree --blocks 64"
 # program arguments
 #
 
-args="$opts $infile $outfile $bf $sr"
+args="$opts $infile $outfile $sr"
 
 #------
 #
@@ -98,7 +98,7 @@ fi
 
 if [ "$ARCH" = "BGQ" ]; then
 
-qsub -n $num_nodes --mode c$ppn -A SSSPPg -t 60 $exe $args
+qsub -n $num_nodes --mode c$ppn -A SDAV -t 60 $exe $args
 
 fi
 
