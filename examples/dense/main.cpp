@@ -143,7 +143,7 @@ int main(int argc, char** argv)
   times[COMP_TIME] = MPI_Wtime();
 
   // init diy
-  int num_threads = 1;
+  int num_threads = 4;
   int mem_blocks = -1;
   diy::mpi::communicator    world(comm);
   diy::FileStorage          storage("./DIY.XXXXXX");

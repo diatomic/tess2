@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
 
     // defaults
     tot_blocks    = size;
-    num_threads   = 1;
+    num_threads   = 4;
     mem_blocks    = -1;
     string prefix = "./DIY.XXXXXX";
     minvol        = 0;

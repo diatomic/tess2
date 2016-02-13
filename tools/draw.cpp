@@ -36,7 +36,7 @@
 #include <GL/gl.h>
 #endif
 
-#define SPHERE_RAD_FACTOR .004 // used to compute sphere radius
+#define SPHERE_RAD_FACTOR .001 // used to compute sphere radius
 // #define PAPER // color scheme for paper (white backgound)
 
 using namespace std;
@@ -337,9 +337,9 @@ void display() {
   if (draw_tess) {
 
     glDisable(GL_LIGHTING);
-    glColor4f(0.7, 0.7, 0.7, 1.0);
+    glColor4f(0.9, 0.9, 0.9, 1.0);
     if (draw_fancy)
-      glLineWidth(2.0);
+      glLineWidth(1.3);
     else
       glLineWidth(1.0);
     n = 0;
@@ -418,13 +418,13 @@ void display() {
     if (draw_fancy) {
 
       float d = size / 3000.0; // face shift found by trial and error
-      GLfloat spec[] = {1.0, 1.0, 1.0, 1.0};
-      GLfloat shine[] = {64}; // 0 - 128, 0 = shiny, 128 = dull
+      GLfloat spec[] = {0.2, 0.2, 0.2};
+      GLfloat shine[] = {128}; // 0 - 128, 0 = shiny, 128 = dull
       glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, spec);
       glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, shine);
 
 
-      GLfloat mat[] = {0.65, 0.65, 0.85, 1.0};
+      GLfloat mat[] = {0.3, 0.3, 0.5, 1.0};
       glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, mat);
       n = 0;
 
@@ -593,7 +593,7 @@ void draw_tets() {
   glDisable(GL_LIGHTING);
   glColor4f(0.7, 0.7, 0.7, 1.0);
   if (draw_fancy)
-    glLineWidth(2.0);
+    glLineWidth(1.5);
   else
     glLineWidth(1.0);
 
