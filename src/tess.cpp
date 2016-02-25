@@ -121,12 +121,12 @@ void tess_load(diy::Master& master, diy::Assigner& assigner, const char* infile,
 //
 void* create_block()
 {
-  dblock_t* b = new dblock_t;
-  b->sent_particles = new std::vector<int>;
-  b->convex_hull_particles = new std::vector< std::set<int> >;
-  b->complete = 0;
-  init_delaunay_data_structure(b);
-  return b;
+    dblock_t* b = new dblock_t;
+    b->sent_particles = new std::vector<int>;
+    b->convex_hull_particles = new std::vector< std::set<int> >;
+    b->complete = 0;
+    init_delaunay_data_structure(b);
+    return b;
 }
 
 void destroy_block(void* b_)
@@ -145,18 +145,25 @@ void destroy_block(void* b_)
     delete[] b->density;   // allocated with new, freed with delete
 
   // convex hull particles and sent particles
-  vector <int> *convex_hull_particles =
-    static_cast<vector <int>*>(b->convex_hull_particles);
-  vector <set <int> > *sent_particles =
-    static_cast<vector <set <int> >*>(b->sent_particles);
-  for (int i = 0; i < (int)sent_particles->size(); i++)
-    sent_particles[i].clear();
-  sent_particles->clear();
-  convex_hull_particles->clear();
-  delete sent_particles;
-  delete convex_hull_particles;
+  if (b->convex_hull_particles)
+  {
+      vector <int> *convex_hull_particles =
+          static_cast<vector <int>*>(b->convex_hull_particles);
+      convex_hull_particles->clear();
+      delete convex_hull_particles;
+  }
+  if (b->sent_particles)
+  {
+      vector <set <int> > *sent_particles =
+          static_cast<vector <set <int> >*>(b->sent_particles);
+      for (int i = 0; i < (int)sent_particles->size(); i++)
+          sent_particles[i].clear();
+      sent_particles->clear();
+      delete sent_particles;
+  }
 
-  clean_delaunay_data_structure(b);
+  if (b->Dt)
+      clean_delaunay_data_structure(b);
 
   delete b;
 }

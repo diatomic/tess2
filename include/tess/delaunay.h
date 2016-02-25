@@ -68,7 +68,7 @@ struct dblock_t {
   /* estimated density field */
   float* density;            /* density field */
   int num_grid_pts;          /* total number of density grid points */
-  
+
   int complete;
 };
 
