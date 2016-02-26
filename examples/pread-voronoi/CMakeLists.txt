@@ -1,6 +1,6 @@
-option			    (gadget		"Gadget IO support"	on)
-option			    (hacc		"HACC IO support"	off)
-option			    (moab		"MOAB IO support"	off)
+option			    (gadget		"Gadget IO support"	 on)
+option			    (hacc		"HACC IO support"	 off)
+option			    (moab		"MOAB IO support"	 off)
 
 # gadget
 if			    (gadget)

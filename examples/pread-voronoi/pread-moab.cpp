@@ -420,29 +420,10 @@ int main(int argc, char *argv[])
                                      &load_block);
     diy::ContiguousAssigner   assigner(world.size(), tot_blocks);
 
-    // add blocks to the master manually, without a decomposition
-    // because I first need to read data into the blocks, reduce it, to get global domain bounds
-    // and then domain bounds are needed for decomposition
-    std::vector<int> my_gids;                       // my local gids
-    assigner.local_gids(rank, my_gids);
-    for (unsigned i = 0; i < my_gids.size(); ++i)   // for the local blocks in this processor
-    {
-        diy::Link* link = new diy::Link;            // link is this block's neighborhood
-        dblock_t*  b    = (dblock_t*)create_block();// create a new block
-        master.add(my_gids[i], b, link);            // add the current local block to the master
-        // init block fields
-        b->gid = my_gids[i];
-        b->num_orig_particles = 0;
-        b->num_particles = 0;
-        b->particles = NULL;
-        b->num_tets = 0;
-        b->tets = NULL;
-        b->rem_gids = NULL;
-        b->rem_lids = NULL;
-        b->vert_to_tet = NULL;
-        b->num_grid_pts = 0;
-        b->density = NULL;
-    }
+    // decomposing with an uninitialized domain in order to add blocks and links to the master
+    // will decompose later with proper domain and block bounds after points have been read
+    AddBlock                  create(master);
+    diy::decompose(3, rank, domain, assigner, create);
 
     // read points
     Aux aux;
@@ -469,7 +450,7 @@ int main(int argc, char *argv[])
 
     // decompose
     UpdateBlock update(master);
-    diy::redecompose(3, rank, domain, assigner, master, update);
+    diy::decompose(3, rank, domain, assigner, master, update);
 
     // sort and distribute particles to all blocks
     if (kdtree)
