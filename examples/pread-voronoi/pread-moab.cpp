@@ -223,6 +223,7 @@ struct Aux
 {
     string* infile;
     diy::Assigner* assigner;
+    float jitter;
 };
 
 // read mesh vertices
@@ -232,6 +233,8 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
     dblock_t* b             = static_cast<dblock_t*>(b_);
     string* infile          = ((Aux*)aux)->infile;
     diy::Assigner* assigner = ((Aux*)aux)->assigner;
+    float jitter            = ((Aux*)aux)->jitter; // max distance to jitter a point
+    srand(b->gid);                                 // seed for jittering points by random amounts
     ErrorCode rval; // moab return value
 
     std::vector<int> my_gids;                // my local gids
@@ -263,11 +266,20 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
         size_t i = 0;
         for (Range::iterator it = pts.begin(); it != pts.end(); it++)
         {
+            // debug: amount to jitter each coordinate
+            float d0 = 0.0, d1 = 0.0, d2 = 0.0;
+            if (jitter)
+            {
+                d0 = rand() / (float)RAND_MAX * 2 * jitter - jitter;
+                d1 = rand() / (float)RAND_MAX * 2 * jitter - jitter;
+                d2 = rand() / (float)RAND_MAX * 2 * jitter - jitter;
+            }
+
             // copy point
             rval = mb->get_coords(&(*it), 1, pt); ERR;
-            b->particles[i++] = pt[0];
-            b->particles[i++] = pt[1];
-            b->particles[i++] = pt[2];
+            b->particles[i++] = (pt[0] += d0);
+            b->particles[i++] = (pt[1] += d1);
+            b->particles[i++] = (pt[2] += d2);
 
             // extrema
             // eventually the block bounds will get overwritten when we have a proper decomposition
@@ -289,6 +301,15 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
                 if (pt[2] > b->maxs[2]) b->maxs[2] = pt[2];
             }
         }
+
+        // to prevent roundoff error caused by jittering, expand the block bounds by max jitter
+        b->mins[0] -= jitter;
+        b->mins[1] -= jitter;
+        b->mins[2] -= jitter;
+        b->maxs[0] += jitter;
+        b->maxs[1] += jitter;
+        b->maxs[2] += jitter;
+
 
         // debug
         // fprintf(stderr, "min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
@@ -429,6 +450,7 @@ int main(int argc, char *argv[])
     Aux aux;
     aux.infile   = &infile;
     aux.assigner = &assigner;
+    aux.jitter   = 0.1;
     master.foreach(&read_vertices, &aux);
 
     // reduce global domain bounds
