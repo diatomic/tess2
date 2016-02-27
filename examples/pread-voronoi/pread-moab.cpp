@@ -19,6 +19,7 @@
 #include <diy/reduce.hpp>
 #include <diy/reduce-operations.hpp>
 #include <diy/partners/swap.hpp>
+#include <diy/io/bov.hpp>
 
 #include "../opts.h"
 #include "../memory.h"
@@ -221,7 +222,7 @@ void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 
 struct Aux
 {
-    string* infile;
+    string* filename;
     diy::Assigner* assigner;
     float jitter;
 };
@@ -231,7 +232,7 @@ void
 read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
 {
     dblock_t* b             = static_cast<dblock_t*>(b_);
-    string* infile          = ((Aux*)aux)->infile;
+    string* infile          = ((Aux*)aux)->filename;
     diy::Assigner* assigner = ((Aux*)aux)->assigner;
     float jitter            = ((Aux*)aux)->jitter; // max distance to jitter a point
     srand(b->gid);                                 // seed for jittering points by random amounts
@@ -325,6 +326,61 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
     }
 }
 
+// debug: write mesh vertices
+void
+write_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
+{
+    dblock_t* b             = static_cast<dblock_t*>(b_);
+    string* outfile         = ((Aux*)aux)->filename;
+    diy::Assigner* assigner = ((Aux*)aux)->assigner;
+
+    diy::mpi::communicator world = cp.master()->communicator();
+    std::vector<int> my_gids;                // my local gids
+    assigner->local_gids(cp.master()->communicator().rank(), my_gids);
+
+    // only write once for each mpi rank
+    if (b->gid == my_gids[0])
+    {
+        // debug
+        {
+            fprintf(stderr, "%d particles written to file %s:\n---\n", b->num_particles,
+                    outfile->c_str());
+            for (size_t i = 0; i < b->num_particles; i++)
+                fprintf(stderr, "%f %f %f\n",
+                        b->particles[3 * i],
+                        b->particles[3 * i + 1],
+                        b->particles[3 * i + 2]);
+        }
+        fprintf(stderr, "---\n");
+
+        diy::DiscreteBounds box;
+        box.min[0] = 0;
+        box.max[0] = b->num_particles * 3 - 1;
+
+        std::vector<unsigned> shape;
+        shape.push_back(b->num_particles * 3);
+
+        diy::mpi::io::file out(world, outfile->c_str(), diy::mpi::io::file::wronly | diy::mpi::io::file::create);
+        diy::io::BOV writer(out, shape);
+        writer.write(box, b->particles);
+
+        // debug: read back in as a sanity check
+        // diy::mpi::io::file in(world, outfile->c_str(), diy::mpi::io::file::rdonly);
+        // diy::io::BOV reader(in, shape);
+        // std::vector<float> read_particles(b->num_particles * 3);
+        // reader.read(box, &read_particles[0]);
+        // if (read_particles.size())
+        // {
+        //     fprintf(stderr, "particles read back:\n");
+        //     for (size_t i = 0; i < read_particles.size() / 3; i++)
+        //         fprintf(stderr, "[%f %f %f]\n",
+        //                 read_particles[3 * i],
+        //                 read_particles[3 * i + 1],
+        //                 read_particles[3 * i + 2]);
+        // }
+    }
+}
+
 // debug: print the block
 void debug(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
@@ -349,8 +405,6 @@ int main(int argc, char *argv[])
     int num_threads;                    // number of threads diy can use
     int mem_blocks;                     // number of blocks to keep in memory
     string infile;                      // input file name
-    string outfile;                     // output file name
-    float minvol, maxvol;               // volume range, -1.0 = unused
     int rank, size;                     // MPI usual
     double times[TESS_MAX_TIMES];       // timing
     quants_t quants;                    // quantity stats
@@ -371,8 +425,6 @@ int main(int argc, char *argv[])
     num_threads   = 4;
     mem_blocks    = -1;
     string prefix = "./DIY.XXXXXX";
-    minvol        = 0;
-    maxvol        = 0;
 
     Options ops(argc, argv);
 
@@ -381,14 +433,12 @@ int main(int argc, char *argv[])
         >> Option('t', "threads",   num_threads,  "Number of threads to use")
         >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
         >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
-        >> Option(     "minvol",    minvol,       "minvol cutoff")
-        >> Option(     "maxvol",    maxvol,       "minvol cutoff")
         ;
     bool single = ops >> Present('1', "single", "use single-phase version of the algorithm");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
 
     if ( ops >> Present('h', "help", "show help") ||
-         !(ops >> PosOption(infile) >> PosOption(outfile)) )
+         !(ops >> PosOption(infile)) )
     {
         if (rank == 0)
         {
@@ -423,9 +473,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (outfile == "!")
-        outfile = "";
-
     timing(times, -1, -1, world);
     timing(times, TOT_TIME, -1, world);
 
@@ -448,10 +495,15 @@ int main(int argc, char *argv[])
 
     // read points
     Aux aux;
-    aux.infile   = &infile;
+    aux.filename = &infile;
     aux.assigner = &assigner;
     aux.jitter   = 0.1;
     master.foreach(&read_vertices, &aux);
+
+    // debug: write points
+    string outfile("debug.bov");
+    aux.filename   = &outfile;
+    master.foreach(&write_vertices, &aux);
 
     // reduce global domain bounds
     diy::all_to_all(master, assigner, &minmax);
@@ -493,7 +545,7 @@ int main(int argc, char *argv[])
 
     tess(master, quants, times, single);
 
-    tess_save(master, outfile.c_str(), times);
+    tess_save(master, "del.out", times);
 
     timing(times, -1, TOT_TIME, world);
     tess_stats(master, quants, times);
