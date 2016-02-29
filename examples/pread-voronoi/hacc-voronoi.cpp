@@ -29,12 +29,10 @@ struct AddAndRead: public AddBlock
     AddAndRead(diy::Master&			m,
                int				nblocks_,
                const char*			infile_,
-               const std::vector<std::string>&  coordinates_,
                int                              sample_rate_ = 1) :  // only used for hacc
         AddBlock(m),
         nblocks(nblocks_),
         infile(infile_),
-        coordinates(coordinates_),
         sample_rate(sample_rate_)               {}
 
     void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
@@ -68,7 +66,6 @@ struct AddAndRead: public AddBlock
 
     int					nblocks;
     const char*				infile;
-    const std::vector<std::string>&	coordinates;
     int                                 sample_rate; // for hacc only
     Bounds*                             data_bounds; // global data bounds (for hacc only)
 };
@@ -83,7 +80,6 @@ int main(int argc, char *argv[])
     float minvol, maxvol; // volume range, -1.0 = unused
     int wrap_; // whether wraparound neighbors are used
     int rank,size; // MPI usual
-    std::vector<std::string>  coordinates; // coordinates to read
     double times[TESS_MAX_TIMES]; // timing
     quants_t quants; // quantity stats
     int sample_rate; // keep every one out of this many particles
@@ -179,7 +175,6 @@ int main(int argc, char *argv[])
     AddAndRead		      create_and_read(master,
                                               tot_blocks,
                                               infile.c_str(),
-                                              coordinates,
                                               sample_rate);
     io::hacc::read_domain(master.communicator(),
                           infile.c_str(),

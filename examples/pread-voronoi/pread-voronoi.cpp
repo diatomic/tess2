@@ -81,7 +81,6 @@ struct AddAndRead: public AddBlock
     int					nblocks;
     const char*				infile;
     const std::vector<std::string>&	coordinates;
-    int                                 sample_rate; // for hacc only
     Bounds*                             data_bounds; // global data bounds (for hacc only)
 };
 
@@ -99,7 +98,6 @@ int main(int argc, char *argv[])
     std::vector<std::string>  coordinates; // coordinates to read
     double times[TESS_MAX_TIMES]; // timing
     quants_t quants; // quantity stats
-    int sample_rate; // keep every one out of this many particles
 
     diy::mpi::environment     env(argc, argv);
     diy::mpi::communicator    world;
@@ -119,7 +117,6 @@ int main(int argc, char *argv[])
     string prefix = "./DIY.XXXXXX";
     minvol        = 0;
     maxvol        = 0;
-    sample_rate   = 1;
 
     Options ops(argc, argv);
 
