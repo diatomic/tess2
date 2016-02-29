@@ -10,9 +10,7 @@
 #include "tess/tess.hpp"
 
 #include "io/hdf5/pread.h"
-#ifdef TESS_GADGET_IO
-#include "io/gadget/particles.h"
-#endif
+#include "io/hacc/particles.h"
 
 #include <diy/mpi.hpp>
 #include <diy/master.hpp>
@@ -31,11 +29,13 @@ struct AddAndRead: public AddBlock
     AddAndRead(diy::Master&			m,
                int				nblocks_,
                const char*			infile_,
-               const std::vector<std::string>&  coordinates_):
+               const std::vector<std::string>&  coordinates_,
+               int                              sample_rate_ = 1) :  // only used for hacc
         AddBlock(m),
         nblocks(nblocks_),
         infile(infile_),
-        coordinates(coordinates_)	{}
+        coordinates(coordinates_),
+        sample_rate(sample_rate_)               {}
 
     void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
                      const RCLink& link) const
@@ -45,25 +45,13 @@ struct AddAndRead: public AddBlock
             // read points
             std::vector<float>	particles;
 
-#if defined TESS_GADGET_IO
-            std::string infn(infile);
-            if (infn.size() > 7 && infn.substr(0,7) == "gadget:")
-            {
-                std::string infilename = std::string(infile).substr(7);
-                io::gadget::read_particles(master.communicator(),
-                                           infilename.c_str(),
-                                           gid,
-                                           nblocks,
-                                           particles,
-                                           coordinates);
-            } else	// assume HDF5
-#endif
-                io::hdf5::read_particles(master.communicator(),
+            // only read a new genericio block once for each mpi rank
+            // following test assumes contiguous assignment, not round robin
+            if (gid % (nblocks / master.communicator().size()) == 0)
+                io::hacc::read_particles(master.communicator(),
                                          infile,
-                                         gid,
-                                         nblocks,
                                          particles,
-                                         coordinates);
+                                         sample_rate);
 
             b->num_particles = particles.size()/3;
             b->num_orig_particles = b->num_particles;
@@ -84,7 +72,6 @@ struct AddAndRead: public AddBlock
     int                                 sample_rate; // for hacc only
     Bounds*                             data_bounds; // global data bounds (for hacc only)
 };
-
 
 int main(int argc, char *argv[])
 {
@@ -135,22 +122,23 @@ int main(int argc, char *argv[])
     bool single = ops >> Present('1', "single", "use single-phase version of the algorithm");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
 
-    coordinates.resize(3);
-    if (  ops >> Present('h', "help", "show help") ||
-          !(ops >> PosOption(infile) >> PosOption(outfile)
-            >> PosOption(coordinates[0]) >> PosOption(coordinates[1]) >> PosOption(coordinates[2])
-            >> PosOption(domain.min[0])  >> PosOption(domain.min[1])  >> PosOption(domain.min[2])
-            >> PosOption(domain.max[0])  >> PosOption(domain.max[1])  >> PosOption(domain.max[2])
-              )
-        )
+    if ( ops >> Present('h', "help", "show help") ||
+         !(ops >> PosOption(infile) >> PosOption(outfile) >> PosOption(sample_rate)) )
     {
         if (rank == 0)
         {
-            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile coordinates mins maxs\n", argv[0]);
+            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile minvol bf sr\n", argv[0]);
             std::cout << ops;
         }
         return 1;
     }
+
+    // debug
+    // if (rank == 0)
+    //     fprintf(stderr, "infile %s outfile %s minv %.1f maxv %.1f wrap %d sr %d "
+    //             "th %d mb %d opts %d %d tb %d\n",
+    //             infile.c_str(), outfile.c_str(), minvol, maxvol, wrap_,
+    //             sample_rate, num_threads, mem_blocks, single, kdtree, tot_blocks);
 
     if (kdtree)
     {
@@ -191,7 +179,11 @@ int main(int argc, char *argv[])
     AddAndRead		      create_and_read(master,
                                               tot_blocks,
                                               infile.c_str(),
-                                              coordinates);
+                                              coordinates,
+                                              sample_rate);
+    io::hacc::read_domain(master.communicator(),
+                          infile.c_str(),
+                          domain);
 
     // decompose
     std::vector<int> my_gids;

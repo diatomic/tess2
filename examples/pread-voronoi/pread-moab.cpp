@@ -24,11 +24,7 @@
 #include "../opts.h"
 #include "../memory.h"
 
-typedef     std::map<size_t, int>       DuplicateCountMap;
-
-using namespace std;
-
-void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*);
+#include "common.h"
 
 struct UpdateBlock
 {
@@ -122,101 +118,6 @@ void minmax(void* b_,                                  // local block
         // fprintf(stderr, "min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
         //         b->data_bounds.min[0], b->data_bounds.min[1], b->data_bounds.min[2],
         //         b->data_bounds.max[0], b->data_bounds.max[1], b->data_bounds.max[2]);
-    }
-}
-
-// Structure to remove duplicate points, since downstream code can't handle them.
-struct DedupPoint
-{
-    float data[3];
-    bool operator<(const DedupPoint& other) const
-        {
-            return std::lexicographical_compare(data, data + 3, other.data, other.data + 3);
-        }
-    bool operator==(const DedupPoint& other) const
-        {
-            return std::equal(data, data + 3, other.data);
-        }
-};
-
-// Removes duplicate points
-void deduplicate(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
-{
-    dblock_t* b = static_cast<dblock_t*>(b_);
-
-    if (!b->num_particles)
-        return;
-
-    // simple static_assert to ensure sizeof(Point) == sizeof(float[3]);
-    // necessary to make this hack work
-    typedef int static_assert_Point_size[sizeof(DedupPoint) == sizeof(float[3]) ? 1 : -1];
-    DedupPoint* bg  = (DedupPoint*) &b->particles[0];
-    DedupPoint* end = (DedupPoint*) &b->particles[3*b->num_particles];
-    std::sort(bg,end);
-
-    DuplicateCountMap* count = (DuplicateCountMap*) aux;
-    DedupPoint* out = bg + 1;
-    for (DedupPoint* it = bg + 1; it != end; ++it)
-    {
-        if (*it == *(it - 1))
-            (*count)[out - bg - 1]++;
-        else
-        {
-            *out = *it;
-            ++out;
-        }
-    }
-    b->num_orig_particles = b->num_particles = out - bg;
-
-    if (!count->empty())
-    {
-        size_t total = 0;
-        for (DuplicateCountMap::const_iterator it = count->begin(); it != count->end(); ++it)
-            total += it->second;
-        fprintf(stderr, "%d: Found %ld particles that appear more than once, with %ld "
-                "total extra copies\n", b->gid, count->size(), total);
-    }
-}
-
-// check if the particles fall inside the block bounds
-void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
-{
-    dblock_t* b = static_cast<dblock_t*>(b_);
-
-    fprintf(stderr, "gid %d num_particles %d num_orig_particles %d "
-            "bounds min[%.3f %.3f %.3f] max[%.3f %.3f %.3f] "
-            "domain min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
-            b->gid, b->num_particles, b->num_orig_particles,
-            b->mins[0], b->mins[1], b->mins[2],
-            b->maxs[0], b->maxs[1], b->maxs[2],
-            b->data_bounds.min[0], b->data_bounds.min[1], b->data_bounds.min[2],
-            b->data_bounds.max[0], b->data_bounds.max[1], b->data_bounds.max[2]);
-
-    for (size_t i = 0; i < b->num_particles; ++i)
-    {
-        // fprintf(stderr, "Particle: [%f %f %f]\n",
-        //         b->particles[3*i],
-        //         b->particles[3*i + 1],
-        //         b->particles[3*i + 2]);
-        for (int j = 0; j < 3; ++j)
-        {
-            if (b->particles[3*i + j] < b->mins[j] || b->particles[3*i + j] > b->maxs[j])
-            {
-                fprintf(stderr, "Particle outside the block: %f %f %f\n",
-                        b->particles[3*i],
-                        b->particles[3*i + 1],
-                        b->particles[3*i + 2]);
-                fprintf(stderr, "    block mins: %f %f %f\n",
-                        b->mins[0],
-                        b->mins[1],
-                        b->mins[2]);
-                fprintf(stderr, "    block maxs: %f %f %f\n",
-                        b->maxs[0],
-                        b->maxs[1],
-                        b->maxs[2]);
-                std::exit(1);
-            }
-        }
     }
 }
 
