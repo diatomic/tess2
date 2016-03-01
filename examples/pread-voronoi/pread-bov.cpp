@@ -138,6 +138,7 @@ int main(int argc, char *argv[])
         >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
         >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
         ;
+    bool wrap_  = ops >> Present('w', "wrap", "Use periodic boundary conditions");
     bool single = ops >> Present('1', "single", "use single-phase version of the algorithm");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
 
@@ -241,8 +242,12 @@ int main(int argc, char *argv[])
             domain.max[0], domain.max[1], domain.max[2]);
 
     // decompose
+    diy::RegularDecomposer<Bounds>::BoolVector          wrap;
+    diy::RegularDecomposer<Bounds>::BoolVector          share_face;
+    if (wrap_)
+        wrap.assign(3, true);
     UpdateBlock update(master);
-    diy::decompose(3, rank, domain, assigner, master, update);
+    diy::decompose(3, rank, domain, assigner, master, update, share_face, wrap);
 
     // sort and distribute particles to all blocks
     if (kdtree)
@@ -267,6 +272,9 @@ int main(int argc, char *argv[])
 
     timing(times, -1, TOT_TIME, world);
     tess_stats(master, quants, times);
+    
+    printf("Enumerating cells\n");
+    master.foreach(&enumerate_cells);
 
     // Storage + memory stats
     size_t max_storage = storage.max_size(),

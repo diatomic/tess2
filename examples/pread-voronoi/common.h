@@ -1,6 +1,8 @@
 #ifndef PREAD_COMMON_H
 #define PREAD_COMMON_H
 
+#include <tess/tet-neighbors.h>
+
 /**
  * Deduplicate functionality: get rid of duplicate points, since downstream
  * code can't handle them.
@@ -75,6 +77,24 @@ void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
             }
         }
     }
+}
+
+void enumerate_cells(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+{
+    dblock_t* b = static_cast<dblock_t*>(b_);
+
+    size_t infinite = 0;
+    for (size_t p = 0; p < b->num_orig_particles; ++p)
+    {
+      int t = b->vert_to_tet[p];
+      if (t < 0)
+	std::cerr << "Warning: no matching tet for point " << p << std::endl;
+      vector< pair<int, int> > nbrs;
+      bool finite = neighbor_edges(nbrs, p, b->tets, t);
+      if (!finite)
+	++infinite;
+    }
+    std::cout << "[" << cp.gid() << "] " << infinite << " infinite Voronoi cells" << std::endl;
 }
 
 #endif
