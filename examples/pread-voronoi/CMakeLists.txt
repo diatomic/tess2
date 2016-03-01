@@ -68,6 +68,14 @@ else			    (HDF5_FOUND)
   endif                   (HDF5_LIBRARY)
 endif			  (HDF5_FOUND)
 
+# bov
+add_executable        (pread-bov pread-bov.cpp)
+target_link_libraries (pread-bov tess ${libraries} ${HDF5_libraries})
+
+install               (TARGETS pread-bov
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
+  PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+  GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
 
 # moab
 if			    (moab)
