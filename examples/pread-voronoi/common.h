@@ -88,13 +88,13 @@ void enumerate_cells(void* b_, const diy::Master::ProxyWithLink& cp, void*)
     {
       int t = b->vert_to_tet[p];
       if (t < 0)
-	std::cerr << "Warning: no matching tet for point " << p << std::endl;
+	fprintf(stderr, "[%d] Warning: no matching tet for point %d\n", cp.gid(), p);
       vector< pair<int, int> > nbrs;
       bool finite = neighbor_edges(nbrs, p, b->tets, t);
       if (!finite)
 	++infinite;
     }
-    std::cout << "[" << cp.gid() << "] " << infinite << " infinite Voronoi cells" << std::endl;
+    fprintf(stderr, "[%d] %lu infinite Voronoi cells\n", cp.gid(), infinite);
 }
 
 #endif

@@ -103,6 +103,28 @@ fill_bounds(void *b_, const diy::Master::ProxyWithLink& cp, void*)
     b->data_bounds.max[2] = cp.get<float>() + .0001;
 }
 
+void
+bounds_neighbors(void *b_, const diy::Master::ProxyWithLink& cp, void*)
+{
+    dblock_t* b = static_cast<dblock_t*>(b_);
+    RCLink* link = dynamic_cast<RCLink*>(cp.link());
+
+    fprintf(stderr, "[%d]: %f %f %f - %f %f %f (wrap=%d)\n",
+		    cp.gid(),
+		    b->box.min[0], b->box.min[1], b->box.min[2],
+		    b->box.max[0], b->box.max[1], b->box.max[2],
+		    link->wrap());
+
+    for (size_t i = 0; i < link->size(); ++i)
+    {
+      fprintf(stderr, "   %d: %f %f %f - %f %f %f (%d)\n",
+		      link->target(i).gid,
+		      link->bounds(i).min[0], link->bounds(i).min[1], link->bounds(i).min[2],
+		      link->bounds(i).max[0], link->bounds(i).max[1], link->bounds(i).max[2],
+		      link->direction(i));
+    }
+}
+
 int main(int argc, char *argv[])
 {
     int tot_blocks;                     // total number of blocks in the domain
@@ -195,6 +217,10 @@ int main(int argc, char *argv[])
 
     // decomposing with an uninitialized domain in order to add blocks and links to the master
     // will decompose later with proper domain and block bounds after points have been read
+    diy::RegularDecomposer<Bounds>::BoolVector          wrap;
+    diy::RegularDecomposer<Bounds>::BoolVector          share_face;
+    if (wrap_)
+        wrap.assign(3, true);
     AddBlock                  create(master);
     diy::decompose(3, rank, domain, assigner, create);
 
@@ -242,16 +268,12 @@ int main(int argc, char *argv[])
             domain.max[0], domain.max[1], domain.max[2]);
 
     // decompose
-    diy::RegularDecomposer<Bounds>::BoolVector          wrap;
-    diy::RegularDecomposer<Bounds>::BoolVector          share_face;
-    if (wrap_)
-        wrap.assign(3, true);
     UpdateBlock update(master);
     diy::decompose(3, rank, domain, assigner, master, update, share_face, wrap);
 
     // sort and distribute particles to all blocks
     if (kdtree)
-        tess_kdtree_exchange(master, assigner, times);
+        tess_kdtree_exchange(master, assigner, times, wrap_);
     else
         tess_exchange(master, assigner, times);
     if (rank == 0)
@@ -264,7 +286,7 @@ int main(int argc, char *argv[])
     master.foreach(&verify_particles);
 
     // debug
-    // master.foreach(&debug);
+    master.foreach(&bounds_neighbors);
 
     tess(master, quants, times, single);
 
