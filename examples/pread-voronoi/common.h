@@ -88,7 +88,7 @@ void enumerate_cells(void* b_, const diy::Master::ProxyWithLink& cp, void*)
     {
       int t = b->vert_to_tet[p];
       if (t < 0)
-	fprintf(stderr, "[%d] Warning: no matching tet for point %d\n", cp.gid(), p);
+	fprintf(stderr, "[%d] Warning: no matching tet for point %ld\n", cp.gid(), p);
       vector< pair<int, int> > nbrs;
       bool finite = neighbor_edges(nbrs, p, b->tets, t);
       if (!finite)

@@ -142,7 +142,9 @@ int main(int argc, char *argv[])
     size = world.size();
 
     typedef     diy::ContinuousBounds         Bounds;
-    Bounds domain;
+    Bounds domain;                           // initialize to [0,1] at first, will get reset
+    domain.min[0] = domain.min[1] = domain.min[2] = 0.0;
+    domain.max[0] = domain.max[1] = domain.max[2] = 1.0;
 
     using namespace opts;
 
@@ -230,7 +232,8 @@ int main(int argc, char *argv[])
     size_t sz = in.size() / sizeof(float);
     if (sz % 3 != 0)
     {
-      fprintf(stderr, "Something is wrong: number of floats in BOV file is not divisible by 3, %lu % 3 != 0\n", sz);
+      fprintf(stderr, "Something is wrong: number of floats in BOV file is not divisible by 3, "
+              "%lu %% 3 != 0\n", sz);
       return 1;
     }
     if (rank == 0)

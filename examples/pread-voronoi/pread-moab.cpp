@@ -125,7 +125,6 @@ struct Aux
 {
     string* filename;
     diy::Assigner* assigner;
-    float jitter;
 };
 
 // read mesh vertices
@@ -135,8 +134,7 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
     dblock_t* b             = static_cast<dblock_t*>(b_);
     string* infile          = ((Aux*)aux)->filename;
     diy::Assigner* assigner = ((Aux*)aux)->assigner;
-    float jitter            = ((Aux*)aux)->jitter; // max distance to jitter a point
-    srand(b->gid);                                 // seed for jittering points by random amounts
+
     ErrorCode rval; // moab return value
 
     std::vector<int> my_gids;                // my local gids
@@ -168,20 +166,11 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
         size_t i = 0;
         for (Range::iterator it = pts.begin(); it != pts.end(); it++)
         {
-            // debug: amount to jitter each coordinate
-            float d0 = 0.0, d1 = 0.0, d2 = 0.0;
-            if (jitter)
-            {
-                d0 = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-                d1 = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-                d2 = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-            }
-
             // copy point
             rval = mb->get_coords(&(*it), 1, pt); ERR;
-            b->particles[i++] = (pt[0] += d0);
-            b->particles[i++] = (pt[1] += d1);
-            b->particles[i++] = (pt[2] += d2);
+            b->particles[i++] = pt[0];
+            b->particles[i++] = pt[1];
+            b->particles[i++] = pt[2];
 
             // extrema
             // eventually the block bounds will get overwritten when we have a proper decomposition
@@ -203,15 +192,6 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
                 if (pt[2] > b->maxs[2]) b->maxs[2] = pt[2];
             }
         }
-
-        // to prevent roundoff error caused by jittering, expand the block bounds by max jitter
-        b->mins[0] -= jitter;
-        b->mins[1] -= jitter;
-        b->mins[2] -= jitter;
-        b->maxs[0] += jitter;
-        b->maxs[1] += jitter;
-        b->maxs[2] += jitter;
-
 
         // debug
         // fprintf(stderr, "min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
@@ -243,16 +223,16 @@ write_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
     if (b->gid == my_gids[0])
     {
         // debug
-        {
-            fprintf(stderr, "%d particles written to file %s:\n---\n", b->num_particles,
-                    outfile->c_str());
-            for (size_t i = 0; i < b->num_particles; i++)
-                fprintf(stderr, "%f %f %f\n",
-                        b->particles[3 * i],
-                        b->particles[3 * i + 1],
-                        b->particles[3 * i + 2]);
-        }
-        fprintf(stderr, "---\n");
+        // {
+        //     fprintf(stderr, "%d particles written to file %s:\n---\n", b->num_particles,
+        //             outfile->c_str());
+        //     for (size_t i = 0; i < b->num_particles; i++)
+        //         fprintf(stderr, "%f %f %f\n",
+        //                 b->particles[3 * i],
+        //                 b->particles[3 * i + 1],
+        //                 b->particles[3 * i + 2]);
+        // }
+        // fprintf(stderr, "---\n");
 
         diy::DiscreteBounds box;
         box.min[0] = 0;
@@ -261,7 +241,9 @@ write_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
         std::vector<unsigned> shape;
         shape.push_back(b->num_particles * 3);
 
-        diy::mpi::io::file out(world, outfile->c_str(), diy::mpi::io::file::wronly | diy::mpi::io::file::create);
+        diy::mpi::io::file out(world,
+                               outfile->c_str(),
+                               diy::mpi::io::file::wronly | diy::mpi::io::file::create);
         diy::io::BOV writer(out, shape);
         writer.write(box, b->particles);
 
@@ -317,7 +299,9 @@ int main(int argc, char *argv[])
     size = world.size();
 
     typedef     diy::ContinuousBounds         Bounds;
-    Bounds domain;
+    Bounds domain;                           // initialize to [0,1] at first, will get reset
+    domain.min[0] = domain.min[1] = domain.min[2] = 0.0;
+    domain.max[0] = domain.max[1] = domain.max[2] = 1.0;
 
     using namespace opts;
 
@@ -398,13 +382,12 @@ int main(int argc, char *argv[])
     Aux aux;
     aux.filename = &infile;
     aux.assigner = &assigner;
-    aux.jitter   = 0.1;
     master.foreach(&read_vertices, &aux);
 
     // debug: write points
-    string outfile("debug.bov");
-    aux.filename   = &outfile;
-    master.foreach(&write_vertices, &aux);
+    // string outfile("debug.bov");
+    // aux.filename   = &outfile;
+    // master.foreach(&write_vertices, &aux);
 
     // reduce global domain bounds
     diy::all_to_all(master, assigner, &minmax);
