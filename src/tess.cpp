@@ -67,6 +67,8 @@ size_t tess(diy::Master& master,
   //           "it's not compatible with using multiple threads\n");
 #endif
 
+  timing(times, DEL_TIME, -1, master.communicator());
+
   // save the original link for every block in master
   LinkVector   original_links;
   for (size_t i = 0; i < master.size(); ++i)
@@ -103,6 +105,8 @@ size_t tess(diy::Master& master,
   master.foreach(&finalize, &quants);
     
   // TODO: possibly restore the original links
+  
+  timing(times, -1, DEL_TIME, master.communicator());
 
   return rounds;
 }
@@ -648,28 +652,13 @@ void tess_stats(diy::Master& master,
   {
     fprintf(stderr, "----------------- global stats ------------------\n");
     fprintf(stderr, "particle exchange time        = %.3lf s\n", times[EXCH_TIME]);
-    fprintf(stderr, "first delaunay time           = %.3lf s\n",
-            times[DEL1_TIME]);
-    fprintf(stderr, "  (%.3lf s local cell + %.3lf s incomplete cell)\n",
-            times[LOC1_TIME], times[INC1_TIME]);
-    fprintf(stderr, "first particle exchange time  = %.3lf s\n",
-            times[NEIGH1_TIME]);
-    fprintf(stderr, "second delaunay time          = %.3lf s\n",
-            times[DEL2_TIME]);
-    fprintf(stderr, "second particle exchange time = %.3lf s\n",
-            times[NEIGH2_TIME]);
-    fprintf(stderr, "third delaunay time           = %.3lf s\n",
-            times[DEL3_TIME]);
-    fprintf(stderr, "output time                   = %.3lf s\n",
-            times[OUT_TIME]);
-    fprintf(stderr, "total time                    = %.3lf s\n",
-            times[TOT_TIME]);
+    fprintf(stderr, "delaunay computation time     = %.3lf s\n", times[DEL_TIME]);
+    fprintf(stderr, "output time                   = %.3lf s\n", times[OUT_TIME]);
+    fprintf(stderr, "total time                    = %.3lf s\n", times[TOT_TIME]);
     fprintf(stderr, "All times printed in one row:\n");
-    fprintf(stderr, "%.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
-            times[EXCH_TIME],
-            times[DEL1_TIME], times[NEIGH1_TIME],
-            times[DEL2_TIME], times[NEIGH2_TIME],
-            times[DEL3_TIME], times[OUT_TIME], times[TOT_TIME]);
+    fprintf(stderr, "%.3lf %.3lf %.3lf %.3lf\n",
+            times[EXCH_TIME], times[DEL_TIME],
+            times[OUT_TIME],  times[TOT_TIME]);
     fprintf(stderr, "-------------------------------------------------\n");
     fprintf(stderr, "original particles = [%d, %d]\n", global_min_quants[NUM_ORIG_PTS],
             global_max_quants[NUM_ORIG_PTS]);

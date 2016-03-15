@@ -207,9 +207,10 @@ int main(int argc, char *argv[])
     // master.foreach(&verify_particles);
 
     size_t rounds = tess(master, quants, times);
-    fprintf(stderr, "Done in %lu rounds\n", rounds);
+    if (rank == 0)
+      fprintf(stderr, "Done in %lu rounds\n", rounds);
 
-    if (rounds > 2 && wrap_)
+    if (rounds > 2 && wrap_ && rank == 0)
       fprintf(stderr, "Warning: took more than 2 rounds with wrap on, result is likely incorrect!\n");
 
     tess_save(master, outfile.c_str(), times);
