@@ -104,7 +104,9 @@ size_t tess(diy::Master& master,
   // blocks as complete; TODO: this of how to get rid of this
   master.foreach(&finalize, &quants);
     
-  // TODO: possibly restore the original links
+  // restore the original links
+  for (size_t i = 0; i < master.size(); ++i)
+    master.replace_link(i, new RCLink(original_links[i]));
   
   timing(times, -1, DEL_TIME, master.communicator());
 
