@@ -146,7 +146,7 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
         // load mesh
         Interface *mb       = new Core();
         const char* options = ";;PARALLEL=READ_PART;PARALLEL_RESOLVE_SHARED_ENTS;"
-            "PARTITION=MATERIAL_SET;PARTITION_DISTRIBUTE";
+            "PARTITION=PARALLEL_PARTITION;PARTITION_DISTRIBUTE";
         EntityHandle file_set;
         rval = mb->create_meshset(MESHSET_SET, file_set); ERR;
         rval = mb->load_file(infile->c_str(), &file_set, options); ERR;
@@ -194,7 +194,8 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
         }
 
         // debug
-        // fprintf(stderr, "min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
+        // fprintf(stderr, "num_particles %d min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
+        //         b->num_particles,
         //         b->mins[0], b->mins[1], b->mins[2], b->maxs[0], b->maxs[1], b->maxs[2]);
 
         // cleanup
@@ -307,7 +308,7 @@ int main(int argc, char *argv[])
 
     // defaults
     tot_blocks    = size;
-    num_threads   = 4;
+    num_threads   = 1;
     mem_blocks    = -1;
     string prefix = "./DIY.XXXXXX";
 
