@@ -40,17 +40,26 @@
 
 using namespace std;
 
-void tess(diy::Master& master, bool single)
+typedef std::vector<RCLink> LinkVector;
+typedef std::vector<size_t> LastNeighbors;
+
+struct Aux
+{
+  LinkVector*       links;
+  LastNeighbors*    neighbors;
+  bool              first;
+};
+
+size_t tess(diy::Master& master)
 {
   double times[TESS_MAX_TIMES]; // timing
   quants_t quants; // quantity stats
-  tess(master, quants, times, single);
+  tess(master, quants, times);
 }
 
-void tess(diy::Master& master,
-          quants_t& quants,
-          double* times,
-	  bool single)
+size_t tess(diy::Master& master,
+            quants_t& quants,
+            double* times)
 {
 #ifdef TIMING
   // if (master.threads() != 1)
@@ -58,36 +67,44 @@ void tess(diy::Master& master,
   //           "it's not compatible with using multiple threads\n");
 #endif
 
-  // compute first stage tessellation
-  timing(times, DEL1_TIME, -1, master.communicator());
-  master.foreach(&delaunay1, times);
+  // save the original link for every block in master
+  LinkVector   original_links;
+  for (size_t i = 0; i < master.size(); ++i)
+  {
+    original_links.push_back(*dynamic_cast<RCLink*>(master.link(i)));
+    //fprintf(stderr, "Link of %d\n", master.gid(i));
+    //for (size_t j = 0; j < original_links.back().size(); ++j)
+    //  fprintf(stderr, "  %d\n", original_links.back().target(j).gid); 
+  }
+  
+  // array of the previous link sizes
+  LastNeighbors last_neighbors(master.size(), 0);
 
-  // exchange particles
-  timing(times, NEIGH1_TIME, DEL1_TIME, master.communicator());
-  master.exchange();
+  Aux aux;
+  aux.links = &original_links;
+  aux.neighbors = &last_neighbors;
+  aux.first = true;
 
-  //fprintf(stderr, "Done with exchange\n");
+  bool done = false;
+  size_t rounds = 0;
+  while(!done)
+  {
+    rounds++;
 
- if (!single)
- {
-  // compute second stage tessellation
-  timing(times, DEL2_TIME, NEIGH1_TIME, master.communicator());
-  master.foreach(&delaunay2);
+    master.foreach(&delaunay, &aux);
+    master.exchange();
 
-  // exchange particles
-  timing(times, NEIGH2_TIME, DEL2_TIME, master.communicator());
-  master.exchange();
- } else
- {
-  // record zero times
-  timing(times, DEL2_TIME, NEIGH1_TIME, master.communicator());
-  timing(times, NEIGH2_TIME, DEL2_TIME, master.communicator());
- }
+    aux.first = false;
+    done = master.proxy(master.loaded_block()).read<bool>();
+  }
 
-  // compute third stage tessellation
-  timing(times, DEL3_TIME, NEIGH2_TIME, master.communicator());
-  master.foreach(&delaunay3, &quants);
-  timing(times, -1, DEL3_TIME, master.communicator());
+  // this is not ideal, but need to do this to collect statistics and mark
+  // blocks as complete; TODO: this of how to get rid of this
+  master.foreach(&finalize, &quants);
+    
+  // TODO: possibly restore the original links
+
+  return rounds;
 }
 
 void tess_save(diy::Master& master, const char* outfile, const diy::MemoryBuffer& extra)
@@ -122,8 +139,6 @@ void tess_load(diy::Master& master, diy::Assigner& assigner, const char* infile,
 void* create_block()
 {
     dblock_t* b = new dblock_t;
-    b->sent_particles = new std::vector<int>;
-    b->convex_hull_particles = new std::vector< std::set<int> >;
     b->complete = 0;
     init_delaunay_data_structure(b);
     return b;
@@ -134,33 +149,15 @@ void destroy_block(void* b_)
   dblock_t* b = static_cast<dblock_t*>(b_);
 
   // particles and tets
-  if (b->particles) 	free(b->particles);
-  if (b->tets)		free(b->tets);
-  if (b->rem_gids)	free(b->rem_gids);
-  if (b->rem_lids)	free(b->rem_lids);
-  if (b->vert_to_tet)	free(b->vert_to_tet);
+  if (b->particles)     free(b->particles);
+  if (b->tets)          free(b->tets);
+  if (b->rem_gids)      free(b->rem_gids);
+  if (b->rem_lids)      free(b->rem_lids);
+  if (b->vert_to_tet)   free(b->vert_to_tet);
 
   // density
   if (b->density)
     delete[] b->density;   // allocated with new, freed with delete
-
-  // convex hull particles and sent particles
-  if (b->convex_hull_particles)
-  {
-      vector <int> *convex_hull_particles =
-          static_cast<vector <int>*>(b->convex_hull_particles);
-      convex_hull_particles->clear();
-      delete convex_hull_particles;
-  }
-  if (b->sent_particles)
-  {
-      vector <set <int> > *sent_particles =
-          static_cast<vector <set <int> >*>(b->sent_particles);
-      for (int i = 0; i < (int)sent_particles->size(); i++)
-          sent_particles[i].clear();
-      sent_particles->clear();
-      delete sent_particles;
-  }
 
   if (b->Dt)
       clean_delaunay_data_structure(b);
@@ -284,43 +281,43 @@ int gen_particles(dblock_t* b, float jitter)
     for (unsigned j = 0; j < sizes[1]; j++)
     {
       if (b->mins[1] > 0 && j == 0) // dedup block doundary points
-	continue;
+        continue;
       for (unsigned k = 0; k < sizes[2]; k++)
       {
-	if (b->mins[2] > 0 && k == 0) // dedup block doundary points
-	  continue;
+        if (b->mins[2] > 0 && k == 0) // dedup block doundary points
+          continue;
 
-	// start with particles on a grid
-	p[3 * n] = b->mins[0] + i;
-	p[3 * n + 1] = b->mins[1] + j;
-	p[3 * n + 2] = b->mins[2] + k;
+        // start with particles on a grid
+        p[3 * n] = b->mins[0] + i;
+        p[3 * n + 1] = b->mins[1] + j;
+        p[3 * n + 2] = b->mins[2] + k;
 
-	// and now jitter them
-	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-	if (p[3 * n] - jit >= b->mins[0] &&
-	    p[3 * n] - jit <= b->maxs[0])
-	  p[3 * n] -= jit;
-	else if (p[3 * n] + jit >= b->mins[0] &&
-		 p[3 * n] + jit <= b->maxs[0])
-	  p[3 * n] += jit;
+        // and now jitter them
+        jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
+        if (p[3 * n] - jit >= b->mins[0] &&
+            p[3 * n] - jit <= b->maxs[0])
+          p[3 * n] -= jit;
+        else if (p[3 * n] + jit >= b->mins[0] &&
+                 p[3 * n] + jit <= b->maxs[0])
+          p[3 * n] += jit;
 
-	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-	if (p[3 * n + 1] - jit >= b->mins[1] &&
-	    p[3 * n + 1] - jit <= b->maxs[1])
-	  p[3 * n + 1] -= jit;
-	else if (p[3 * n + 1] + jit >= b->mins[1] &&
-		 p[3 * n + 1] + jit <= b->maxs[1])
-	  p[3 * n + 1] += jit;
+        jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
+        if (p[3 * n + 1] - jit >= b->mins[1] &&
+            p[3 * n + 1] - jit <= b->maxs[1])
+          p[3 * n + 1] -= jit;
+        else if (p[3 * n + 1] + jit >= b->mins[1] &&
+                 p[3 * n + 1] + jit <= b->maxs[1])
+          p[3 * n + 1] += jit;
 
-	jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-	if (p[3 * n + 2] - jit >= b->mins[2] &&
-	    p[3 * n + 2] - jit <= b->maxs[2])
-	  p[3 * n + 2] -= jit;
-	else if (p[3 * n + 2] + jit >= b->mins[2] &&
-		 p[3 * n + 2] + jit <= b->maxs[2])
-	  p[3 * n + 2] += jit;
+        jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
+        if (p[3 * n + 2] - jit >= b->mins[2] &&
+            p[3 * n + 2] - jit <= b->maxs[2])
+          p[3 * n + 2] -= jit;
+        else if (p[3 * n + 2] + jit >= b->mins[2] &&
+                 p[3 * n + 2] + jit <= b->maxs[2])
+          p[3 * n + 2] += jit;
 
-	n++;
+        n++;
       }
     }
   }
@@ -329,118 +326,123 @@ int gen_particles(dblock_t* b, float jitter)
 
   return n;
 }
-//
-// foreach block functions, 3 delaunay stages
-//
-void delaunay1(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
+
+void delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void* aux_)
 {
-  dblock_t* b = (dblock_t*)b_;
-  double* times = (double*)misc_args;
+  dblock_t*         b     = (dblock_t*) b_;
 
-  // create local delaunay cells
-  //timing(times, LOC1_TIME, -1);
-  local_cells(b);
-  //timing(times, INC1_TIME, LOC1_TIME);
+  Aux* aux = static_cast<Aux*>(aux_);
 
-  // debug
-  //fprintf(stderr, "phase 1 gid %d num_tets %d num_particles %d \n",
-  //        b->gid, b->num_tets, b->num_particles);
+  int               lid           = cp.master()->lid(cp.gid());
+  const RCLink&     original_link = (*aux->links)[lid];
+  size_t&           last_neighbor = (*aux->neighbors)[lid];
+  bool              first         = aux->first;
 
-  // determine which cells are incomplete or too close to neighbor
-  incomplete_cells_initial(b, cp);
-  //timing(times, -1, INC1_TIME);
-  //fprintf(stderr, "[%d]: done with incomplete_initial\n", b->gid);
+  RCLink*           link          = dynamic_cast<RCLink*>(cp.link());
 
   // cleanup block
   reset_block(b);
+
+  // clear collectives
+  cp.collectives()->clear();
+  
+  LinkVector in_links;
+  if (!first)       // we don't receive on the first round
+  {
+    // dequeue links and work out the duplicates
+    for (size_t i = last_neighbor; i < link->size(); ++i)
+    {
+      diy::MemoryBuffer& in = cp.incoming(link->target(i).gid);
+
+      RCLink* l = dynamic_cast<RCLink*>(diy::LinkFactory::load(in));
+      in_links.push_back(*l);
+      delete l;
+    }
+    last_neighbor = link->size();       // update last_neighbor
+
+    // parse received particles
+    neighbor_particles(b, cp);
+
+    // update the links, taking care of duplicates
+    std::set<diy::BlockID> neighbor_blocks;
+    for (size_t i = 0; i < link->size(); ++i)
+      neighbor_blocks.insert(link->target(i));
+    size_t original_size_unique = link->size_unique();
+
+    // NB: this does not take care of the wrap properly
+    //     (in fact, even duplicate pruning is based on BlockID)
+    //     So this wouldn't work with wrap on (past a single round).
+    for (size_t i = 0; i < in_links.size(); ++i)
+      for (size_t j = 0; j < in_links[i].size(); ++j)
+      {
+        if (in_links[i].target(j).gid == cp.gid()) continue;        // skip self
+
+        bool inserted = neighbor_blocks.insert(in_links[i].target(j)).second;
+        if (!inserted) continue;
+
+        link->add_neighbor(in_links[i].target(j));
+        link->add_direction(in_links[i].direction(j));
+        link->add_bounds(in_links[i].bounds(j));
+      }
+    cp.master()->add_expected(link->size_unique() - original_size_unique);
+  }
+  //fprintf(stderr, "Links updated; last_neighbor = %lu\n", last_neighbor);
+
+  // compute (or update) the local tessellation
+  local_cells(b);
+  
+  // enqueue the original link to the new neighbors
+  for (size_t i = last_neighbor; i < link->size(); ++i)
+  {
+    diy::MemoryBuffer& out = cp.outgoing(link->target(i));
+    diy::LinkFactory::save(out, &original_link);
+  }
+
+  // enqueue points to neighbors
+  size_t num = incomplete_cells(b, cp, last_neighbor);
+  //fprintf(stderr, "Particles enqueued: %lu\n", num);
+  bool done = (num == 0);
+  cp.all_reduce(done, std::logical_and<bool>());
 }
 
-void delaunay2(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+void finalize(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
 {
   dblock_t* b = (dblock_t*)b_;
-
-  // parse received particles
-  neighbor_particles(b, cp);
-  //fprintf(stderr, "[%d]: parsed received particles\n", b->gid);
-
-  // recompute local cells
-  local_cells(b);
-
-  // debug
-  //fprintf(stderr, "phase 2 gid %d num_tets %d num_particles %d \n",
-	  //b->gid, b->num_tets, b->num_particles);
-
-  incomplete_cells_final(b, cp);
-  //fprintf(stderr, "[%d]: done with incomplete_final\n", b->gid);
-
-  // TODO, turn walls back on
-  // generate particles to create wall
-//   if (!wrap_neighbors && walls_on)
-//     for (int i = 0; i < nblocks; i++)
-//         wall_particles(&dblocks[i]);
-
-  // cleanup block
-  reset_block(b);
-}
-
-void delaunay3(void* b_, const diy::Master::ProxyWithLink& cp, void* misc_args)
-{
-  dblock_t* b = (dblock_t*)b_;
-  quants_t* quants = (quants_t*)misc_args;
-  static bool first_time = true;
-
-  // parse received particles
-  neighbor_particles(b_, cp);
-
-  // create all final cells
-  local_cells(b);
+  quants_t* quants = (quants_t*)aux;
 
   b->complete = 1;
 
   // collect quantities
-  if (first_time || b->num_orig_particles < quants->min_quants[NUM_ORIG_PTS])
+  if (b->num_orig_particles < quants->min_quants[NUM_ORIG_PTS])
     quants->min_quants[NUM_ORIG_PTS] = b->num_orig_particles;
-  if (first_time || b->num_orig_particles > quants->max_quants[NUM_ORIG_PTS])
+  if (b->num_orig_particles > quants->max_quants[NUM_ORIG_PTS])
     quants->max_quants[NUM_ORIG_PTS] = b->num_orig_particles;
 
-  if (first_time || b->num_particles < quants->min_quants[NUM_FINAL_PTS])
+  if (b->num_particles < quants->min_quants[NUM_FINAL_PTS])
     quants->min_quants[NUM_FINAL_PTS] = b->num_particles;
-  if (first_time || b->num_particles > quants->max_quants[NUM_FINAL_PTS])
+  if (b->num_particles > quants->max_quants[NUM_FINAL_PTS])
     quants->max_quants[NUM_FINAL_PTS] = b->num_particles;
 
-  if (first_time || b->num_tets < quants->min_quants[NUM_TETS])
+  if (b->num_tets < quants->min_quants[NUM_TETS])
     quants->min_quants[NUM_TETS] = b->num_tets;
-  if (first_time || b->num_tets > quants->max_quants[NUM_TETS])
+  if (b->num_tets > quants->max_quants[NUM_TETS])
     quants->max_quants[NUM_TETS] = b->num_tets;
-
-  first_time = false;
 
   // debug
 //   fprintf(stderr, "phase 3 gid %d num_tets %d num_particles %d \n",
 //           b->gid, b->num_tets, b->num_particles);
 }
-//
-// incomplete cells functions
-//
-void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp)
+
+size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp, size_t last_neighbor)
 {
   if (dblock->num_orig_particles == 0)
   {
-    fprintf(stderr, "In incomplete_cells_initial, number of particles: %d\n", dblock->num_orig_particles);
+    fprintf(stderr, "In incomplete_cells, number of particles: %d\n", dblock->num_orig_particles);
     assert(false);
   }
 
-  // particles on the convex hull of the local points and
-  // information about particles sent to neighbors
-  // sent_particles[particle][i] = ith neighbor (edge)
-  vector <int> *convex_hull_particles =
-    static_cast<vector <int>*>(dblock->convex_hull_particles);
-  vector <set <int> > *sent_particles =
-    static_cast<vector <set <int> >*>(dblock->sent_particles);
-
-  struct point_t rp; // particle being sent or received
-  sent_particles->resize(dblock->num_orig_particles);
   RCLink* l = dynamic_cast<RCLink*>(cp.link());
+  std::vector< std::set<int> > to_send(dblock->num_orig_particles);
 
   // identify and enqueue convex hull particles
   for (int p = 0; p < dblock->num_orig_particles; ++p)
@@ -454,27 +456,10 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
 
     // on convex hull = less than 4 neighbors
     if (dblock->num_tets == 0 ||
-    	!complete(p, dblock->tets, dblock->num_tets, dblock->vert_to_tet[p]))
+        !complete(p, dblock->tets, dblock->num_tets, dblock->vert_to_tet[p]))
     {
-      // add to list of convex hull particles
-      convex_hull_particles->push_back(p);
-
-      if (cp.master()->limit() == -1)
-      {
-	// incomplete cell goes to the closest neighbor
-	diy::Direction nearest_dir =
-	  nearest_neighbor(&(dblock->particles[3 * p]), dblock->mins, dblock->maxs);
-	// TODO: helper functions will be moved to standalone
-	if (l->direction(nearest_dir) != -1)
-	  (*sent_particles)[p].insert(l->direction(nearest_dir));
-      } else
-      {
-	// if not all blocks fit in memory, we'll do one phase, so send convex
-	// hull particles to everybody
-	for (unsigned i = 0; i < l->size(); ++i)
-	  if (l->target(i).gid != cp.gid())
-	    (*sent_particles)[p].insert(i);
-      }
+        for (int i = last_neighbor; i < l->size(); ++i)
+          to_send[p].insert(i);
     }
   }
 
@@ -488,30 +473,34 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
     float rad = distance(center, &dblock->particles[3 * p]);
 
     // find nearby blocks within radius of circumcenter
-    set<int> dests; // destination neighbor edges for this point
-    for (int i = 0; i < l->size(); ++i)
+    for (int i = last_neighbor; i < l->size(); ++i)
     {
       diy::ContinuousBounds neigh_bounds = l->bounds(i);
       diy::wrap_bounds(neigh_bounds, l->wrap() & l->direction(i), dblock->data_bounds, l->dimension());
 
       if (diy::distance(3, neigh_bounds, center) <= rad)
-	dests.insert(i);
-    }
+      {
+        // all 4 verts go these dests, if they are among the original particles
+        for (int v = 0; v < 4; v++)
+        {
+          int p = dblock->tets[t].verts[v];
+          if (p >= dblock->num_orig_particles)
+            continue;
 
-    // all 4 verts go these dests
-    for (int v = 0; v < 4; v++)
-    {
-      int p = dblock->tets[t].verts[v];
-      for (set<int>::iterator it = dests.begin(); it != dests.end(); it++)
-        (*sent_particles)[p].insert(*it);
+          to_send[p].insert(i);
+        }
+      }
     }
   }
 
   // enqueue the particles
+  size_t enqueued = 0;
+  point_t rp; // particle being sent
   for (int p = 0; p < dblock->num_orig_particles; p++)
   {
-    for (set<int>::iterator it = (*sent_particles)[p].begin(); it != (*sent_particles)[p].end();
-         it++)
+    for (set<int>::iterator it  = to_send[p].begin();
+                            it != to_send[p].end();
+                            it++)
     {
       rp.x   = dblock->particles[3 * p];
       rp.y   = dblock->particles[3 * p + 1];
@@ -520,111 +509,18 @@ void incomplete_cells_initial(struct dblock_t *dblock, const diy::Master::ProxyW
       rp.lid = p;
       wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
       cp.enqueue(l->target(*it), rp);
+      ++enqueued;
     }
   }
+
+  return enqueued;
 }
 
-void incomplete_cells_final(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp)
-{
-  // particles on the convex hull of the local points and
-  // information about particles sent to neighbors
-  // sent_particles[particle][i] = ith neighbor (edge)
-  vector <int> *convex_hull_particles =
-    static_cast<vector <int>*>(dblock->convex_hull_particles);
-  vector <set <int> > *sent_particles =
-    static_cast<vector <set <int> >*>(dblock->sent_particles);
-
-  struct point_t rp; // particle being sent or received
-  RCLink* l = dynamic_cast<RCLink*>(cp.link());
-
-  // for all convex hull particles
-  for (int j = 0; j < (int)convex_hull_particles->size(); ++j)
-  {
-    set<int> new_dests; // new destination neighbor edges for sending this point
-    int p = (*convex_hull_particles)[j];
-
-    if (dblock->vert_to_tet[p] == -1)
-    {
-      fprintf(stderr, "Particle %d is not in the triangulation. "
-	      "Perhaps it's a duplicate? Aborting.\n", p);
-      assert(false);
-    }
-
-    std::vector<int> nbrs;
-    bool complete = neighbor_tets(nbrs, p, dblock->tets,
-                                  dblock->num_tets,
-    				  dblock->vert_to_tet[p]);
-
-    if (!complete)
-    {
-      // local point still on the convex hull goes to everybody it hasn't gone to yet
-      for (int n = 0; n < l->size(); n++) // all neighbors
-      {
-      	if ((*sent_particles)[p].find(n) == (*sent_particles)[p].end())
-          new_dests.insert(n);
-      }
-    } // !complete
-
-    else // complete
-    {
-      // point not on convex hull anymore goes to all neighbbors neear enough provided it hasn't
-      // gone to them already
-      for (int j = 0; j < (int)nbrs.size(); ++j)
-      {
-    	int t = nbrs[j];
-    	float center[3];
-    	circumcenter(center, &dblock->tets[t], dblock->particles);
-
-    	// radius is distance from circumcenter to any tet vertex
-    	int p0 = dblock->tets[t].verts[0];
-    	float rad = distance(center, &dblock->particles[3 * p0]);
-
-        // find nearby blocks within radius of circumcenter
-        set<int> near_candts; // candidate destination neighbor edges for this point
-	for (int i = 0; i < l->size(); ++i)
-	{
-	  diy::ContinuousBounds neigh_bounds = l->bounds(i);
-	  diy::wrap_bounds(neigh_bounds, l->wrap() & l->direction(i), dblock->data_bounds, l->dimension());
-
-	  if (diy::distance(3, neigh_bounds, center) <= rad)
-	    near_candts.insert(i);
-	}
-
-    	// remove the nearby neighbors we've already sent to
-        for (set<int>::iterator it = near_candts.begin(); it != near_candts.end(); it++)
-        {
-    	  if ((*sent_particles)[p].find(*it) == (*sent_particles)[p].end())
-    	    new_dests.insert(*it);
-    	}
-      } // nbrs
-    } // complete
-
-    // enquue the particle to the new destinations
-    if (new_dests.size())
-    {
-      for (set<int>::iterator it = new_dests.begin(); it != new_dests.end(); it++)
-      {
-        rp.x   = dblock->particles[3 * p];
-        rp.y   = dblock->particles[3 * p + 1];
-        rp.z   = dblock->particles[3 * p + 2];
-        if (p >= dblock->num_orig_particles)
-          fprintf(stderr, "Warning: p %d is not one of the original particles of block gid %d.\n"
-                  "Not sure whther this is a sign of trouble, but in any case its remote gid "
-                  "will not be assigned correctly\n", p, dblock->gid);
-        rp.gid = dblock->gid;
-        rp.lid = p;
-        wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
-        cp.enqueue(cp.link()->target(*it), rp);
-      }
-    }
-  } // for convex hull particles
-}
 //
 // parse received particles
 //
-void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
+void neighbor_particles(dblock_t* b, const diy::Master::ProxyWithLink& cp)
 {
-  dblock_t*  b = (dblock_t*)b_;
   diy::Link* l = cp.link();
   std::vector<int> in; // gids of sources
   cp.incoming(in);
@@ -632,7 +528,10 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
   // count total number of incoming points
   int numpts = 0;
   for (int i = 0; i < (int)in.size(); i++)
-    numpts += cp.incoming(in[i]).buffer.size() / sizeof(point_t);
+  {
+    diy::MemoryBuffer& in_queue = cp.incoming(in[i]);
+    numpts += (in_queue.size() - in_queue.position) / sizeof(point_t);
+  }
 
   // grow space for remote particles
   int n = (b->num_particles - b->num_orig_particles);
@@ -646,10 +545,11 @@ void neighbor_particles(void* b_, const diy::Master::ProxyWithLink& cp)
   // copy received particles
   for (int i = 0; i < (int)in.size(); i++)
   {
-    numpts = cp.incoming(in[i]).buffer.size() / sizeof(point_t);
+    diy::MemoryBuffer& in_queue = cp.incoming(in[i]);
+    numpts = (in_queue.size() - in_queue.position) / sizeof(point_t);
     vector<point_t> pts;
     pts.resize(numpts);
-    cp.dequeue(in[i], &pts[0], numpts);
+    diy::load(in_queue, &pts[0], numpts);
 
     for (int j = 0; j < numpts; j++)
     {
@@ -749,27 +649,27 @@ void tess_stats(diy::Master& master,
     fprintf(stderr, "----------------- global stats ------------------\n");
     fprintf(stderr, "particle exchange time        = %.3lf s\n", times[EXCH_TIME]);
     fprintf(stderr, "first delaunay time           = %.3lf s\n",
-	    times[DEL1_TIME]);
+            times[DEL1_TIME]);
     fprintf(stderr, "  (%.3lf s local cell + %.3lf s incomplete cell)\n",
             times[LOC1_TIME], times[INC1_TIME]);
     fprintf(stderr, "first particle exchange time  = %.3lf s\n",
-	    times[NEIGH1_TIME]);
+            times[NEIGH1_TIME]);
     fprintf(stderr, "second delaunay time          = %.3lf s\n",
-	    times[DEL2_TIME]);
+            times[DEL2_TIME]);
     fprintf(stderr, "second particle exchange time = %.3lf s\n",
-	    times[NEIGH2_TIME]);
+            times[NEIGH2_TIME]);
     fprintf(stderr, "third delaunay time           = %.3lf s\n",
-	    times[DEL3_TIME]);
+            times[DEL3_TIME]);
     fprintf(stderr, "output time                   = %.3lf s\n",
-	    times[OUT_TIME]);
+            times[OUT_TIME]);
     fprintf(stderr, "total time                    = %.3lf s\n",
-	    times[TOT_TIME]);
+            times[TOT_TIME]);
     fprintf(stderr, "All times printed in one row:\n");
     fprintf(stderr, "%.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf %.3lf\n",
-	    times[EXCH_TIME],
-	    times[DEL1_TIME], times[NEIGH1_TIME],
-	    times[DEL2_TIME], times[NEIGH2_TIME],
-	    times[DEL3_TIME], times[OUT_TIME], times[TOT_TIME]);
+            times[EXCH_TIME],
+            times[DEL1_TIME], times[NEIGH1_TIME],
+            times[DEL2_TIME], times[NEIGH2_TIME],
+            times[DEL3_TIME], times[OUT_TIME], times[TOT_TIME]);
     fprintf(stderr, "-------------------------------------------------\n");
     fprintf(stderr, "original particles = [%d, %d]\n", global_min_quants[NUM_ORIG_PTS],
             global_max_quants[NUM_ORIG_PTS]);
@@ -800,7 +700,7 @@ void fill_vert_to_tet(dblock_t* dblock)
       int p = dblock->tets[t].verts[v];
       //if (p >= dblock->num_particles || p < 0)
       //  fprintf(stderr, "Warning: %d is out of bounds!\n", p);
-      dblock->vert_to_tet[p] = t;	// the last one wins
+      dblock->vert_to_tet[p] = t;       // the last one wins
     }
   }
 }
@@ -863,10 +763,10 @@ void get_mem(int breakpoint, MPI_Comm comm)
   double heap_mem = double(heapmax) / to_mb;
   double max_heap_mem;
   MPI_Reduce(&heap_mem, &max_heap_mem, 1, MPI_DOUBLE, MPI_MAX, 0,
-	     comm);
+             comm);
   if (rank == 0)
     fprintf(stderr, "%d: BGQ max memory = %.0lf MB\n",
-	    breakpoint, max_heap_mem);
+            breakpoint, max_heap_mem);
 
 #else // !BGQ
 
@@ -920,10 +820,10 @@ void get_mem(int breakpoint, MPI_Comm comm)
 //     and output
 //
 void tess_init(int num_blocks, int *gids,
-	       struct bb_t *bounds, struct gb_t **neighbors,
-	       int *num_neighbors, float *global_mins, float *global_maxs,
-	       int wrap, int twalls_on, float minvol, float maxvol,
-	       MPI_Comm mpi_comm, double *all_times) {
+               struct bb_t *bounds, struct gb_t **neighbors,
+               int *num_neighbors, float *global_mins, float *global_maxs,
+               int wrap, int twalls_on, float minvol, float maxvol,
+               MPI_Comm mpi_comm, double *all_times) {
 
   int i;
 
@@ -949,7 +849,7 @@ void tess_init(int num_blocks, int *gids,
   // init DIY
   DIY_Init(3, 1, comm);
   DIY_Decomposed(num_blocks, gids, bounds, NULL, NULL, NULL, NULL, neighbors,
-		 num_neighbors, wrap);
+                 num_neighbors, wrap);
 
 }
 // ------------------------------------------------------------------------
@@ -967,9 +867,9 @@ void tess_init(int num_blocks, int *gids,
 //   all_times: times for particle exchange, voronoi cells,
 //    convex hulls, and output
 void tess_init_diy_exist(int num_blocks, float *global_mins,
-			 float *global_maxs, int wrap, int twalls_on,
-			 float minvol, float maxvol, MPI_Comm mpi_comm,
-			 double *all_times) {
+                         float *global_maxs, int wrap, int twalls_on,
+                         float minvol, float maxvol, MPI_Comm mpi_comm,
+                         double *all_times) {
 
   int i;
 
@@ -1036,12 +936,12 @@ void tess(int nblocks, float **particles, int *num_particles, char *out_file) {
 //   returns: array of local delaunay blocks
 //
 struct dblock_t *tess_test_diy_exist(int nblocks, int *data_size, float jitter,
-				     float minvol, float maxvol, int wrap,
-				     int twalls_on, double *times,
-				     MPI_Comm mpi_comm) {
+                                     float minvol, float maxvol, int wrap,
+                                     int twalls_on, double *times,
+                                     MPI_Comm mpi_comm) {
 
   float **particles; // particles[block_num][particle]
-		     // where each particle is 3 values, px, py, pz
+                     // where each particle is 3 values, px, py, pz
   int *num_particles; // number of particles in each block
   struct dblock_t *ret_blocks; // returned delaunay blocks
 
@@ -1117,19 +1017,19 @@ void wall_particles(struct dblock_t *dblock)
       // for all faces in a voronoi cell
       for (int i = 0; i < (int)nbrs.size(); ++i)
       {
-	// get edge link
-	std::vector<int> edge_link;
-	fill_edge_link(edge_link, p, nbrs[i].first, nbrs[i].second, dblock->tets);
+        // get edge link
+        std::vector<int> edge_link;
+        fill_edge_link(edge_link, p, nbrs[i].first, nbrs[i].second, dblock->tets);
 
-	// following is equivalent of all vertices in a face
-	for (int j = 0; j < (int)edge_link.size(); ++j)
+        // following is equivalent of all vertices in a face
+        for (int j = 0; j < (int)edge_link.size(); ++j)
         {
-	  float pt[3];
-	  circumcenter(pt,&(dblock->tets[edge_link[j]]), dblock->particles);
-	  for (int wi = 0; wi < num_walls; ++wi)
-	    if (!wall_cut[wi])
-	      wall_cut[wi] = test_outside(pt,&walls[wi]);
-	}
+          float pt[3];
+          circumcenter(pt,&(dblock->tets[edge_link[j]]), dblock->particles);
+          for (int wi = 0; wi < num_walls; ++wi)
+            if (!wall_cut[wi])
+              wall_cut[wi] = test_outside(pt,&walls[wi]);
+        }
       }
     }
 
@@ -1224,7 +1124,7 @@ void sample_particles(float *particles, int &num_particles, int sample_rate) {
 void print_block(struct dblock_t *dblock, int gid) {
 
   fprintf(stderr, "block gid = %d has %d tets:\n",
-	  gid, dblock->num_tets);
+          gid, dblock->num_tets);
   for (int i = 0; i < dblock->num_tets; i++) {
     int sort_verts[4], sort_tets[4]; // sorted verts and tets
     for (int j = 0; j < 4; j++) {
@@ -1234,8 +1134,8 @@ void print_block(struct dblock_t *dblock, int gid) {
     qsort(sort_verts, 4, sizeof(int), &compare);
     qsort(sort_tets, 4, sizeof(int), &compare);
     fprintf(stderr, "tet %d verts [%d %d %d %d] neigh_tets [%d %d %d %d]\n",
-	    i, sort_verts[0], sort_verts[1], sort_verts[2], sort_verts[3],
-	    sort_tets[0], sort_tets[1], sort_tets[2], sort_tets[3]);
+            i, sort_verts[0], sort_verts[1], sort_verts[2], sort_verts[3],
+            sort_tets[0], sort_tets[1], sort_tets[2], sort_tets[3]);
   }
 
 }
@@ -1253,8 +1153,8 @@ void print_particles(float *particles, int num_particles, int gid) {
 
   for (n = 0; n < num_particles; n++)
     fprintf(stderr, "block = %d particle[%d] = [%.1lf %.1lf %.1lf]\n",
-	    gid, n, particles[3 * n], particles[3 * n + 1],
-	    particles[3 * n + 2]);
+            gid, n, particles[3 * n], particles[3 * n + 1],
+            particles[3 * n + 2]);
 
 }
 // --------------------------------------------------------------------------
@@ -1282,7 +1182,7 @@ int compare(const void *a, const void *b) {
 //  outfile: output file name
 //
 void write_particles(int nblocks, float **particles, int *num_particles,
-		     char *outfile) {
+                     char *outfile) {
 
   int i;
   float *all_particles; // particles from all local blocks merged
@@ -1299,7 +1199,7 @@ void write_particles(int nblocks, float **particles, int *num_particles,
   int n = 0;
   for (i = 0; i < nblocks; i++) {
     memcpy(&all_particles[n], &particles[i][0],
-	   num_particles[i] * 3 * sizeof(float));
+           num_particles[i] * 3 * sizeof(float));
     n += num_particles[i] * 3;
   }
 
@@ -1315,14 +1215,14 @@ void write_particles(int nblocks, float **particles, int *num_particles,
 
   // open
   int retval = MPI_File_open(comm, (char *)outfile,
-			     MPI_MODE_WRONLY | MPI_MODE_CREATE,
-			     MPI_INFO_NULL, &fd);
+                             MPI_MODE_WRONLY | MPI_MODE_CREATE,
+                             MPI_INFO_NULL, &fd);
   assert(retval == MPI_SUCCESS);
   MPI_File_set_size(fd, 0); // start with an empty file every time
 
   // write
   retval = MPI_File_write_at_all(fd, ofst, all_particles, tot_particles * 3,
-				 MPI_FLOAT, &status);
+                                 MPI_FLOAT, &status);
   if (retval != MPI_SUCCESS)
     handle_error(retval, comm, (char *)"MPI_File_write_at_all");
 
@@ -1448,8 +1348,8 @@ void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall) {
 
   // signed distance from wall to site point
   float D = (pt[0]*wall->a + pt[1]*wall->b + pt[2]* wall->c +
-	     wall->d)/sqrt(wall->a*wall->a + wall->b*wall->b +
-			   wall->c*wall->c);
+             wall->d)/sqrt(wall->a*wall->a + wall->b*wall->b +
+                           wall->c*wall->c);
 
   rpt[0] = pt[0] - 2*D*wall->a;
   rpt[1] = pt[1] - 2*D*wall->b;
@@ -1461,9 +1361,9 @@ void generate_mirror(float *rpt, const float *pt, const struct wall_t *wall) {
 //  Adds mirror particles to list
 //
 void add_mirror_particles(int nblocks, float **mirror_particles,
-			  int *num_mirror_particles, float **particles,
-			  int *num_particles, int *num_orig_particles,
-			  int **gids, int **nids, unsigned char **dirs) {
+                          int *num_mirror_particles, float **particles,
+                          int *num_particles, int *num_orig_particles,
+                          int **gids, int **nids, unsigned char **dirs) {
 
   int i,j;
 
@@ -1480,9 +1380,9 @@ void add_mirror_particles(int nblocks, float **mirror_particles,
 
       // grow space
       particles[i] =
-	(float *)realloc(particles[i],
-			 (num_particles[i] + num_mirror_particles[i]) *
-			 3 * sizeof(float));
+        (float *)realloc(particles[i],
+                         (num_particles[i] + num_mirror_particles[i]) *
+                         3 * sizeof(float));
 
       // copy mirror particles
       for (j = 0; j < num_mirror_particles[i]; j++) {

@@ -320,7 +320,6 @@ int main(int argc, char *argv[])
         >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
         >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
         ;
-    bool single = ops >> Present('1', "single", "use single-phase version of the algorithm");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
 
     if ( ops >> Present('h', "help", "show help") ||
@@ -337,20 +336,12 @@ int main(int argc, char *argv[])
     // debug
     // if (rank == 0)
     //     fprintf(stderr, "infile %s outfile %s minv %.1f maxv %.1f "
-    //             "th %d mb %d opts %d %d tb %d\n",
+    //             "th %d mb %d opts %d tb %d\n",
     //             infile.c_str(), outfile.c_str(), minvol, maxvol,
-    //             num_threads, mem_blocks, single, kdtree, tot_blocks);
+    //             num_threads, mem_blocks, kdtree, tot_blocks);
 
     if (kdtree)
     {
-        if (!single)
-        {
-            if (rank == 0)
-                fprintf(stderr, "kdtree can only be used with a single-phase version "
-                        "of the algorithm\n");
-            return 1;
-        }
-
         if (mem_blocks != -1)
         {
             if (rank == 0)
@@ -428,7 +419,7 @@ int main(int argc, char *argv[])
     // debug
     // master.foreach(&debug);
 
-    tess(master, quants, times, single);
+    tess(master, quants, times);
 
     tess_save(master, "del.out", times);
 
