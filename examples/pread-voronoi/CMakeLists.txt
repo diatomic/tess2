@@ -11,62 +11,33 @@ if			    (gadget)
 endif			    (gadget)
 
 # HDF5 is always required
-find_package              (HDF5 QUIET)
+find_package              (HDF5)
 
-if                        (HDF5_FOUND)
+include_directories     (SYSTEM ${HDF5_INCLUDE_DIR})
 
-  include_directories     (SYSTEM ${HDF5_INCLUDE_DIR})
+add_library		    (hdf5 STATIC IMPORTED)
+set_target_properties   (hdf5 PROPERTIES IMPORTED_LOCATION ${HDF5_hdf5_LIBRARY})
 
-  add_library		    (hdf5 STATIC IMPORTED)
-  set_target_properties   (hdf5 PROPERTIES IMPORTED_LOCATION ${HDF5_hdf5_LIBRARY})
-  set			    (HDF5_libraries     hdf5)
+set			    (HDF5_libraries     hdf5)
 
-  set			    (io_sources ${io_sources} io/hdf5/pread-hdf5.cpp)
+# pread-voronoi
+set			    (io_sources ${io_sources} io/hdf5/pread-hdf5.cpp)
 
-  add_executable          (pread-voronoi pread-voronoi.cpp ${io_sources})
-  target_link_libraries   (pread-voronoi tess ${libraries} ${HDF5_libraries})
-  if			    (gadget)
-    target_link_libraries (pread-voronoi ${Boost_FILESYSTEM_LIBRARY})
-  endif		    (gadget)
+add_executable          (pread-voronoi pread-voronoi.cpp ${io_sources})
+target_link_libraries   (pread-voronoi tess ${libraries} ${HDF5_libraries})
+if			    (gadget)
+  target_link_libraries (pread-voronoi ${Boost_FILESYSTEM_LIBRARY})
+endif		    (gadget)
 
-  install                 (TARGETS pread-voronoi
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
-    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
-    GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
+install                 (TARGETS pread-voronoi
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
+  PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+  GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
 
-  install                 (FILES PREAD_VORONOI unit-cube.h5
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
-    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
-    GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
-
-else			    (HDF5_FOUND)
-
-  find_path               (HDF5_INCLUDE_DIR   hdf5.h)
-  find_library            (HDF5_LIBRARY NAMES     hdf5)
-  include_directories     (SYSTEM ${HDF5_INCLUDE_DIR})
-  message                 ("HDF5_INCLUDE_DIR=${HDF5_INCLUDE_DIR} HDF5_LIBRARY=${HDF5_LIBRARY}")
-  if                      (HDF5_LIBRARY)
-    find_package          (ZLIB REQUIRED)
-    include_directories   (SYSTEM ${ZLIB_INCLUDE_DIRS})
-    set		    (HDF5_libraries ${HDF5_LIBRARY} ${ZLIB_LIBRARIES})
-
-    set		    (io_sources ${io_sources} io/hdf5/pread-hdf5.cpp)
-
-    add_executable        (pread-voronoi pread-voronoi.cpp ${io_sources})
-    target_link_libraries (pread-voronoi tess ${libraries} ${HDF5_libraries})
-
-    install               (TARGETS pread-voronoi
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
-      GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
-
-    install               (FILES PREAD_VORONOI unit-cube.h5
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
-      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
-      GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
-
-  endif                   (HDF5_LIBRARY)
-endif			  (HDF5_FOUND)
+install                 (FILES PREAD_VORONOI unit-cube.h5
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/
+  PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_WRITE
+  GROUP_EXECUTE WORLD_READ WORLD_WRITE WORLD_EXECUTE)
 
 # bov
 add_executable        (pread-bov pread-bov.cpp)
