@@ -414,23 +414,27 @@ void finalize(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
   dblock_t* b = (dblock_t*)b_;
   quants_t* quants = (quants_t*)aux;
 
+  static bool first = true;
+
   b->complete = 1;
 
   // collect quantities
-  if (b->num_orig_particles < quants->min_quants[NUM_ORIG_PTS])
+  if (first || b->num_orig_particles < quants->min_quants[NUM_ORIG_PTS])
     quants->min_quants[NUM_ORIG_PTS] = b->num_orig_particles;
-  if (b->num_orig_particles > quants->max_quants[NUM_ORIG_PTS])
+  if (first || b->num_orig_particles > quants->max_quants[NUM_ORIG_PTS])
     quants->max_quants[NUM_ORIG_PTS] = b->num_orig_particles;
 
-  if (b->num_particles < quants->min_quants[NUM_FINAL_PTS])
+  if (first || b->num_particles < quants->min_quants[NUM_FINAL_PTS])
     quants->min_quants[NUM_FINAL_PTS] = b->num_particles;
-  if (b->num_particles > quants->max_quants[NUM_FINAL_PTS])
+  if (first || b->num_particles > quants->max_quants[NUM_FINAL_PTS])
     quants->max_quants[NUM_FINAL_PTS] = b->num_particles;
 
-  if (b->num_tets < quants->min_quants[NUM_TETS])
+  if (first || b->num_tets < quants->min_quants[NUM_TETS])
     quants->min_quants[NUM_TETS] = b->num_tets;
-  if (b->num_tets > quants->max_quants[NUM_TETS])
+  if (first || b->num_tets > quants->max_quants[NUM_TETS])
     quants->max_quants[NUM_TETS] = b->num_tets;
+
+  first = false;
 
   // debug
 //   fprintf(stderr, "phase 3 gid %d num_tets %d num_particles %d \n",
