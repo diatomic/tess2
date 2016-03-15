@@ -50,7 +50,7 @@ outfile="del.out"
 #outfile="!"
 
 # options: kd-tree
-# possibilities are --wrap --kdtree --minvol <minvol> --maxvol <maxvol> --blocks <totblocks>
+# possibilities are --wrap --kdtree --blocks <totblocks>
 opts="--blocks 4"
 #opts="--kdtree --blocks 4"
 
@@ -71,6 +71,8 @@ if [ "$ARCH" = "MAC_OSX" ]; then
 mpiexec -l -n $num_procs $exe $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs xterm -e gdb -x gdb.run --args $exe $args
+
+#dsymutil $exe ; mpiexec -l -n $num_procs xterm -e lldb -s lldb.run $exe -- $args
 
 #dsymutil $exe ; mpiexec -l -n $num_procs valgrind -q $exe $args
 

@@ -289,6 +289,7 @@ int main(int argc, char *argv[])
     int num_threads;                    // number of threads diy can use
     int mem_blocks;                     // number of blocks to keep in memory
     string infile;                      // input file name
+    string outfile;                     // output file name
     int rank, size;                     // MPI usual
     double times[TESS_MAX_TIMES];       // timing
     quants_t quants;                    // quantity stats
@@ -323,11 +324,11 @@ int main(int argc, char *argv[])
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
 
     if ( ops >> Present('h', "help", "show help") ||
-         !(ops >> PosOption(infile)) )
+         !(ops >> PosOption(infile)) || !(ops >> PosOption(outfile)) )
     {
         if (rank == 0)
         {
-            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile minvol bf sr\n", argv[0]);
+            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile\n", argv[0]);
             std::cout << ops;
         }
         return 1;
@@ -335,10 +336,8 @@ int main(int argc, char *argv[])
 
     // debug
     // if (rank == 0)
-    //     fprintf(stderr, "infile %s outfile %s minv %.1f maxv %.1f "
-    //             "th %d mb %d opts %d tb %d\n",
-    //             infile.c_str(), outfile.c_str(), minvol, maxvol,
-    //             num_threads, mem_blocks, kdtree, tot_blocks);
+    //     fprintf(stderr, "infile %s outfile %s th %d mb %d opts %d tb %d\n",
+    //             infile.c_str(), outfile.c_str(), num_threads, mem_blocks, kdtree, tot_blocks);
 
     if (kdtree)
     {
@@ -421,7 +420,7 @@ int main(int argc, char *argv[])
 
     tess(master, quants, times);
 
-    tess_save(master, "del.out", times);
+    tess_save(master, outfile.c_str(), times);
 
     timing(times, -1, TOT_TIME, world);
     tess_stats(master, quants, times);

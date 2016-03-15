@@ -54,7 +54,7 @@ size_t tess(diy::Master& master)
 {
   double times[TESS_MAX_TIMES]; // timing
   quants_t quants; // quantity stats
-  tess(master, quants, times);
+  return tess(master, quants, times);
 }
 
 size_t tess(diy::Master& master,
@@ -401,8 +401,8 @@ void delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void* aux_)
   // enqueue points to neighbors
   size_t num = incomplete_cells(b, cp, last_neighbor);
   //fprintf(stderr, "Particles enqueued: %lu\n", num);
-  bool done = (num == 0);
-  cp.all_reduce(done, std::logical_and<bool>());
+  int done = (num == 0);
+  cp.all_reduce(done, std::logical_and<int>());
 }
 
 void finalize(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
