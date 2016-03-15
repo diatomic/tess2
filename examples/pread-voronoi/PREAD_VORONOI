@@ -12,6 +12,6 @@ coords="x y z"
 mins="0 0 0"
 maxs="1. 1. 1."
 
-opts="--single --kdtree"
+opts="--kdtree"
 
 mpiexec -n $procs ./pread-voronoi $opts $infile $outfile $coords $mins $maxs 0 0 0 0

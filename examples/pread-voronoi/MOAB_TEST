@@ -49,10 +49,10 @@ infile="/Users/tpeterka/software/cian/data/64bricks_12ktet_1proc.h5m"
 outfile="del.out"
 #outfile="!"
 
-# options: single-phase and kd-tree
-# possibilities are --wrap --single --kdtree --minvol <minvol> --maxvol <maxvol> --blocks <totblocks>
-opts="--single --blocks 4"
-#opts="--single --kdtree --blocks 4"
+# options: kd-tree
+# possibilities are --wrap --kdtree --minvol <minvol> --maxvol <maxvol> --blocks <totblocks>
+opts="--blocks 4"
+#opts="--kdtree --blocks 4"
 
 #------
 #

@@ -129,7 +129,6 @@ int main(int argc, char *argv[])
         >> Option(     "maxvol",    maxvol,       "minvol cutoff")
         ;
     wrap_ = ops >> Present('w', "wrap", "Use periodic boundary conditions");
-    bool single = ops >> Present('1', "single", "use single-phase version of the algorithm");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
 
     coordinates.resize(3);
@@ -151,13 +150,6 @@ int main(int argc, char *argv[])
 
     if (kdtree)
     {
-        if (!single)
-        {
-            if (rank == 0)
-                std::cout << "kdtree can only be used with a single-phase version of the algorithm\n";
-            return 1;
-        }
-
         if (mem_blocks != -1)
         {
             if (rank == 0)
@@ -214,7 +206,11 @@ int main(int argc, char *argv[])
     // debug purposes only: checks if the particles got into the right blocks
     // master.foreach(&verify_particles);
 
-    tess(master, quants, times, single);
+    size_t rounds = tess(master, quants, times);
+    fprintf(stderr, "Done in %lu rounds\n", rounds);
+
+    if (rounds > 2 && wrap_)
+      fprintf(stderr, "Warning: took more than 2 rounds with wrap on, result is likely incorrect!\n");
 
     tess_save(master, outfile.c_str(), times);
 

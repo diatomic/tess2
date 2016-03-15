@@ -59,12 +59,6 @@ struct dblock_t {
   int* rem_lids;	     /* "local ids" of the remote particles */
   int* vert_to_tet;          /* a tet that contains the vertex */
 
-  /* sent particles and convex hull particles
-     these persist between phases of the algorithm but ar not saved in the final output
-     using void* for each so that C files tess-qhull.c and io.c can see them */
-  void* convex_hull_particles;
-  void* sent_particles;
-
   /* estimated density field */
   float* density;            /* density field */
   int num_grid_pts;          /* total number of density grid points */

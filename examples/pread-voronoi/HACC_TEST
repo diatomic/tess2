@@ -55,10 +55,10 @@ outfile="del.out"
 # sample rate (1 = keep every particle, 10 = keep every 10th particle)
 sr=1
 
-# options: single-phase and kd-tree
-# possibilities are --wrap --single --kdtree --minvol <minvol> --maxvol <maxvol> --blocks <totblocks>
-# opts="--single --blocks 64"
-opts="--single --kdtree --blocks 64"
+# options: kd-tree
+# possibilities are --wrap --kdtree --minvol <minvol> --maxvol <maxvol> --blocks <totblocks>
+# opts="--blocks 64"
+opts="--kdtree --blocks 64"
 
 #------
 #
