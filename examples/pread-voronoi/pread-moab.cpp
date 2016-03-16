@@ -321,7 +321,9 @@ int main(int argc, char *argv[])
         >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
         >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
         ;
+    bool wrap_  = ops >> Present('w', "wrap", "Use periodic boundary conditions");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
+    bool debug  = ops >> Present('d', "debug", "print debugging info");
 
     if ( ops >> Present('h', "help", "show help") ||
          !(ops >> PosOption(infile)) || !(ops >> PosOption(outfile)) )
@@ -366,6 +368,10 @@ int main(int argc, char *argv[])
 
     // decomposing with an uninitialized domain in order to add blocks and links to the master
     // will decompose later with proper domain and block bounds after points have been read
+    diy::RegularDecomposer<Bounds>::BoolVector          wrap;
+    diy::RegularDecomposer<Bounds>::BoolVector          share_face;
+    if (wrap_)
+        wrap.assign(3, true);
     AddBlock                  create(master);
     diy::decompose(3, rank, domain, assigner, create);
 
@@ -376,9 +382,9 @@ int main(int argc, char *argv[])
     master.foreach(&read_vertices, &aux);
 
     // debug: write points
-    // string outfile("debug.bov");
-    // aux.filename   = &outfile;
-    // master.foreach(&write_vertices, &aux);
+    string debugfile("debug.bov");
+    aux.filename   = &debugfile;
+    master.foreach(&write_vertices, &aux);
 
     // reduce global domain bounds
     diy::all_to_all(master, assigner, &minmax);
@@ -399,11 +405,11 @@ int main(int argc, char *argv[])
 
     // decompose
     UpdateBlock update(master);
-    diy::decompose(3, rank, domain, assigner, master, update);
+    diy::decompose(3, rank, domain, assigner, master, update, share_face, wrap);
 
     // sort and distribute particles to all blocks
     if (kdtree)
-        tess_kdtree_exchange(master, assigner, times);
+        tess_kdtree_exchange(master, assigner, times, wrap_);
     else
         tess_exchange(master, assigner, times);
     if (rank == 0)
@@ -413,12 +419,17 @@ int main(int argc, char *argv[])
     master.foreach(&deduplicate, &count);
 
     // debug purposes only: checks if the particles got into the right blocks
-    master.foreach(&verify_particles);
+    // master.foreach(&verify_particles);
 
     // debug
     // master.foreach(&debug);
 
-    tess(master, quants, times);
+    size_t rounds = tess(master, quants, times);
+    if (rank == 0)
+      fprintf(stderr, "Done in %lu rounds\n", rounds);
+
+    if (rounds > 2 && wrap_ && rank == 0)
+      fprintf(stderr, "Warning: took more than 2 rounds with wrap on, result is likely incorrect!\n");
 
     tess_save(master, outfile.c_str(), times);
 
