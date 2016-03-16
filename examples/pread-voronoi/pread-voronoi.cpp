@@ -156,6 +156,9 @@ int main(int argc, char *argv[])
                 std::cout << "kdtree doesn't yet support the out-of-core mode\n";
             return 1;
         }
+	
+	if (wrap_ && tot_blocks < 64 && rank == 0)
+	    fprintf(stderr, "Warning: using k-d tree with wrap on and fewer than 64 blocks is likely to fail\n");
     }
 
     if (outfile == "!")
@@ -209,9 +212,6 @@ int main(int argc, char *argv[])
     size_t rounds = tess(master, quants, times);
     if (rank == 0)
       fprintf(stderr, "Done in %lu rounds\n", rounds);
-
-    if (rounds > 2 && wrap_ && rank == 0)
-      fprintf(stderr, "Warning: took more than 2 rounds with wrap on, result is likely incorrect!\n");
 
     tess_save(master, outfile.c_str(), times);
 

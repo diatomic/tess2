@@ -95,7 +95,7 @@ void enumerate_cells(void* b_, const diy::Master::ProxyWithLink& cp, void*)
       if (!finite)
 	++infinite;
     }
-    fprintf(stderr, "[%d] %lu infinite Voronoi cells\n", cp.gid(), infinite);
+    //fprintf(stderr, "[%d] %lu infinite Voronoi cells\n", cp.gid(), infinite);
 
     cp.all_reduce(infinite, std::plus<size_t>());
 }

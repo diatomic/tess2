@@ -61,7 +61,7 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
     size_t from = lid * npoints / size * 3;
     size_t to   = lid == size - 1 ? (values.size() - 1) : ((lid + 1) * npoints / size * 3 - 1);
 
-    fprintf(stderr, "[%d - %d]: reading [%lu,%lu] out of %lu\n", cp.gid(), lid, from, to, values.size());
+    //fprintf(stderr, "[%d - %d]: reading [%lu,%lu] out of %lu\n", cp.gid(), lid, from, to, values.size());
 
     size_t nlocal = (to - from + 1)/3;
     b->num_particles      = nlocal;
@@ -109,19 +109,19 @@ bounds_neighbors(void *b_, const diy::Master::ProxyWithLink& cp, void*)
     dblock_t* b = static_cast<dblock_t*>(b_);
     RCLink* link = dynamic_cast<RCLink*>(cp.link());
 
-    fprintf(stderr, "[%d]: %f %f %f - %f %f %f (wrap=%d)\n",
+    fprintf(stderr, "[%d]: %f %f %f - %f %f %f\n",
 		    cp.gid(),
 		    b->box.min[0], b->box.min[1], b->box.min[2],
-		    b->box.max[0], b->box.max[1], b->box.max[2],
-		    link->wrap());
+		    b->box.max[0], b->box.max[1], b->box.max[2]);
 
     for (size_t i = 0; i < link->size(); ++i)
     {
-      fprintf(stderr, "   %d: %f %f %f - %f %f %f (%d)\n",
+      fprintf(stderr, "   %d: %f %f %f - %f %f %f (dir = %d %d %d, wrap = %d %d %d)\n",
 		      link->target(i).gid,
 		      link->bounds(i).min[0], link->bounds(i).min[1], link->bounds(i).min[2],
 		      link->bounds(i).max[0], link->bounds(i).max[1], link->bounds(i).max[2],
-		      link->direction(i));
+		      link->direction(i)[0],  link->direction(i)[1],  link->direction(i)[2],
+		      link->wrap(i)[0],	      link->wrap(i)[1],	      link->wrap(i)[2]);
     }
 }
 
@@ -185,6 +185,9 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "kdtree doesn't yet support the out-of-core mode\n");
             return 1;
         }
+
+	if (wrap_ && tot_blocks < 64 && rank == 0)
+	    fprintf(stderr, "Warning: using k-d tree with wrap on and fewer than 64 blocks is likely to fail\n");
     }
 
     timing(times, -1, -1, world);
@@ -282,9 +285,6 @@ int main(int argc, char *argv[])
     size_t rounds = tess(master, quants, times);
     if (rank == 0)
       fprintf(stderr, "Done in %lu rounds\n", rounds);
-
-    if (rounds > 2 && wrap_ && rank == 0)
-      fprintf(stderr, "Warning: took more than 2 rounds with wrap on, result is likely incorrect!\n");
 
     tess_save(master, "del.out", times);
 

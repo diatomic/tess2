@@ -74,8 +74,7 @@ void reset_block(struct dblock_t* &dblock);
 void fill_vert_to_tet(dblock_t* dblock);
 void wall_particles(struct dblock_t *dblock);
 void sample_particles(float *particles, int &num_particles, int sample_rate);
-diy::Direction nearest_neighbor(float* p, float* mins, float* maxs);
-void wrap_pt(point_t& rp, int wrap_dir, Bounds& domain);
+void wrap_pt(point_t& rp, diy::Direction wrap_dir, Bounds& domain);
 int compare(const void *a, const void *b);
 
 // add block to a master

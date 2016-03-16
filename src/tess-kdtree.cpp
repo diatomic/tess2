@@ -33,21 +33,6 @@ void populate_kdtree_block(dblock_t* d, const diy::Master::ProxyWithLink& cp, vo
 
   KDTreeBlock* b = new KDTreeBlock;
   diy::RegularContinuousLink* l = new diy::RegularContinuousLink(3, domain, domain);
-  if (wrap)
-  {
-      // link to self in every direction
-      for (int j = 0; j < 3; ++j)
-          for (int k = 0; k < 2; ++k)
-          {
-              diy::BlockID nbr = { cp.gid(), cp.master()->communicator().rank() };
-              l->add_neighbor(nbr);
-
-              diy::Direction dir = static_cast<diy::Direction>(1 << (2*j + k));
-              l->add_direction(dir);
-
-              l->add_bounds(domain);
-          }
-  }
   kdtree_master->add(cp.gid(), b, l);
 
   // copy the particles over

@@ -92,6 +92,7 @@ size_t tess(diy::Master& master,
   while(!done)
   {
     rounds++;
+    fprintf(stderr, "round = %lu\n", rounds);
 
     master.foreach(&delaunay, &aux);
     master.exchange();
@@ -364,32 +365,57 @@ void delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void* aux_)
       in_links.push_back(*l);
       delete l;
     }
+    size_t last_last_neighbor = last_neighbor;
     last_neighbor = link->size();       // update last_neighbor
 
     // parse received particles
     neighbor_particles(b, cp);
 
     // update the links, taking care of duplicates
-    std::set<diy::BlockID> neighbor_blocks;
+
+    std::set< std::pair<diy::BlockID, diy::Direction> > neighbor_blocks;
     for (size_t i = 0; i < link->size(); ++i)
-      neighbor_blocks.insert(link->target(i));
+      neighbor_blocks.insert(std::make_pair(link->target(i), link->wrap(i)));
     size_t original_size_unique = link->size_unique();
 
     // NB: this does not take care of the wrap properly
     //     (in fact, even duplicate pruning is based on BlockID)
     //     So this wouldn't work with wrap on (past a single round).
     for (size_t i = 0; i < in_links.size(); ++i)
+    {
+      size_t ii = i + last_last_neighbor;
       for (size_t j = 0; j < in_links[i].size(); ++j)
       {
         if (in_links[i].target(j).gid == cp.gid()) continue;        // skip self
 
-        bool inserted = neighbor_blocks.insert(in_links[i].target(j)).second;
+	// add wrap of the neighbor we got the link from to the link's wrap
+	diy::Direction wrap = link->wrap(ii);
+	//fprintf(stderr, "[%d] -> %d: wrap = (%d,%d,%d); -> %d = (%d,%d,%d)\n",
+	//                cp.gid(), link->target(ii).gid,
+	//                wrap[0], wrap[1], wrap[2],
+	//                in_links[i].target(j).gid,
+	//                in_links[i].wrap(j)[0], in_links[i].wrap(j)[1], in_links[i].wrap(j)[2]);
+				
+	for (int k = 0; k < 3; ++k)
+	{
+	  wrap[k] += in_links[i].wrap(j)[k];
+	  if (wrap[k] < -1 || wrap[k] > 1)
+	  {
+	    fprintf(stderr, "Warning: something is odd with the wrap, the it exceeds a single wrap-around\n");
+	  }
+	}
+	//fprintf(stderr, "   -> wrap = (%d,%d,%d)\n",
+	//                wrap[0], wrap[1], wrap[2]);
+
+        bool inserted = neighbor_blocks.insert(std::make_pair(in_links[i].target(j),wrap)).second;
         if (!inserted) continue;
 
         link->add_neighbor(in_links[i].target(j));
         link->add_direction(in_links[i].direction(j));
         link->add_bounds(in_links[i].bounds(j));
+	link->add_wrap(wrap);
       }
+    }
     cp.master()->add_expected(link->size_unique() - original_size_unique);
   }
   //fprintf(stderr, "Links updated; last_neighbor = %lu\n", last_neighbor);
@@ -476,7 +502,7 @@ size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLin
     for (int i = last_neighbor; i < l->size(); ++i)
     {
       diy::ContinuousBounds neigh_bounds = l->bounds(i);
-      diy::wrap_bounds(neigh_bounds, l->wrap() & l->direction(i), dblock->data_bounds, l->dimension());
+      diy::wrap_bounds(neigh_bounds, l->wrap(i), dblock->data_bounds, l->dimension());
 
       if (diy::distance(3, neigh_bounds, center) <= rad)
       {
@@ -508,7 +534,7 @@ size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLin
       for (int i = last_neighbor; i < l->size(); ++i)
       {
 	diy::ContinuousBounds neigh_bounds = l->bounds(i);
-	diy::wrap_bounds(neigh_bounds, l->wrap() & l->direction(i), dblock->data_bounds, l->dimension());
+	diy::wrap_bounds(neigh_bounds, l->wrap(i), dblock->data_bounds, l->dimension());
 
 	// test whether there is a point in neigh_bounds that lies on the opposite side of the convex hull than j
 	if (!side_of_plane(neigh_bounds.min, neigh_bounds.max, &dblock->tets[t], dblock->particles, j)) continue;
@@ -561,7 +587,7 @@ size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLin
       rp.z   = dblock->particles[3 * p + 2];
       rp.gid = dblock->gid;
       rp.lid = p;
-      wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
+      wrap_pt(rp, l->wrap(*it), dblock->data_bounds);
       cp.enqueue(l->target(*it), rp);
       ++enqueued;
 
@@ -640,58 +666,16 @@ void reset_block(struct dblock_t* &dblock)
   dblock->vert_to_tet = NULL;
 }
 //
-//   finds the direction of the nearest block to the given point
-//
-//   p: coordinates of the point
-//   mins, maxs: block bounds
-//
-diy::Direction nearest_neighbor(float* p, float* mins, float* maxs)
-{
-  // TODO: possibly find the 3 closest neighbors, and look at the ratio of
-  //   the distances to deal with the corners
-
-  int               i;
-  float             dists[6];
-  diy::Direction    dirs[6] = { DIY_X0, DIY_X1, DIY_Y0, DIY_Y1, DIY_Z0, DIY_Z1 };
-
-  for (i = 0; i < 3; ++i)
-  {
-    dists[2*i]     = p[i] - mins[i];
-    dists[2*i + 1] = maxs[i] - p[i];
-  }
-
-  int   smallest = 0;
-  for (i = 1; i < 6; ++i)
-  {
-    if (dists[i] < dists[smallest])
-      smallest = i;
-  }
-
-  return dirs[smallest];
-}
-//
 // wraps point coordinates
 //
 // wrap dir:wrapping direction from original block to wrapped neighbor block
 // domain: overall domain bounds
 //
-void wrap_pt(point_t& rp, int wrap_dir, Bounds& domain)
+void wrap_pt(point_t& rp, diy::Direction wrap_dir, Bounds& domain)
 {
-  // wrapping toward the left transforms the point to the right, and vice versa
-  if ((wrap_dir & DIY_X0) == DIY_X0)
-    rp.x += (domain.max[0] - domain.min[0]);
-  if ((wrap_dir & DIY_X1) == DIY_X1)
-    rp.x -= (domain.max[0] - domain.min[0]);
-
-  if ((wrap_dir & DIY_Y0) == DIY_Y0)
-    rp.y += (domain.max[1] - domain.min[1]);
-  if ((wrap_dir & DIY_Y1) == DIY_Y1)
-    rp.y -= (domain.max[1] - domain.min[1]);
-
-  if ((wrap_dir & DIY_Z0) == DIY_Z0)
-    rp.z += (domain.max[2] - domain.min[2]);
-  if ((wrap_dir & DIY_Z1) == DIY_Z1)
-    rp.z -= (domain.max[2] - domain.min[2]);
+  rp.x -= wrap_dir[0] * (domain.max[0] - domain.min[0]);
+  rp.y -= wrap_dir[1] * (domain.max[1] - domain.min[1]);
+  rp.z -= wrap_dir[2] * (domain.max[2] - domain.min[2]);
 }
 
 //   collects statistics
