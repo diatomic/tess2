@@ -18,6 +18,15 @@ int find(tet_t* tet, int v)
   return -1;
 }
 
+// dot product: u * (p - x)
+float dot(float* u, float* p, float* x)
+{
+  float res = 0;
+  for (int i = 0; i < 3; ++i)
+    res += u[i] * (p[i] - x[i]);
+  return res;
+}
+
 /**
  * computes circumcenter of a tetrahedron
  *
@@ -54,6 +63,52 @@ void circumcenter(float* center, tet_t* tet, float* particles)
 
   for (int i = 0; i < 3; ++i)
     center[i] = d[i] + (norm_t*uv[i] + norm_u*vt[i] + norm_v*tu[i])/den;
+}
+
+// determine if any point in the box [min, max] lies on the opposite side of the
+// facet opposite to vertex j
+int side_of_plane(float* min, float* max, struct tet_t* tet, float* particles, int j)
+{
+  float one[3] = { 1., 1., 1. };
+
+  int idx[4] = { 0, 1, 2, 3 };
+  std::swap(idx[j], idx[3]);
+  
+  float *x = &particles[3*tet->verts[idx[0]]],
+	*y = &particles[3*tet->verts[idx[1]]],
+	*z = &particles[3*tet->verts[idx[2]]],
+	*p = &particles[3*tet->verts[idx[3]]];
+
+  float u[3], v[3], w[3], n[3];
+  for (int i = 0; i < 3; ++i)
+  {
+    u[i] = y[i] - x[i];
+    v[i] = z[i] - x[i];
+  }
+  cross(n, u, v);
+
+  // plane through x, normal to n
+  float res = dot(n, p, x);
+  int sign = 0;
+  if (res > 0)
+    sign = 1;
+  else if (res < 0)
+    sign = -1;
+
+  if (sign == 0)
+    fprintf(stderr, "Warning: got a degenerate convex hull tet in side_of_plane computation\n");
+
+  // find the sign of the extreme-most point of the box
+  res = 0;
+  for (int i = 0; i < 3; ++i)
+  {
+    if (sign ^ (n[i] < 0))
+      res += n[i] * (min[i] - x[i]);
+    else
+      res += n[i] * (max[i] - x[i]);
+  }
+
+  return (sign ^ (res > 0));
 }
 
 // returns |x|^2

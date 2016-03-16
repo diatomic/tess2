@@ -16,7 +16,17 @@ int find(struct tet_t* tet, int v);
 #ifdef __cplusplus
 extern "C"
 #endif
+float dot(float* u, float* p, float* x);
+
+#ifdef __cplusplus
+extern "C"
+#endif
 void circumcenter(float* c, struct tet_t* tet, float* particles);
+
+#ifdef __cplusplus
+extern "C"
+#endif
+int side_of_plane(float* min, float* max, struct tet_t* tet, float* particles, int j);
 
 #ifdef __cplusplus
 extern "C"

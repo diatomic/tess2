@@ -293,6 +293,11 @@ int main(int argc, char *argv[])
     
     printf("Enumerating cells\n");
     master.foreach(&enumerate_cells);
+    master.exchange();
+
+    size_t total_infinite = master.proxy(master.loaded_block()).read<size_t>();
+    if (rank == 0)
+      fprintf(stderr, "Total infinite cells: %lu\n", total_infinite);
 
     // Storage + memory stats
     size_t max_storage = storage.max_size(),

@@ -454,33 +454,23 @@ size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLin
   RCLink* l = dynamic_cast<RCLink*>(cp.link());
   std::vector< std::set<int> > to_send(dblock->num_orig_particles);
 
-  // identify and enqueue convex hull particles
-  for (int p = 0; p < dblock->num_orig_particles; ++p)
-  {
-    if (dblock->vert_to_tet[p] == -1)
-    {
-      fprintf(stderr, "Particle %d is not in the triangulation. "
-              "Perhaps it's a duplicate? Aborting.\n", p);
-      assert(false);
-    }
-
-    // on convex hull = less than 4 neighbors
-    if (dblock->num_tets == 0 ||
-        !complete(p, dblock->tets, dblock->num_tets, dblock->vert_to_tet[p]))
-    {
-        for (int i = last_neighbor; i < l->size(); ++i)
-          to_send[p].insert(i);
-    }
-  }
-
   // for all tets
   for (int t = 0; t < dblock->num_tets; t++)
   {
+    int j;
+    for (j = 0; j < 4; ++j)
+      if (dblock->tets[t].verts[j] < dblock->num_orig_particles)
+	break;
+    if (j == 4)	    // no local particles in the tet, so we don't care
+      continue;
+
     // cirumcenter of tet and radius from circumcenter to any vertex
     float center[3]; // circumcenter
     circumcenter(center, &dblock->tets[t], dblock->particles);
     int p = dblock->tets[t].verts[0];
     float rad = distance(center, &dblock->particles[3 * p]);
+
+    // TODO: we could optimize by checking if the circumsphere is too deep inside the block to be able to stick out
 
     // find nearby blocks within radius of circumcenter
     for (int i = last_neighbor; i < l->size(); ++i)
@@ -501,10 +491,64 @@ size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLin
         }
       }
     }
+
+    // check for a convex hull facet
+    for (j = 0; j < 4; ++j)
+    {
+      if (dblock->tets[t].tets[j] != -1) continue;	// facet opposite of vertex j is not on the convex hull
+
+      int k;
+      for (k = 0; k < 4; ++k)
+      {
+	if (k == j) continue;
+	if (dblock->tets[t].verts[k] < dblock->num_orig_particles) break;
+      }
+      if (k == 4) continue;  // there is not a local particle on the convex hull
+
+      for (int i = last_neighbor; i < l->size(); ++i)
+      {
+	diy::ContinuousBounds neigh_bounds = l->bounds(i);
+	diy::wrap_bounds(neigh_bounds, l->wrap() & l->direction(i), dblock->data_bounds, l->dimension());
+
+	// test whether there is a point in neigh_bounds that lies on the opposite side of the convex hull than j
+	if (!side_of_plane(neigh_bounds.min, neigh_bounds.max, &dblock->tets[t], dblock->particles, j)) continue;
+
+	// all 4 verts, but j go to these dests, if they are among the original particles
+	for (int v = 0; v < 4; v++)
+	{
+	  if (v == j) continue;
+	  int p = dblock->tets[t].verts[v];
+	  if (p >= dblock->num_orig_particles)
+	    continue;
+
+	  to_send[p].insert(i);
+	}
+      }
+    }
+  }
+
+  // handle the weird corner case, where there are less than four points in a block;
+  // in this case the previous for loop didn't execute at all
+  if (dblock->num_tets == 0)
+  {
+    // send everybody everywhere
+    for (int p = 0; p < dblock->num_orig_particles; ++p)
+    {
+      if (dblock->vert_to_tet[p] == -1)
+      {
+	fprintf(stderr, "Particle %d is not in the triangulation. "
+		"Perhaps it's a duplicate? Aborting.\n", p);
+	assert(false);
+      }
+
+      for (int i = last_neighbor; i < l->size(); ++i)
+	to_send[p].insert(i);
+    }
   }
 
   // enqueue the particles
   size_t enqueued = 0;
+  //size_t convex_hull = 0;
   point_t rp; // particle being sent
   for (int p = 0; p < dblock->num_orig_particles; p++)
   {
@@ -520,8 +564,12 @@ size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLin
       wrap_pt(rp, l->wrap() & l->direction(*it), dblock->data_bounds);
       cp.enqueue(l->target(*it), rp);
       ++enqueued;
+
+      //if (!complete(p, dblock->tets, dblock->num_tets, dblock->vert_to_tet[p]))
+      //  ++convex_hull;
     }
   }
+  //fprintf(stderr, "[%d]: %lu convex hull particles; %lu total\n", cp.gid(), convex_hull, enqueued);
 
   return enqueued;
 }

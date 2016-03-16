@@ -82,6 +82,7 @@ void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 void enumerate_cells(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
     dblock_t* b = static_cast<dblock_t*>(b_);
+    cp.collectives()->clear();
 
     size_t infinite = 0;
     for (size_t p = 0; p < b->num_orig_particles; ++p)
@@ -95,6 +96,8 @@ void enumerate_cells(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 	++infinite;
     }
     fprintf(stderr, "[%d] %lu infinite Voronoi cells\n", cp.gid(), infinite);
+
+    cp.all_reduce(infinite, std::plus<size_t>());
 }
 
 #endif
