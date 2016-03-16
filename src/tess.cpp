@@ -92,7 +92,6 @@ size_t tess(diy::Master& master,
   while(!done)
   {
     rounds++;
-    fprintf(stderr, "round = %lu\n", rounds);
 
     master.foreach(&delaunay, &aux);
     master.exchange();
