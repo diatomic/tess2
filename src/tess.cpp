@@ -495,35 +495,6 @@ size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLin
     int p = dblock->tets[t].verts[0];
     float rad = distance(center, &dblock->particles[3 * p]);
 
-    // check if the circumsphere is too deep inside the block to be able to stick out
-    for (j = 0; j < 3; ++j)
-    {
-      if (center[j] - l->bounds().min[j] <= rad) break;
-      if (l->bounds().max[j] - center[j] <= rad) break;
-    }
-    if (j == 3)	// the circumsphere is too deep inside the block
-      continue;
-
-    // find nearby blocks within radius of circumcenter
-    for (int i = last_neighbor; i < l->size(); ++i)
-    {
-      diy::ContinuousBounds neigh_bounds = l->bounds(i);
-      diy::wrap_bounds(neigh_bounds, l->wrap(i), dblock->data_bounds, l->dimension());
-
-      if (diy::distance(3, neigh_bounds, center) <= rad)
-      {
-        // all 4 verts go these dests, if they are among the original particles
-        for (int v = 0; v < 4; v++)
-        {
-          int p = dblock->tets[t].verts[v];
-          if (p >= dblock->num_orig_particles)
-            continue;
-
-          to_send[p].insert(i);
-        }
-      }
-    }
-
     // check for a convex hull facet
     for (j = 0; j < 4; ++j)
     {
@@ -555,6 +526,35 @@ size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLin
 
 	  to_send[p].insert(i);
 	}
+      }
+    }
+
+    // check if the circumsphere is too deep inside the block to be able to stick out
+    for (j = 0; j < 3; ++j)
+    {
+      if (center[j] - l->bounds().min[j] <= rad) break;
+      if (l->bounds().max[j] - center[j] <= rad) break;
+    }
+    if (j == 3)	// the circumsphere is too deep inside the block
+      continue;
+
+    // find nearby blocks within radius of circumcenter
+    for (int i = last_neighbor; i < l->size(); ++i)
+    {
+      diy::ContinuousBounds neigh_bounds = l->bounds(i);
+      diy::wrap_bounds(neigh_bounds, l->wrap(i), dblock->data_bounds, l->dimension());
+
+      if (diy::distance(3, neigh_bounds, center) <= rad)
+      {
+        // all 4 verts go these dests, if they are among the original particles
+        for (int v = 0; v < 4; v++)
+        {
+          int p = dblock->tets[t].verts[v];
+          if (p >= dblock->num_orig_particles)
+            continue;
+
+          to_send[p].insert(i);
+        }
       }
     }
   }
