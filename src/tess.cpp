@@ -495,7 +495,14 @@ size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLin
     int p = dblock->tets[t].verts[0];
     float rad = distance(center, &dblock->particles[3 * p]);
 
-    // TODO: we could optimize by checking if the circumsphere is too deep inside the block to be able to stick out
+    // check if the circumsphere is too deep inside the block to be able to stick out
+    for (j = 0; j < 3; ++j)
+    {
+      if (center[j] - l->bounds().min[j] <= rad) break;
+      if (l->bounds().max[j] - center[j] <= rad) break;
+    }
+    if (j == 3)	// the circumsphere is too deep inside the block
+      continue;
 
     // find nearby blocks within radius of circumcenter
     for (int i = last_neighbor; i < l->size(); ++i)
