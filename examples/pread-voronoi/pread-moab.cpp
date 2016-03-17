@@ -75,12 +75,12 @@ void minmax(void* b_,                                  // local block
     // step 0: initialize global bounds
     if (!rp.in_link().size() && b->num_particles)      // this block read points
     {
-        b->data_bounds.min[0] = b->mins[0];
-        b->data_bounds.min[1] = b->mins[1];
-        b->data_bounds.min[2] = b->mins[2];
-        b->data_bounds.max[0] = b->maxs[0];
-        b->data_bounds.max[1] = b->maxs[1];
-        b->data_bounds.max[2] = b->maxs[2];
+        b->data_bounds.min[0] = b->mins[0] - 0.0001;
+        b->data_bounds.min[1] = b->mins[1] - 0.0001;
+        b->data_bounds.min[2] = b->mins[2] - 0.0001;
+        b->data_bounds.max[0] = b->maxs[0] + 0.0001;
+        b->data_bounds.max[1] = b->maxs[1] + 0.0001;
+        b->data_bounds.max[2] = b->maxs[2] + 0.0001;
     }
     if (!rp.in_link().size() && !b->num_particles)     // this block did not read points
     {
@@ -206,67 +206,13 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
         b->num_particles = b->num_orig_particles = 0;
         b->particles = NULL;
     }
-}
 
-// debug: write mesh vertices
-void
-write_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
-{
-    dblock_t* b             = static_cast<dblock_t*>(b_);
-    string* outfile         = ((Aux*)aux)->filename;
-    diy::Assigner* assigner = ((Aux*)aux)->assigner;
-
-    diy::mpi::communicator world = cp.master()->communicator();
-    std::vector<int> my_gids;                // my local gids
-    assigner->local_gids(cp.master()->communicator().rank(), my_gids);
-
-    // only write once for each mpi rank
-    if (b->gid == my_gids[0])
-    {
-        // debug
-        // {
-        //     fprintf(stderr, "%d particles written to file %s:\n---\n", b->num_particles,
-        //             outfile->c_str());
-        //     for (size_t i = 0; i < b->num_particles; i++)
-        //         fprintf(stderr, "%f %f %f\n",
-        //                 b->particles[3 * i],
-        //                 b->particles[3 * i + 1],
-        //                 b->particles[3 * i + 2]);
-        // }
-        // fprintf(stderr, "---\n");
-
-        diy::DiscreteBounds box;
-        box.min[0] = 0;
-        box.max[0] = b->num_particles * 3 - 1;
-
-        std::vector<unsigned> shape;
-        shape.push_back(b->num_particles * 3);
-
-        diy::mpi::io::file out(world,
-                               outfile->c_str(),
-                               diy::mpi::io::file::wronly | diy::mpi::io::file::create);
-        diy::io::BOV writer(out, shape);
-        writer.write(box, b->particles);
-
-        // debug: read back in as a sanity check
-        // diy::mpi::io::file in(world, outfile->c_str(), diy::mpi::io::file::rdonly);
-        // diy::io::BOV reader(in, shape);
-        // std::vector<float> read_particles(b->num_particles * 3);
-        // reader.read(box, &read_particles[0]);
-        // if (read_particles.size())
-        // {
-        //     fprintf(stderr, "particles read back:\n");
-        //     for (size_t i = 0; i < read_particles.size() / 3; i++)
-        //         fprintf(stderr, "[%f %f %f]\n",
-        //                 read_particles[3 * i],
-        //                 read_particles[3 * i + 1],
-        //                 read_particles[3 * i + 2]);
-        // }
-    }
+    // global total number of particles
+    cp.all_reduce(b->num_particles, std::plus<int>());
 }
 
 // debug: print the block
-void debug(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+void verify_block(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
     dblock_t* b = static_cast<dblock_t*>(b_);
 
@@ -381,16 +327,37 @@ int main(int argc, char *argv[])
     aux.assigner = &assigner;
     master.foreach(&read_vertices, &aux);
 
-    // debug: write points
-    string debugfile("debug.bov");
-    aux.filename   = &debugfile;
-    master.foreach(&write_vertices, &aux);
+    // get total number of particles
+    master.exchange();			    // process collectives
+    int tot_particles = master.proxy(master.loaded_block()).read<int>();
+    if (rank == 0)
+        fprintf(stderr, "Total number of particles = %d\n", tot_particles);
+
+    // debug: write points to bov file
+    if (debug)
+    {
+        size_t nparticles = ((dblock_t*)master.block(0))->num_particles;
+        size_t ofst;
+        MPI_Exscan(&nparticles, &ofst, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+        fprintf(stderr, "ofst (in particles) = %ld\n", ofst);
+        diy::mpi::io::file out(world,
+                               "debug.bov",
+                               diy::mpi::io::file::wronly | diy::mpi::io::file::create);
+        std::vector<size_t> shape(1, tot_particles * 3);        // in floats
+        diy::io::BOV writer(out, shape);
+        diy::DiscreteBounds box;
+        box.min[0] = ofst * 3;                                  // in floats
+        box.max[0] = (ofst + nparticles) * 3 - 1;               // in floats
+        writer.write(box, ((dblock_t*)master.block(0))->particles, true);
+        if (rank == 0)
+            fprintf(stderr, "BOV file written\n");
+    }
 
     // reduce global domain bounds
     diy::all_to_all(master, assigner, &minmax);
 
     // get the domain from any block
-    dblock_t*b = (dblock_t*)(master.block(0));
+    dblock_t*b = (dblock_t*)(master.block(master.loaded_block()));
     domain.min[0] = b->data_bounds.min[0];
     domain.min[1] = b->data_bounds.min[1];
     domain.min[2] = b->data_bounds.min[2];
@@ -399,9 +366,10 @@ int main(int argc, char *argv[])
     domain.max[2] = b->data_bounds.max[2];
 
     // debug
-    fprintf(stderr, "min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
-            domain.min[0], domain.min[1], domain.min[2],
-            domain.max[0], domain.max[1], domain.max[2]);
+    if (rank == 0)
+        fprintf(stderr, "min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
+                domain.min[0], domain.min[1], domain.min[2],
+                domain.max[0], domain.max[1], domain.max[2]);
 
     // decompose
     UpdateBlock update(master);
@@ -419,10 +387,8 @@ int main(int argc, char *argv[])
     master.foreach(&deduplicate, &count);
 
     // debug purposes only: checks if the particles got into the right blocks
-    // master.foreach(&verify_particles);
-
-    // debug
-    // master.foreach(&debug);
+    if (debug)
+        master.foreach(&verify_particles);
 
     size_t rounds = tess(master, quants, times);
     if (rank == 0)
