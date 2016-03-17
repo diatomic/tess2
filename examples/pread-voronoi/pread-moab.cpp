@@ -387,7 +387,7 @@ int main(int argc, char *argv[])
     master.foreach(&deduplicate, &count);
 
     // debug purposes only: checks if the particles got into the right blocks
-    if (debug)
+    // if (debug)
         master.foreach(&verify_particles);
 
     size_t rounds = tess(master, quants, times);

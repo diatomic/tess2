@@ -20,6 +20,9 @@ void deduplicate(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
 {
     dblock_t* b = static_cast<dblock_t*>(b_);
 
+    if (!b->num_particles)
+        return;
+
     // simple static_assert to ensure sizeof(Point) == sizeof(float[3]);
     // necessary to make this hack work
     typedef int static_assert_Point_size[sizeof(DedupPoint) == sizeof(float[3]) ? 1 : -1];
@@ -55,6 +58,12 @@ void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
     dblock_t* b = static_cast<dblock_t*>(b_);
 
+    // TP: testing 0-particle blocks by removing all the particles in block 0
+    /* if (!b->gid) */
+    /*     b->num_particles = b->num_orig_particles = 0; */
+
+    /* fprintf(stderr, "gid %d has %d particles\n", b->gid, b->num_particles); */
+
     for (size_t i = 0; i < b->num_particles; ++i)
     {
         for (int j = 0; j < 3; ++j)
@@ -73,7 +82,7 @@ void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
                         b->maxs[0],
                         b->maxs[1],
                         b->maxs[2]);
-                std::exit(1);
+                /* std::exit(1); */
             }
         }
     }

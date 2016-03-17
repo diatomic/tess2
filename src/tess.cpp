@@ -257,6 +257,11 @@ void load_block_light(void* b_, diy::BinaryBuffer& bb)
 //
 int gen_particles(dblock_t* b, float jitter)
 {
+    // TP
+    // to test 0-blocks, make 0 particles in block gid 0
+    // if (!b->gid)
+    //     return 0;
+
   int sizes[3]; // number of grid points
   int n = 0;
   int num_particles; // theoretical num particles with duplicates at block boundaries
@@ -428,8 +433,9 @@ void delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void* aux_)
   //fprintf(stderr, "Links updated; last_neighbor = %lu\n", last_neighbor);
 
   // compute (or update) the local tessellation
-  local_cells(b);
-  
+  if (b->num_particles)                      // TP
+      local_cells(b);
+
   // enqueue the original link to the new neighbors
   for (size_t i = last_neighbor; i < link->size(); ++i)
   {
@@ -437,10 +443,14 @@ void delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void* aux_)
     diy::LinkFactory::save(out, &original_link);
   }
 
+  // TP
   // enqueue points to neighbors
-  size_t num = incomplete_cells(b, cp, last_neighbor);
-  //fprintf(stderr, "Particles enqueued: %lu\n", num);
-  int done = (num == 0);
+  int done = 1;
+  if (b->num_particles)
+  {
+      size_t num = incomplete_cells(b, cp, last_neighbor);
+      done = (num == 0);
+  }
   cp.all_reduce(done, std::logical_and<int>());
 }
 
@@ -481,11 +491,12 @@ void finalize(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
 
 size_t incomplete_cells(struct dblock_t *dblock, const diy::Master::ProxyWithLink& cp, size_t last_neighbor)
 {
-  if (dblock->num_orig_particles == 0)
-  {
-    fprintf(stderr, "In incomplete_cells, number of particles: %d\n", dblock->num_orig_particles);
-    assert(false);
-  }
+    // TP: changed from num_orig_particles to num_particles
+    if (dblock->num_particles == 0)
+    {
+        fprintf(stderr, "In incomplete_cells, number of particles: %d\n", dblock->num_particles);
+        assert(false);
+    }
 
   RCLink* l = dynamic_cast<RCLink*>(cp.link());
   std::vector< std::set<int> > to_send(dblock->num_orig_particles);
