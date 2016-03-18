@@ -106,13 +106,13 @@ int side_of_plane(float* min, float* max, struct tet_t* tet, float* particles, i
   res = 0;
   for (int i = 0; i < 3; ++i)
   {
-    if (sign ^ (n[i] < 0))
+    if ((sign > 0) ^ (n[i] < 0))
       res += n[i] * (min[i] - x[i]);
     else
       res += n[i] * (max[i] - x[i]);
   }
 
-  return (sign ^ (res > 0));
+  return ((sign > 0) ^ (res > 0));
 }
 
 // returns |x|^2
