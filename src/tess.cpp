@@ -98,6 +98,10 @@ size_t tess(diy::Master& master,
 
     aux.first = false;
     done = master.proxy(master.loaded_block()).read<int>();
+
+#ifdef MEMORY
+    get_mem(rounds, master.communicator());
+#endif
   }
 
   // this is not ideal, but need to do this to collect statistics and mark
