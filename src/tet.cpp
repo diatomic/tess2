@@ -96,7 +96,11 @@ int side_of_plane(float* min, float* max, struct tet_t* tet, float* particles, i
     sign = -1;
 
   if (sign == 0)
-    fprintf(stderr, "Warning: got a degenerate convex hull tet in side_of_plane computation\n");
+  {
+    // Warning: got a degenerate convex hull tet in side_of_plane computation
+    // Play it safe and report the box as intersecting
+    return 1;
+  }
 
   // find the sign of the extreme-most point of the box
   res = 0;
