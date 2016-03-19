@@ -87,17 +87,20 @@ size_t tess(diy::Master& master,
   aux.neighbors = &last_neighbors;
   aux.first = true;
 
-  bool done = false;
+  int done = false;
   size_t rounds = 0;
   while(!done)
   {
     rounds++;
 
-    master.foreach(&delaunay, &aux);
+    if (master.communicator().rank() == 0)
+      fprintf(stderr, "rounds %lu\n", rounds);
+ 
+   master.foreach(&delaunay, &aux);
     master.exchange();
 
     aux.first = false;
-    done = master.proxy(master.loaded_block()).read<bool>();
+    done = master.proxy(master.loaded_block()).read<int>();
   }
 
   // this is not ideal, but need to do this to collect statistics and mark
