@@ -196,7 +196,9 @@ int main(int argc, char *argv[])
     // debug purposes only: checks if the particles got into the right blocks
     // master.foreach(&verify_particles);
 
-    tess(master, quants, times);
+    size_t rounds = tess(master, quants, times);
+    if (rank == 0)
+      fprintf(stderr, "Done in %lu rounds\n", rounds);
 
     tess_save(master, outfile.c_str(), times);
 
