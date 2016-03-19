@@ -92,11 +92,8 @@ size_t tess(diy::Master& master,
   while(!done)
   {
     rounds++;
-
-    if (master.communicator().rank() == 0)
-      fprintf(stderr, "rounds %lu\n", rounds);
  
-   master.foreach(&delaunay, &aux);
+    master.foreach(&delaunay, &aux);
     master.exchange();
 
     aux.first = false;
