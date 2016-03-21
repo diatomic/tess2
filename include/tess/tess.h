@@ -32,6 +32,7 @@ enum
   NUM_ORIG_PTS,
   NUM_FINAL_PTS,
   NUM_TETS,
+  NUM_LOC_BLOCKS,
   MAX_QUANTS
 };
 

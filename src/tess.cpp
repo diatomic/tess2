@@ -106,6 +106,10 @@ size_t tess(diy::Master& master,
 
   // this is not ideal, but need to do this to collect statistics and mark
   // blocks as complete; TODO: this of how to get rid of this
+  quants.sum_quants[NUM_ORIG_PTS] = 0;
+  quants.sum_quants[NUM_FINAL_PTS] = 0;
+  quants.sum_quants[NUM_TETS] = 0;
+  quants.sum_quants[NUM_LOC_BLOCKS] = master.size();
   master.foreach(&finalize, &quants);
     
   // restore the original links
@@ -454,16 +458,19 @@ void finalize(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
     quants->min_quants[NUM_ORIG_PTS] = b->num_orig_particles;
   if (first || b->num_orig_particles > quants->max_quants[NUM_ORIG_PTS])
     quants->max_quants[NUM_ORIG_PTS] = b->num_orig_particles;
+  quants->sum_quants[NUM_ORIG_PTS] += b->num_orig_particles;
 
   if (first || b->num_particles < quants->min_quants[NUM_FINAL_PTS])
     quants->min_quants[NUM_FINAL_PTS] = b->num_particles;
   if (first || b->num_particles > quants->max_quants[NUM_FINAL_PTS])
     quants->max_quants[NUM_FINAL_PTS] = b->num_particles;
+  quants->sum_quants[NUM_FINAL_PTS] += b->num_particles;
 
   if (first || b->num_tets < quants->min_quants[NUM_TETS])
     quants->min_quants[NUM_TETS] = b->num_tets;
   if (first || b->num_tets > quants->max_quants[NUM_TETS])
     quants->max_quants[NUM_TETS] = b->num_tets;
+  quants->sum_quants[NUM_TETS] += b->num_tets;
 
   first = false;
 
@@ -692,9 +699,16 @@ void wrap_pt(point_t& rp, diy::Direction wrap_dir, Bounds& domain)
 void tess_stats(diy::Master& master,
                 quants_t& quants,double* times)
 {
-  int global_min_quants[MAX_QUANTS], global_max_quants[MAX_QUANTS];
-  MPI_Reduce(quants.min_quants, global_min_quants, MAX_QUANTS, MPI_INT, MPI_MIN, 0, master.communicator());
-  MPI_Reduce(quants.max_quants, global_max_quants, MAX_QUANTS, MPI_INT, MPI_MAX, 0, master.communicator());
+    int global_min_quants[MAX_QUANTS],
+        global_max_quants[MAX_QUANTS],
+        global_sum_quants[MAX_QUANTS];
+
+    MPI_Reduce(quants.min_quants, global_min_quants, MAX_QUANTS, MPI_INT, MPI_MIN, 0,
+               master.communicator());
+    MPI_Reduce(quants.max_quants, global_max_quants, MAX_QUANTS, MPI_INT, MPI_MAX, 0,
+               master.communicator());
+    MPI_Reduce(quants.sum_quants, global_sum_quants, MAX_QUANTS, MPI_INT, MPI_SUM, 0,
+               master.communicator());
 
   if (master.communicator().rank() == 0)
   {
@@ -708,11 +722,18 @@ void tess_stats(diy::Master& master,
             times[EXCH_TIME], times[DEL_TIME],
             times[OUT_TIME],  times[TOT_TIME]);
     fprintf(stderr, "-------------------------------------------------\n");
-    fprintf(stderr, "original particles = [%d, %d]\n", global_min_quants[NUM_ORIG_PTS],
+    fprintf(stderr, "                     [min, avg, max]:\n");
+    fprintf(stderr, "original particles = [%d, %d, %d]\n",
+            global_min_quants[NUM_ORIG_PTS],
+            global_sum_quants[NUM_ORIG_PTS] / global_sum_quants[NUM_LOC_BLOCKS],
             global_max_quants[NUM_ORIG_PTS]);
-    fprintf(stderr, "with ghosts        = [%d, %d]\n", global_min_quants[NUM_FINAL_PTS],
+    fprintf(stderr, "with ghosts        = [%d, %d, %d]\n",
+            global_min_quants[NUM_FINAL_PTS],
+            global_sum_quants[NUM_FINAL_PTS] / global_sum_quants[NUM_LOC_BLOCKS],
             global_max_quants[NUM_FINAL_PTS]);
-    fprintf(stderr, "tets               = [%d, %d]\n", global_min_quants[NUM_TETS],
+    fprintf(stderr, "tets               = [%d, %d, %d]\n",
+            global_min_quants[NUM_TETS],
+            global_sum_quants[NUM_TETS] / global_sum_quants[NUM_LOC_BLOCKS],
             global_max_quants[NUM_TETS]);
     fprintf(stderr, "-------------------------------------------------\n");
   }

@@ -38,8 +38,9 @@
 
 // quantity stats per process
 struct quants_t {
-int min_quants[MAX_QUANTS];
-int max_quants[MAX_QUANTS];
+    int min_quants[MAX_QUANTS];       // min of quantities
+    int max_quants[MAX_QUANTS];       // max of quantities
+    int sum_quants[MAX_QUANTS];       // sum of quantities
 };
 
 typedef  diy::ContinuousBounds       Bounds;
