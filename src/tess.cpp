@@ -258,8 +258,8 @@ void load_block_light(void* b_, diy::BinaryBuffer& bb)
 int gen_particles(dblock_t* b, float jitter)
 {
     // to test 0-blocks, make 0 particles in block gid 0
-    // if (!b->gid)
-    //     return 0;
+    if (!b->gid)
+        return 0;
 
   int sizes[3]; // number of grid points
   int n = 0;
@@ -432,8 +432,10 @@ void delaunay(void* b_, const diy::Master::ProxyWithLink& cp, void* aux_)
   //fprintf(stderr, "Links updated; last_neighbor = %lu\n", last_neighbor);
 
   // compute (or update) the local tessellation
-  if (b->num_particles)                      // NB, crashes when this test is b->num_orig_particles
+  if (b->num_orig_particles)
       local_cells(b);
+  else
+      fill_vert_to_tet(b);
 
   // enqueue the original link to the new neighbors
   for (size_t i = last_neighbor; i < link->size(); ++i)
