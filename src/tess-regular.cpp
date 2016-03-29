@@ -11,7 +11,11 @@ void tess_exchange(diy::Master& master, const diy::Assigner& assigner, double* t
 {
   timing(times, EXCH_TIME, -1, master.communicator());
   int k = 2;
-  diy::RegularSwapPartners  partners(3, assigner.nblocks(), k, false);
+
+  diy::ContinuousBounds domain = master.block<dblock_t>(master.loaded_block())->data_bounds;
+  diy::RegularDecomposer<Bounds> decomposer(3, domain, assigner.nblocks());
+  diy::RegularSwapPartners  partners(decomposer, k, false);
+
   diy::reduce(master, assigner, partners, &redistribute);
   timing(times, -1, EXCH_TIME, master.communicator());
 }
@@ -47,7 +51,7 @@ void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapP
       b->particles = (float *)realloc(b->particles, (b->num_particles + npts) * 3 * sizeof(float));
       size_t o = b->num_particles * 3;
       for (size_t j = 0; j < in_points.size(); ++j)
-	b->particles[o++] = in_points[j];
+        b->particles[o++] = in_points[j];
       b->num_particles += npts;
     }
     b->num_orig_particles = b->num_particles;
@@ -67,15 +71,15 @@ void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapP
                       group_size);
       if ((loc >= out_points.size() && b->particles[3*i + cur_dim] > b->box.max[cur_dim]) ||
           loc < 0)
-	fprintf(stderr, "Warning: loc=%d < 0 || loc >= %lu : %f vs [%f,%f]\n",
-			loc, out_points.size(),
-			b->particles[3*i + cur_dim],
-			b->box.min[cur_dim], b->box.max[cur_dim]
-		);
+        fprintf(stderr, "Warning: loc=%d < 0 || loc >= %lu : %f vs [%f,%f]\n",
+                        loc, out_points.size(),
+                        b->particles[3*i + cur_dim],
+                        b->box.min[cur_dim], b->box.max[cur_dim]
+                );
       if (loc == out_points.size())
-	loc -= 1;
+        loc -= 1;
       if (loc < 0)
-	loc = 0;
+        loc = 0;
 
       out_points[loc].push_back(b->particles[3*i]);
       out_points[loc].push_back(b->particles[3*i + 1]);
@@ -86,11 +90,11 @@ void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapP
     {
       if (srp.out_link().target(i).gid == srp.gid())
       {
-	b->particles	 = (float *)realloc(b->particles, out_points[i].size() * sizeof(float));
-	for (size_t j = 0; j < out_points[i].size(); ++j)
-	  b->particles[j] = out_points[i][j];
-	b->num_particles = out_points[i].size() / 3;
-	b->num_orig_particles = b->num_particles;
+        b->particles     = (float *)realloc(b->particles, out_points[i].size() * sizeof(float));
+        for (size_t j = 0; j < out_points[i].size(); ++j)
+          b->particles[j] = out_points[i][j];
+        b->num_particles = out_points[i].size() / 3;
+        b->num_orig_particles = b->num_particles;
         pos = i;
       }
       else
