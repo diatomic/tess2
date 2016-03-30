@@ -104,9 +104,6 @@ int main(int argc, char *argv[])
     if (rank == 0)
         std::cout << "Particles read: " << total_particles << std::endl;
 
-    if (rank == 0)
-        std::cout << "nblocks max-regular max-kd-tree-hist max-kd-tree-sample average "
-                  << "ratio1 ratio2 ratio3" << std::endl;
     for (int nblocks = min_blocks; nblocks <= max_blocks; nblocks *= 2)
     {
         size_t average = total_particles / nblocks;
@@ -144,7 +141,7 @@ int main(int argc, char *argv[])
                             size_t to   = (lid != lids.size() - 1 ? (lid + 1) * width * 3 - 1 : particles.size() - 1);
                             b->num_particles      = (to - from + 1) / 3;
                             b->num_orig_particles = b->num_particles;
-                            b->particles     = (float *)malloc((to - from + 1) * sizeof(float));
+                            b->particles     = (float *)realloc(b->particles, (to - from + 1) * sizeof(float));
                             for (size_t i = from; i <= to; ++i)
                                 b->particles[i - from] = particles[i];
 
@@ -167,7 +164,7 @@ int main(int argc, char *argv[])
                                  });
         master.exchange();
 
-        int all_max_regular, all_max_kdtree_hist, all_max_kdtree_sample;
+        int all_max_regular;
         if (rank == 0)
         {
             all_max_regular = master.proxy(0).get<int>();
@@ -190,6 +187,7 @@ int main(int argc, char *argv[])
                                  });
         master.exchange();
 
+        int all_max_kdtree_hist;
         if (rank == 0)
         {
             all_max_kdtree_hist = master.proxy(0).get<int>();
@@ -200,10 +198,23 @@ int main(int argc, char *argv[])
                       << std::endl;
         }
 
-        // TODO: add sampling k-d tree
+        // k-d tree sampling
+        master.clear();
+        diy::decompose(3, rank, domain, assigner, fill_block);
+        tess_kdtree_exchange(master, assigner, times, false, true);
+
+        // figure out the maxs
+        master.foreach<dblock_t>([](dblock_t* b, const diy::Master::ProxyWithLink& cp, void*)
+                                 {
+                                    cp.collectives()->clear();
+                                    cp.all_reduce(b->num_particles, diy::mpi::maximum<int>());
+                                 });
+        master.exchange();
+
+        int all_max_kdtree_sample;
         if (rank == 0)
         {
-            all_max_kdtree_sample = 0;
+            all_max_kdtree_sample = master.proxy(0).get<int>();
             std::cout << "K-d tree (sampling): "
                       << all_max_kdtree_sample << ' '
                       << float(all_max_kdtree_sample)/average << ' '

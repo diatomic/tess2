@@ -10,24 +10,24 @@ struct KDTreeBlock
 {
   struct Point
   {
-    float&	    operator[](unsigned i)		{ return data[i]; }
-    const float&    operator[](unsigned i) const	{ return data[i]; }
-    float	    data[3];
+    float&          operator[](unsigned i)              { return data[i]; }
+    const float&    operator[](unsigned i) const        { return data[i]; }
+    float           data[3];
   };
-  std::vector<Point>		    points;
+  std::vector<Point>                points;
 };
 
 struct WrapMaster
 {
     diy::Master* master;
-    bool	 wrap;
+    bool         wrap;
 };
 
 void populate_kdtree_block(dblock_t* d, const diy::Master::ProxyWithLink& cp, void* aux_)
 {
   WrapMaster*   aux = (WrapMaster*) aux_;
-  diy::Master*	kdtree_master = aux->master;
-  bool		wrap	      = aux->wrap;
+  diy::Master*  kdtree_master = aux->master;
+  bool          wrap          = aux->wrap;
 
   diy::ContinuousBounds domain = d->data_bounds;
 
@@ -47,10 +47,10 @@ void populate_kdtree_block(dblock_t* d, const diy::Master::ProxyWithLink& cp, vo
 
 void extract_kdtree_block(KDTreeBlock* b, const diy::Master::ProxyWithLink& cp, void* aux)
 {
-  diy::Master*	tess_master = (diy::Master*) aux;
+  diy::Master*  tess_master = (diy::Master*) aux;
 
   int           tess_lid = tess_master->lid(cp.gid());
-  dblock_t*	d        = (dblock_t*) tess_master->block(tess_lid);	// assumes all the blocks are in memory
+  dblock_t*     d        = (dblock_t*) tess_master->block(tess_lid);    // assumes all the blocks are in memory
 
   // copy out the particles
   d->num_particles = d->num_orig_particles = b->points.size();
@@ -79,7 +79,7 @@ void extract_kdtree_block(KDTreeBlock* b, const diy::Master::ProxyWithLink& cp, 
   delete b;     // safe to do since kdtree_master doesn't own the blocks (no create/destroy supplied)
 }
 
-void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, double* times, bool wrap)
+void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, double* times, bool wrap, bool sampling)
 {
   timing(times, EXCH_TIME, -1, master.communicator());
 
@@ -87,9 +87,12 @@ void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, do
   WrapMaster wrap_master = { &kdtree_master, wrap };
   master.foreach<dblock_t>(&populate_kdtree_block, &wrap_master);
 
-  int bins = 1024;	// histogram bins; TODO: make a function argument
+  int bins = 1024;      // histogram bins; TODO: make a function argument
   diy::ContinuousBounds domain = master.block<dblock_t>(master.loaded_block())->data_bounds;
-  diy::kdtree(kdtree_master, assigner, 3, domain, &KDTreeBlock::points, bins, wrap);
+  if (sampling)
+      diy::kdtree_sampling(kdtree_master, assigner, 3, domain, &KDTreeBlock::points, bins, wrap);
+  else
+      diy::kdtree(kdtree_master, assigner, 3, domain, &KDTreeBlock::points, bins, wrap);
 
   kdtree_master.foreach<KDTreeBlock>(&extract_kdtree_block, &master);
   master.set_expected(kdtree_master.expected());
@@ -97,8 +100,8 @@ void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, do
   timing(times, -1, EXCH_TIME, master.communicator());
 }
 
-void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, bool wrap)
+void tess_kdtree_exchange(diy::Master& master, const diy::Assigner& assigner, bool wrap, bool sampling)
 {
   double times[TESS_MAX_TIMES];
-  tess_kdtree_exchange(master, assigner, times, wrap);
+  tess_kdtree_exchange(master, assigner, times, wrap, sampling);
 }
