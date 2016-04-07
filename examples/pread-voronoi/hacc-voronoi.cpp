@@ -18,6 +18,7 @@
 #include <diy/decomposition.hpp>
 #include <diy/reduce.hpp>
 #include <diy/partners/swap.hpp>
+#include <diy/io/bov.hpp>
 
 #include "../opts.h"
 #include "../memory.h"
@@ -72,17 +73,17 @@ struct AddAndRead: public AddBlock
 
 int main(int argc, char *argv[])
 {
-    int tot_blocks; // total number of blocks in the domain
-    int num_threads; // number of threads diy can use
-    int mem_blocks; // number of blocks to keep in memory
-    string infile; // input file name
-    string outfile; // output file name
-    float minvol, maxvol; // volume range, -1.0 = unused
-    int wrap_; // whether wraparound neighbors are used
-    int rank,size; // MPI usual
+    int tot_blocks;               // total number of blocks in the domain
+    int num_threads;              // number of threads diy can use
+    int mem_blocks;               // number of blocks to keep in memory
+    string infile;                // input file name
+    string outfile;               // output file name
+    float minvol, maxvol;         // volume range, -1.0 = unused
+    int wrap_;                    // whether wraparound neighbors are used
+    int rank, size;               // MPI usual
     double times[TESS_MAX_TIMES]; // timing
-    quants_t quants; // quantity stats
-    int sample_rate; // keep every one out of this many particles
+    quants_t quants;              // quantity stats
+    int sample_rate;              // keep every one out of this many particles
 
     diy::mpi::environment     env(argc, argv);
     diy::mpi::communicator    world;
@@ -114,8 +115,9 @@ int main(int argc, char *argv[])
         >> Option(     "minvol",    minvol,       "minvol cutoff")
         >> Option(     "maxvol",    maxvol,       "minvol cutoff")
         ;
-    wrap_ = ops >> Present('w', "wrap", "Use periodic boundary conditions");
+    wrap_       = ops >> Present('w', "wrap", "Use periodic boundary conditions");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
+    bool debug  = ops >> Present('d', "debug", "print debugging info");
 
     if ( ops >> Present('h', "help", "show help") ||
          !(ops >> PosOption(infile) >> PosOption(outfile) >> PosOption(sample_rate)) )
@@ -181,6 +183,33 @@ int main(int argc, char *argv[])
     if (wrap_)
         wrap.assign(3, true);
     diy::decompose(3, rank, domain, assigner, create_and_read, share_face, wrap, ghosts);
+
+    // get total number of particles
+    size_t nparticles = ((dblock_t*)master.block(0))->num_particles;
+    size_t tot_particles;
+    diy::mpi::all_reduce (world, nparticles, tot_particles, std::plus<size_t>());
+    if (rank == 0)
+        fprintf(stderr, "Total number of particles = %ld\n", tot_particles);
+
+    // debug: write points to bov file
+    if (debug)
+    {
+        size_t ofst = 0;
+        MPI_Exscan(&nparticles, &ofst, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+        // fprintf(stderr, "ofst (in particles) = %ld\n", ofst);   // debug
+        diy::mpi::io::file out(world,
+                               "debug.bov",
+                               diy::mpi::io::file::wronly | diy::mpi::io::file::create);
+        out.resize(0);                                          // truncate file if it exists
+        std::vector<size_t> shape(1, tot_particles * 3);        // in floats
+        diy::io::BOV writer(out, shape);
+        diy::DiscreteBounds box;
+        box.min[0] = ofst * 3;                                  // in floats
+        box.max[0] = (ofst + nparticles) * 3 - 1;               // in floats
+        writer.write(box, ((dblock_t*)master.block(0))->particles, true);
+        if (rank == 0)
+            fprintf(stderr, "BOV file written\n");
+    }
 
     // sort and distribute particles to all blocks
     if (kdtree)

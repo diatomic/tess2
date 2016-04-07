@@ -337,12 +337,13 @@ int main(int argc, char *argv[])
     if (debug)
     {
         size_t nparticles = ((dblock_t*)master.block(0))->num_particles;
-        size_t ofst;
+        size_t ofst = 0;
         MPI_Exscan(&nparticles, &ofst, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
-        fprintf(stderr, "ofst (in particles) = %ld\n", ofst);
+        // fprintf(stderr, "ofst (in particles) = %ld\n", ofst);    // debug
         diy::mpi::io::file out(world,
                                "debug.bov",
                                diy::mpi::io::file::wronly | diy::mpi::io::file::create);
+        out.resize(0);                                          // truncate file if it exists
         std::vector<size_t> shape(1, tot_particles * 3);        // in floats
         diy::io::BOV writer(out, shape);
         diy::DiscreteBounds box;

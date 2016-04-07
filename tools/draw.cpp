@@ -321,6 +321,7 @@ void display() {
 
   // block bounds
   if (block_mode) {
+    glDisable(GL_LIGHTING);
     for (int i = 0; i < nblocks; i++)
       draw_cube(master->block<dblock_t>(i)->mins, master->block<dblock_t>(i)->maxs, 1.0, 0.0, 1.0);
   }
