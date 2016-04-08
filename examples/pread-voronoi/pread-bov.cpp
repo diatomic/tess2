@@ -153,6 +153,7 @@ int main(int argc, char *argv[])
     num_threads   = 4;
     mem_blocks    = -1;
     string prefix = "./DIY.XXXXXX";
+    int chunk     = 1;
 
     Options ops(argc, argv);
 
@@ -161,10 +162,11 @@ int main(int argc, char *argv[])
         >> Option('t', "threads",   num_threads,  "Number of threads to use")
         >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
         >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
+        >> Option('c', "chunk",     chunk,        "chunk size for writing BOV (for debugging)")
         ;
-    bool wrap_  = ops >> Present('w', "wrap", "Use periodic boundary conditions");
+    bool wrap_  = ops >> Present('w', "wrap",   "Use periodic boundary conditions");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
-    bool debug  = ops >> Present('d', "debug", "print debugging info");
+    bool debug  = ops >> Present('d', "debug",  "print debugging info");
 
     if ( ops >> Present('h', "help", "show help") ||
          !(ops >> PosOption(infile)) )
@@ -225,15 +227,18 @@ int main(int argc, char *argv[])
     }
     if (rank == 0)
       fprintf(stderr, "Found %lu points\n", sz / 3);
-    std::vector<size_t> shape(1, sz);
+    std::vector<size_t> shape(1, sz / chunk);
     diy::io::BOV reader(in, shape);
     std::vector<float> values;
     diy::DiscreteBounds box;
     size_t npoints = sz / 3;
-    box.min[0] = rank * npoints / size * 3;
-    box.max[0] = rank == size - 1 ? sz - 1 : (rank + 1) * npoints / size * 3 - 1;
-    values.resize(box.max[0] - box.min[0] + 1);
-    reader.read(box, &values[0], true);
+    box.min[0] = rank * npoints / size * 3 / chunk;
+    if (rank == size - 1)
+        box.max[0] = sz / chunk - 1;
+    else
+        box.max[0] = (rank + 1) * npoints / size * 3 / chunk - 1;
+    values.resize((box.max[0] - box.min[0]) * chunk + 1);
+    reader.read(box, &values[0], true, chunk);
     fprintf(stderr, "Values read\n");
 
     // split points into blocks

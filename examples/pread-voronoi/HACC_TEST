@@ -56,7 +56,7 @@ outfile="del.out"
 sr=1
 
 # options: kd-tree
-# possibilities are --wrap --kdtree --minvol <minvol> --maxvol <maxvol> --blocks <totblocks>
+# possibilities are --wrap --kdtree --blocks <totblocks> --debug --chunk <chunk size>
 # opts="--blocks 64"
 opts="--kdtree --blocks 64"
 

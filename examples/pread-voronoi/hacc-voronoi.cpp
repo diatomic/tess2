@@ -78,8 +78,6 @@ int main(int argc, char *argv[])
     int mem_blocks;               // number of blocks to keep in memory
     string infile;                // input file name
     string outfile;               // output file name
-    float minvol, maxvol;         // volume range, -1.0 = unused
-    int wrap_;                    // whether wraparound neighbors are used
     int rank, size;               // MPI usual
     double times[TESS_MAX_TIMES]; // timing
     quants_t quants;              // quantity stats
@@ -101,9 +99,8 @@ int main(int argc, char *argv[])
     num_threads   = 4;
     mem_blocks    = -1;
     string prefix = "./DIY.XXXXXX";
-    minvol        = 0;
-    maxvol        = 0;
     sample_rate   = 1;
+    int chunk     = 1;
 
     Options ops(argc, argv);
 
@@ -112,12 +109,11 @@ int main(int argc, char *argv[])
         >> Option('t', "threads",   num_threads,  "Number of threads to use")
         >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
         >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
-        >> Option(     "minvol",    minvol,       "minvol cutoff")
-        >> Option(     "maxvol",    maxvol,       "minvol cutoff")
+        >> Option('c', "chunk",     chunk,        "chunk size for writing BOV (for debugging)")
         ;
-    wrap_       = ops >> Present('w', "wrap", "Use periodic boundary conditions");
+    bool wrap_  = ops >> Present('w', "wrap",   "Use periodic boundary conditions");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
-    bool debug  = ops >> Present('d', "debug", "print debugging info");
+    bool debug  = ops >> Present('d', "debug",  "print debugging info");
 
     if ( ops >> Present('h', "help", "show help") ||
          !(ops >> PosOption(infile) >> PosOption(outfile) >> PosOption(sample_rate)) )
@@ -201,12 +197,12 @@ int main(int argc, char *argv[])
                                "debug.bov",
                                diy::mpi::io::file::wronly | diy::mpi::io::file::create);
         out.resize(0);                                          // truncate file if it exists
-        std::vector<size_t> shape(1, tot_particles * 3);        // in floats
+        std::vector<size_t> shape(1, tot_particles * 3 / chunk);// in chunks
         diy::io::BOV writer(out, shape);
         diy::DiscreteBounds box;
-        box.min[0] = ofst * 3;                                  // in floats
-        box.max[0] = (ofst + nparticles) * 3 - 1;               // in floats
-        writer.write(box, ((dblock_t*)master.block(0))->particles, true);
+        box.min[0] = ofst * 3 / chunk;                          // in chunks
+        box.max[0] = (ofst + nparticles) * 3 / chunk - 1;       // in chunks
+        writer.write(box, ((dblock_t*)master.block(0))->particles, true, chunk);
         if (rank == 0)
             fprintf(stderr, "BOV file written\n");
     }
