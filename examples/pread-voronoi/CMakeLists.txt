@@ -52,19 +52,6 @@ endif                       (gadget)
 # balance
 add_executable              (balance balance.cpp ${io_sources})
 set_target_properties       (balance PROPERTIES COMPILE_FLAGS "-std=c++11")
-
-# TP: I need the following different compiler and link flags for my version of clang
-# but it doesn't link presumably because tess was not linked with these same flags
-# when it was built. TODO
-
-# if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR
-#    "${CMAKE_CXX_COMPILER_ID}" MATCHES  "Clang") #Syntax for CMAKE 3.+
-#     set_target_properties(balance PROPERTIES COMPILE_FLAGS "-std=c++11 -stdlib=libc++")
-#     set_target_properties(balance PROPERTIES LINK_FLAGS    "-lc++")
-# else()
-#     set_target_properties(balance PROPERTIES COMPILE_FLAGS "-std=c++11")
-# endif()
-
 target_link_libraries       (balance tess ${libraries} ${HDF5_libraries})
 if                          (gadget)
   target_link_libraries     (balance ${Boost_FILESYSTEM_LIBRARY})
