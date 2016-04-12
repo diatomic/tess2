@@ -154,6 +154,7 @@ int main(int argc, char *argv[])
     mem_blocks    = -1;
     string prefix = "./DIY.XXXXXX";
     int chunk     = 1;
+    std::string output_fn = "del.out";
 
     Options ops(argc, argv);
 
@@ -163,6 +164,7 @@ int main(int argc, char *argv[])
         >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
         >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
         >> Option('c', "chunk",     chunk,        "chunk size for writing BOV (for debugging)")
+        >> Option('o', "output",    output_fn,    "output filename")
         ;
     bool wrap_  = ops >> Present('w', "wrap",   "Use periodic boundary conditions");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
@@ -297,7 +299,8 @@ int main(int argc, char *argv[])
     if (rank == 0)
       fprintf(stderr, "Done in %lu rounds\n", rounds);
 
-    tess_save(master, "del.out", times);
+    if (output_fn != "!")
+        tess_save(master, output_fn.c_str(), times);
 
     timing(times, -1, TOT_TIME, world);
     tess_stats(master, quants, times);
