@@ -131,6 +131,7 @@ int main(int argc, char *argv[])
     int num_threads;                    // number of threads diy can use
     int mem_blocks;                     // number of blocks to keep in memory
     string infile;                      // input file name
+    string outfile;                     // output file name
     int rank, size;                     // MPI usual
     double times[TESS_MAX_TIMES];       // timing
     quants_t quants;                    // quantity stats
@@ -170,11 +171,11 @@ int main(int argc, char *argv[])
     bool swap   = ops >> Present('s', "swap",   "swap bytes when writing bov file (for debugging)");
 
     if ( ops >> Present('h', "help", "show help") ||
-         !(ops >> PosOption(infile)) )
+         !(ops >> PosOption(infile) >> PosOption(outfile)) )
     {
         if (rank == 0)
         {
-            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile minvol bf sr\n", argv[0]);
+            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile bf\n", argv[0]);
             std::cout << ops;
         }
         return 1;
@@ -192,6 +193,9 @@ int main(int argc, char *argv[])
 	if (wrap_ && tot_blocks < 64 && rank == 0)
 	    fprintf(stderr, "Warning: using k-d tree with wrap on and fewer than 64 blocks is likely to fail\n");
     }
+
+    if (outfile == "!")
+        outfile = "";
 
     timing(times, -1, -1, world);
     timing(times, TOT_TIME, -1, world);
@@ -297,12 +301,13 @@ int main(int argc, char *argv[])
     if (rank == 0)
       fprintf(stderr, "Done in %lu rounds\n", rounds);
 
-    tess_save(master, "del.out", times);
+    tess_save(master, outfile.c_str(), times);
 
     timing(times, -1, TOT_TIME, world);
     tess_stats(master, quants, times);
     
-    printf("Enumerating cells\n");
+    if (rank == 0)
+      fprintf(stderr, "Enumerating cells\n");
     master.foreach(&enumerate_cells);
     master.exchange();
 
