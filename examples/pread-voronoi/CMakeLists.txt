@@ -49,13 +49,13 @@ if                          (gadget)
   target_link_libraries     (pread-voronoi ${Boost_FILESYSTEM_LIBRARY})
 endif                       (gadget)
 
-# # balance
-# add_executable              (balance balance.cpp ${io_sources})
-# set_target_properties       (balance PROPERTIES COMPILE_FLAGS "-std=c++11")
-# target_link_libraries       (balance tess ${libraries} ${HDF5_libraries})
-# if                          (gadget)
-#   target_link_libraries     (balance ${Boost_FILESYSTEM_LIBRARY})
-# endif                       (gadget)
+# balance
+add_executable              (balance balance.cpp ${io_sources})
+set_target_properties       (balance PROPERTIES COMPILE_FLAGS "-std=c++11")
+target_link_libraries       (balance tess ${libraries} ${HDF5_libraries})
+if                          (gadget)
+  target_link_libraries     (balance ${Boost_FILESYSTEM_LIBRARY})
+endif                       (gadget)
 
 install                 (TARGETS pread-voronoi
   DESTINATION ${CMAKE_INSTALL_PREFIX}/examples/pread-voronoi/

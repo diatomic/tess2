@@ -247,11 +247,13 @@ int main(int argc, char *argv[])
 
     // split points into blocks
     master.foreach(&read_vertices, &values);
-    fprintf(stderr, "Values distributed to blocks\n");
+    if (rank == 0)
+      fprintf(stderr, "Values distributed to blocks\n");
     std::vector<float>().swap(values);	    // empty values and free the memory
     master.exchange();			    // process collectives
     master.foreach(&fill_bounds);
-    fprintf(stderr, "Bounds filled\n");
+    if (rank == 0)
+      fprintf(stderr, "Bounds filled\n");
 
     // get the domain from any block
     dblock_t* b = (dblock_t*)(master.block(master.loaded_block()));
@@ -263,9 +265,9 @@ int main(int argc, char *argv[])
     domain.max[2] = b->data_bounds.max[2];
 
     // debug
-    fprintf(stderr, "min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
-            domain.min[0], domain.min[1], domain.min[2],
-            domain.max[0], domain.max[1], domain.max[2]);
+    // fprintf(stderr, "min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
+    //         domain.min[0], domain.min[1], domain.min[2],
+    //         domain.max[0], domain.max[1], domain.max[2]);
 
     // decompose
     UpdateBlock update(master);
@@ -277,7 +279,7 @@ int main(int argc, char *argv[])
     else
         tess_exchange(master, assigner, times);
     if (rank == 0)
-        printf("particles exchanged\n");
+      fprintf(stderr, "particles exchanged\n");
 
     DuplicateCountMap count;
     master.foreach(&deduplicate, &count);

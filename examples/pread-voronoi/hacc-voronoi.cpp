@@ -195,7 +195,8 @@ int main(int argc, char *argv[])
         MPI_Exscan(&nparticles, &ofst, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
         // fprintf(stderr, "ofst (in particles) = %ld\n", ofst);   // debug
         diy::mpi::io::file out(world,
-                               "debug.bov",
+                               // "debug.bov",
+			       "/projects/SSSPPg/tpeterka/debug.bov",
                                diy::mpi::io::file::wronly | diy::mpi::io::file::create);
         out.resize(0);                                          // truncate file if it exists
         std::vector<size_t> shape(1, tot_particles * 3 / chunk);// in chunks
