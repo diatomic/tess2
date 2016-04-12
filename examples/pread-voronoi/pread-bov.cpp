@@ -238,10 +238,10 @@ int main(int argc, char *argv[])
         box.max[0] = sz / chunk - 1;
     else
         box.max[0] = (rank + 1) * npoints / size * 3 / chunk - 1;
-    values.resize((box.max[0] - box.min[0]) * chunk + 1);
+    values.resize((box.max[0] - box.min[0] + 1) * chunk);
     reader.read(box, &values[0], true, chunk);
     if (swap)
-        swap_bytes(&values[0], (box.max[0] - box.min[0]) * chunk + 1, sizeof(float));
+        swap_bytes(&values[0], (box.max[0] - box.min[0] + 1) * chunk, sizeof(float));
     if (rank == 0)
         fprintf(stderr, "Values read\n");
 
