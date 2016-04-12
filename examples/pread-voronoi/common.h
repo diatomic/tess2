@@ -109,4 +109,102 @@ void enumerate_cells(void* b_, const diy::Master::ProxyWithLink& cp, void*)
     cp.all_reduce(infinite, std::plus<size_t>());
 }
 
+// Swaps 8  bytes from 1-2-3-4-5-6-7-8 to 8-7-6-5-4-3-2-1 order.
+// cast the input as a char and use on any 8 byte variable
+void swap8(char *n) {
+
+    char *n1;
+    char c;
+
+    n1 = n + 7;
+    c = *n;
+    *n = *n1;
+    *n1 = c;
+
+    n++;
+    n1--;
+    c = *n;
+    *n = *n1;
+    *n1 = c;
+
+    n++;
+    n1--;
+    c = *n;
+    *n = *n1;
+    *n1 = c;
+
+    n++;
+    n1--;
+    c = *n;
+    *n = *n1;
+    *n1 = c;
+
+}
+
+// Swaps 4 bytes from 1-2-3-4 to 4-3-2-1 order.
+// cast the input as a char and use on any 4 byte variable
+void swap4(char *n) {
+
+    char *n1;
+    char c;
+
+    n1 = n + 3;
+    c = *n;
+    *n = *n1;
+    *n1 = c;
+
+    n++;
+    n1--;
+    c = *n;
+    *n = *n1;
+    *n1 = c;
+
+}
+
+// Swaps 2 bytes from 1-2 to 2-1 order.
+// cast the input as a char and use on any 2 byte variable
+void swap2(char *n){
+
+    char c;
+
+    c = *n;
+    *n = n[1];
+    n[1] = c;
+
+}
+
+void swap_bytes(void *p,                           // address of items
+                int nitems,                        // number of items
+                int item_size)                     // 2, 4, or 8 bytes (returns quietly if 1 byte)
+{
+    int i;
+    char*n = (char*)p;
+    switch(item_size) {
+    case 1:
+        return;
+        break;
+    case 2:
+        for (i = 0; i < nitems; i++) {
+            swap2(n);
+            n += 2;
+        }
+        break;
+    case 4:
+        for (i = 0; i < nitems; i++) {
+            swap4(n);
+            n += 4;
+        }
+        break;
+    case 8:
+        for (i = 0; i < nitems; i++) {
+            swap8(n);
+            n += 8;
+        }
+        break;
+    default:
+        fprintf(stderr, "Error: size of data must be either 1, 2, 4, or 8 bytes per item\n");
+
+    }
+}
+
 #endif

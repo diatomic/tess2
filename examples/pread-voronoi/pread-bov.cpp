@@ -167,6 +167,7 @@ int main(int argc, char *argv[])
     bool wrap_  = ops >> Present('w', "wrap",   "Use periodic boundary conditions");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
     bool debug  = ops >> Present('d', "debug",  "print debugging info");
+    bool swap   = ops >> Present('s', "swap",   "swap bytes when writing bov file (for debugging)");
 
     if ( ops >> Present('h', "help", "show help") ||
          !(ops >> PosOption(infile)) )
@@ -239,7 +240,10 @@ int main(int argc, char *argv[])
         box.max[0] = (rank + 1) * npoints / size * 3 / chunk - 1;
     values.resize((box.max[0] - box.min[0]) * chunk + 1);
     reader.read(box, &values[0], true, chunk);
-    fprintf(stderr, "Values read\n");
+    if (swap)
+        swap_bytes(&values[0], (box.max[0] - box.min[0]) * chunk + 1, sizeof(float));
+    if (rank == 0)
+        fprintf(stderr, "Values read\n");
 
     // split points into blocks
     master.foreach(&read_vertices, &values);

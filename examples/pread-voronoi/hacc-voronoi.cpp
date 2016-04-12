@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
     bool wrap_  = ops >> Present('w', "wrap",   "Use periodic boundary conditions");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
     bool debug  = ops >> Present('d', "debug",  "print debugging info");
+    bool swap   = ops >> Present('s', "swap",   "swap bytes when writing bov file (for debugging)");
 
     if ( ops >> Present('h', "help", "show help") ||
          !(ops >> PosOption(infile) >> PosOption(outfile) >> PosOption(sample_rate)) )
@@ -202,7 +203,11 @@ int main(int argc, char *argv[])
         diy::DiscreteBounds box;
         box.min[0] = ofst * 3 / chunk;                          // in chunks
         box.max[0] = (ofst + nparticles) * 3 / chunk - 1;       // in chunks
+        if (swap)                                               // swap bytes for writing bov file
+            swap_bytes(((dblock_t*)master.block(0))->particles, nparticles * 3, sizeof(float));
         writer.write(box, ((dblock_t*)master.block(0))->particles, true, chunk);
+        if (swap)                                               // swap back to continue with tess
+            swap_bytes(((dblock_t*)master.block(0))->particles, nparticles * 3, sizeof(float));
         if (rank == 0)
             fprintf(stderr, "BOV file written\n");
     }
