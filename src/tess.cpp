@@ -92,9 +92,13 @@ size_t tess(diy::Master& master,
   while(!done)
   {
     rounds++;
- 
+
+    double start = MPI_Wtime();
     master.foreach(&delaunay, &aux);
     master.exchange();
+
+    if (master.communicator().rank() == 0)
+        fprintf(stderr, "[%d]: Time for round %lu = %f s\n", master.communicator().rank(), rounds, MPI_Wtime() - start);
 
     aux.first = false;
     done = master.proxy(master.loaded_block()).read<int>();
