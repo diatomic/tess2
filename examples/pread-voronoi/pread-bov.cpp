@@ -131,6 +131,7 @@ int main(int argc, char *argv[])
     int num_threads;                    // number of threads diy can use
     int mem_blocks;                     // number of blocks to keep in memory
     string infile;                      // input file name
+    string outfile;                     // output file name
     int rank, size;                     // MPI usual
     double times[TESS_MAX_TIMES];       // timing
     quants_t quants;                    // quantity stats
@@ -154,7 +155,6 @@ int main(int argc, char *argv[])
     mem_blocks    = -1;
     string prefix = "./DIY.XXXXXX";
     int chunk     = 1;
-    std::string output_fn = "del.out";
 
     Options ops(argc, argv);
 
@@ -164,7 +164,6 @@ int main(int argc, char *argv[])
         >> Option('m', "in-memory", mem_blocks,   "Number of blocks to keep in memory")
         >> Option('s', "storage",   prefix,       "Path for out-of-core storage")
         >> Option('c', "chunk",     chunk,        "chunk size for writing BOV (for debugging)")
-        >> Option('o', "output",    output_fn,    "output filename")
         ;
     bool wrap_  = ops >> Present('w', "wrap",   "Use periodic boundary conditions");
     bool kdtree = ops >> Present(     "kdtree", "use kdtree decomposition");
@@ -172,11 +171,11 @@ int main(int argc, char *argv[])
     bool swap   = ops >> Present('s', "swap",   "swap bytes when writing bov file (for debugging)");
 
     if ( ops >> Present('h', "help", "show help") ||
-         !(ops >> PosOption(infile)) )
+         !(ops >> PosOption(infile) >> PosOption(outfile)) )
     {
         if (rank == 0)
         {
-            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile minvol bf sr\n", argv[0]);
+            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile\n", argv[0]);
             std::cout << ops;
         }
         return 1;
@@ -299,13 +298,14 @@ int main(int argc, char *argv[])
     if (rank == 0)
       fprintf(stderr, "Done in %lu rounds\n", rounds);
 
-    if (output_fn != "!")
-        tess_save(master, output_fn.c_str(), times);
+    if (outfile != "!")
+        tess_save(master, outfile.c_str(), times);
 
     timing(times, -1, TOT_TIME, world);
     tess_stats(master, quants, times);
     
-    printf("Enumerating cells\n");
+    if (rank == 0)
+      fprintf(stderr, "Enumerating cells\n");
     master.foreach(&enumerate_cells);
     master.exchange();
 

@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     {
         if (rank == 0)
         {
-            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile minvol bf sr\n", argv[0]);
+            fprintf(stderr, "Usage: %s [OPTIONS] infile outfile bf sr\n", argv[0]);
             std::cout << ops;
         }
         return 1;
