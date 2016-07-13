@@ -27,6 +27,21 @@
 #include "common.h"
 
 
+// This class is coupled with how reading works in io/{hdf5,gadget}
+struct ParticleRange
+{
+            ParticleRange(int size_, size_t total_):
+                size(size_), total(total_)      {}
+
+    size_t  from(int rank) const                { if (rank >= size) return total; return total / size * rank; }
+    size_t  to(int rank) const                  { if (rank >= size - 1) return total; return from(rank + 1); }
+    size_t  count(int rank) const               { return to(rank) - from(rank); }
+    int     rank(size_t p) const                { int r = p / (total / size); if (r >= size) r = size - 1; return r; }
+
+    int     size;
+    size_t  total;
+};
+
 int main(int argc, char *argv[])
 {
     string infile; // input file name
@@ -99,13 +114,79 @@ int main(int argc, char *argv[])
                                  coordinates);
 
     size_t total_particles;
-    diy::mpi::reduce(world, particles.size()/3, total_particles, 0, std::plus<size_t>());
+    diy::mpi::all_reduce(world, particles.size()/3, total_particles, std::plus<size_t>());
+
+    std::vector<float> source_particles;
+    source_particles.swap(particles);       // keep a copy of the original for possible redistribution
 
     if (rank == 0)
         std::cout << "Particles read: " << total_particles << std::endl;
 
     for (int nblocks = min_blocks; nblocks <= max_blocks; nblocks *= 2)
     {
+        world.barrier();
+        diy::mpi::communicator working_comm = world;
+        if (nblocks < size)
+        {
+            // redistribute source particles into particles
+            std::list<diy::mpi::request> inflight;
+
+            int tag = 0;
+            ParticleRange source(size,    total_particles);
+            ParticleRange target(nblocks, total_particles);
+            particles.resize(target.count(world.rank())*3);
+
+            // post receive requests
+            diy::mpi::request r;
+            size_t from  = target.from(world.rank());
+            size_t i     = from;
+            size_t to    = target.to(world.rank());
+            particles.resize((to - from)*3);
+            //std::cout << "[" << world.rank() << "]: " << "source particles size = " << source_particles.size() << "; target particles size = " << particles.size() << std::endl;
+            while (i < to)
+            {
+                int rk     = source.rank(i);
+                int count  = std::min(source.count(rk), to - i);
+                //std::cout << "[" << world.rank() << "]: " << "Posting receive at " << (i - from)*3 << " for " << count*3 << " from " << rk << std::endl;
+                MPI_Irecv(&particles[(i - from)*3], count*3, MPI_FLOAT, rk, tag, world, &r.r);
+                inflight.push_back(r);
+                i += count;
+            }
+
+            // post send requests
+            from = source.from(world.rank());
+            i    = from;
+            to   = source.to(world.rank());
+            while (i < to)
+            {
+                int rk     = target.rank(i);
+                int count  = std::min(target.count(rk), to - i);
+                //std::cout << "[" << world.rank() << "]: " << "Posting send at " << (i - from)*3 << " for " << count*3 << " to " << rk << std::endl;
+                MPI_Isend(&source_particles[(i - from)*3], count*3, MPI_FLOAT, rk, tag, world, &r.r);
+                inflight.push_back(r);
+                i += count;
+            }
+
+            // kick requests until done
+            while(!inflight.empty())
+                for (auto it = inflight.begin(); it != inflight.end(); ++it)
+                    if (it->test())
+                        inflight.erase(it--);
+
+            // restrict the working_comm
+            int color = world.rank() < nblocks ? 0 : 1;
+            MPI_Comm newcomm;
+            MPI_Comm_split(world, color, world.rank(), &newcomm);
+            working_comm = newcomm;
+
+            if (world.rank() >= nblocks)
+                continue;
+        } else
+        {
+            particles = source_particles;   // just make a copy
+        }
+        rank = working_comm.rank();
+
         size_t average = total_particles / nblocks;
         if (rank == 0)
             std::cout << "----\n"
@@ -113,14 +194,14 @@ int main(int argc, char *argv[])
 
         // initialize DIY and decompose domain
         diy::FileStorage          storage(prefix);
-        diy::Master               master(world, 1, -1,
+        diy::Master               master(working_comm, 1, -1,
                                          &create_block,
                                          &destroy_block,
                                          &storage,
                                          &save_block,
                                          &load_block);
 
-        diy::ContiguousAssigner   assigner(world.size(), nblocks);
+        diy::ContiguousAssigner   assigner(working_comm.size(), nblocks);
 
         // decompose
         AddBlock add(master);
@@ -154,6 +235,7 @@ int main(int argc, char *argv[])
 
         // regular decomposition
         diy::decompose(3, rank, domain, assigner, fill_block);
+
         tess_exchange(master, assigner, times);
 
         // figure out the maxs
