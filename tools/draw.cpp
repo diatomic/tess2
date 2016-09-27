@@ -1148,8 +1148,11 @@ void PrepCellRendering(stats_t& stats) {
       int t = master->block<dblock_t>(b)->vert_to_tet[p];
 
       // skip tets with missing neighbors
-      if (master->block<dblock_t>(b)->tets[t].tets[0] == -1 || master->block<dblock_t>(b)->tets[t].tets[1] == -1 ||
-	  master->block<dblock_t>(b)->tets[t].tets[2] == -1 || master->block<dblock_t>(b)->tets[t].tets[3] == -1)
+      if (t == -1 ||
+          master->block<dblock_t>(b)->tets[t].tets[0] == -1 ||
+          master->block<dblock_t>(b)->tets[t].tets[1] == -1 ||
+	  master->block<dblock_t>(b)->tets[t].tets[2] == -1 ||
+          master->block<dblock_t>(b)->tets[t].tets[3] == -1)
 	continue;
 
       // neighbor edges a vector of (vertex u, tet of vertex u) pairs

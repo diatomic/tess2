@@ -255,8 +255,8 @@ void IterateCells(dblock_t* block,
     float grid_pos[3]; // physical position of grid point
 
     // skip inccomplete cells
-    if (!complete(cell, block->tets, block->num_tets,
-		  block->vert_to_tet[cell]))
+    if (block->vert_to_tet[cell] == -1 ||
+        !complete(cell, block->tets, block->num_tets, block->vert_to_tet[cell]))
       continue;
 
     vector <float> normals; // cell normals
