@@ -3,11 +3,11 @@
 set			(TESS_SOURCES tess.cpp tess-regular.cpp tess-kdtree.cpp swap.cpp tet.cpp dense.cpp volume.cpp)
 
 if			(${serial} MATCHES "CGAL")
-#  add_library		(tess SHARED ${TESS_SOURCES} tess-cgal.cpp) # DEPRECATED, don't force shared
+ # add_library		(tess SHARED ${TESS_SOURCES} tess-cgal.cpp)
   add_library		(tess ${TESS_SOURCES} tess-cgal.cpp)
   target_link_libraries	(tess ${libraries})
 elseif			(${serial} MATCHES "QHull")
-#  add_library		(tess SHARED ${TESS_SOURCES} tess-qhull.c) # DEPRECATED, don't force shared
+ # add_library		(tess SHARED ${TESS_SOURCES} tess-qhull.c)
   add_library		(tess ${TESS_SOURCES} tess-qhull.c)
   target_link_libraries	(tess ${libraries})
 else			()
