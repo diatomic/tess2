@@ -9,6 +9,10 @@ void redistribute(void* b_, const diy::ReduceProxy& srp, const diy::RegularSwapP
 
 void tess_exchange(diy::Master& master, const diy::Assigner& assigner, double* times)
 {
+  int rank, size;
+  MPI_Comm_rank(master.communicator(), &rank);
+  MPI_Comm_size(master.communicator(), &size);
+  fprintf(stderr, "1.1: rank=%d size=%d\n", rank, size);
   timing(times, EXCH_TIME, -1, master.communicator());
   int k = 2;
 

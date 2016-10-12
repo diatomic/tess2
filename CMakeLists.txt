@@ -10,6 +10,9 @@ option			    (draw	       "Build draw"				       ON)
 option			    (bgq	       "Build on BG/Q"				       OFF)
 option			    (pread             "Build pread-voronoi example (requires HDF5)"   OFF)
 option                      (diy_thread        "Enable diy threading"                          OFF)
+option                      (build_examples    "Build examples"                                ON)
+option                      (build_tools       "Build tools"                                   ON)
+
 set			    (serial	       "QHull" CACHE STRING "serial Delaunay library to use")
 set_property		    (CACHE serial PROPERTY STRINGS CGAL QHull)
 
@@ -74,9 +77,7 @@ endif			    ()
 
 # MPI
 find_package                (MPI REQUIRED)
-if                          (NOT bgq)
-    set                     (libraries ${libraries}    ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
-endif                       (NOT bgq)
+set                         (libraries ${libraries}    ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
 
 # Threads
 find_package		    (Threads)
@@ -127,8 +128,12 @@ endif                       (debug)
 
 # Subdirectories
 add_subdirectory	    (src)
+if                          (build_examples)
 add_subdirectory	    (examples)
+endif                       ()
+if                          (build_tools)
 add_subdirectory	    (tools)
+endif                       ()
 
 # Install the headers
 file                        (GLOB DEPLOY_FILES_AND_DIRS "${PROJECT_SOURCE_DIR}/include/*")
