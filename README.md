@@ -4,14 +4,19 @@
 
 Tess is released as open source software under a BSD style [license](./COPYING).
 
+## Requirements
+
+- a C++11 compiler
+- the [DIY](https://github.com/diatomic/diy) block parallel library
+- either the [Qhull](http://qhull.org/) or [CGAL](http://www.cgal.org/) computational geometry library
+
 ## Installation
 
-(for tess based on qhull)
-
+The following instructions assume Qhull is the serial geometry engine.
 
 Build Dependencies
 
-a. [DIY2](https://github.com/diatomic/diy2)
+a. [DIY](https://github.com/diatomic/diy)
 
 ```
 git clone https://github.com/diatomic/diy2

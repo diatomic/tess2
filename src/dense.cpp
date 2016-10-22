@@ -84,7 +84,8 @@ void dense(alg alg_type,              // algorithm DENSE_TESS, DENSE_CIC
   args.glo_num_idx[2]    = glo_num_idx[2];
 
   // allocate and initialize density field
-  master.foreach(&init_dense, &args);
+  master.foreach([&](dblock_t* b, const diy::Master::ProxyWithLink& cp)
+                 { init_dense(b, cp, &args); });
 
   // divisor for volume (3d density) or area (2d density)
   // assumes projection is to x-y plane
@@ -92,23 +93,22 @@ void dense(alg alg_type,              // algorithm DENSE_TESS, DENSE_CIC
               grid_step_size[0] * grid_step_size[1] * grid_step_size[2]);
 
   // estimate density
-  master.foreach(&est_dense, &args);
+  master.foreach([&](dblock_t* b, const diy::Master::ProxyWithLink& cp)
+                 { est_dense(b, cp, &args); });
 
   // exchange grid points
   master.exchange();
 
   // process received points
-  master.foreach(&recvd_pts, &args);
+  master.foreach([&](dblock_t* b, const diy::Master::ProxyWithLink& cp)
+                 { recvd_pts(b, cp, &args); });
 }
 
 // foreach block function to initialize density
-void init_dense(void* b_,
+void init_dense(dblock_t*                         b,
                 const diy::Master::ProxyWithLink& cp,
-                void* args)
+                args_t*                           a)
 {
-  dblock_t* b = (dblock_t*)b_;
-  args_t* a   = (args_t*)args;
-
   // local block grid parameters
   int block_min_idx[3];                    // global grid index of block minimum grid point
   int block_max_idx[3];                    // global grid index of block maximum grid point
@@ -129,13 +129,10 @@ void init_dense(void* b_,
 }
 
 // foreach block function to estimate density
-void est_dense(void* b_,
-               const diy::Master::ProxyWithLink& cp,
-               void* args)
+void est_dense(dblock_t*                         b,
+                const diy::Master::ProxyWithLink& cp,
+                args_t*                           a)
 {
-  dblock_t* b = (dblock_t*)b_;
-  args_t* a   = (args_t*)args;
-
   // local block grid parameters
   int block_min_idx[3];                    // global grid index of block minimum grid point
   int block_max_idx[3];                    // global grid index of block maximum grid point
@@ -168,12 +165,10 @@ void est_dense(void* b_,
 }
 
 // foreach block function to receive points
-void recvd_pts(void* b_,
+void recvd_pts(dblock_t*                         b,
                const diy::Master::ProxyWithLink& cp,
-               void* args)
+               args_t*                           a)
 {
-  dblock_t*        b    = (dblock_t*)b_;
-  args_t*          a    = (args_t*)args;
   diy::Link*       l    = cp.link();
   std::vector<int> in;                     // gids of sources
 

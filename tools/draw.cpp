@@ -224,13 +224,9 @@ int main(int argc, char** argv) {
                                    &create_block,
                                    &destroy_block);
 
-  diy::ContiguousAssigner   assigner(world.size(), -1);	    // number of blocks will be set by read_blocks()
+  diy::ContiguousAssigner   assigner(world.size(), -1);	// num blocks will be set by read_blocks()
   diy::io::read_blocks(argv[1], world, assigner, master, &load_block_light);
-  //pnetcdf_read(&nblocks, &tot_blocks, &blocks, argv[1], MPI_COMM_WORLD,
-  //             &num_neighbors, &neighbors, &neigh_procs);
 
-  //MPI_Finalize();
-  
   tot_blocks = nblocks = master.size();
   ::master = &master;
 

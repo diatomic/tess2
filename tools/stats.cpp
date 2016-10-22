@@ -2,7 +2,7 @@
 #include "tess/tess.hpp"
 #include "tess/tet-neighbors.h"
 
-void print_block_info(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+void print_block_info(void* b_, const diy::Master::ProxyWithLink& cp)
 {
   dblock_t* b = static_cast<dblock_t*>(b_);
 
@@ -10,7 +10,7 @@ void print_block_info(void* b_, const diy::Master::ProxyWithLink& cp, void*)
          b->gid, b->num_orig_particles, b->num_particles, b->num_tets);
 }
 
-void sum_edges(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+void sum_edges(void* b_, const diy::Master::ProxyWithLink& cp)
 {
   dblock_t* b = static_cast<dblock_t*>(b_);
 
@@ -48,9 +48,9 @@ int main(int argc, char** argv) {
 
   printf("Blocks read: %d\n", master.size());
 
-  master.foreach(&print_block_info);
+  master.foreach(print_block_info);
 
-  master.foreach(&sum_edges);
+  master.foreach(sum_edges);
   master.exchange();	// process collectives
 
   if (world.rank() == 0)
