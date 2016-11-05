@@ -34,7 +34,7 @@ struct UpdateBlock
     void operator()(int gid, int lid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
                      const RCLink& link) const
         {
-            dblock_t* b = (dblock_t*)master.block(lid);
+            DBlock* b = (DBlock*)master.block(lid);
 
             // fprintf(stderr, "gid %d lid %d num_particles %d num_orig_particles %d "
             //         "core min [%.3f %.3f %.3f] max[%.3f %.3f %.3f] "
@@ -48,15 +48,9 @@ struct UpdateBlock
             //         domain.min[0], domain.min[1], domain.min[2],
             //         domain.max[0], domain.max[1], domain.max[2]);
 
-            for (int i = 0; i < 3; ++i)
-            {
-                b->mins[i] = core.min[i];
-                b->maxs[i] = core.max[i];
-                b->box.min[i] = domain.min[i];
-                b->box.max[i] = domain.max[i];
-                b->data_bounds.min[i] = domain.min[i];
-                b->data_bounds.max[i] = domain.max[i];
-            }
+            b->bounds = core;
+            b->box = domain;
+            b->data_bounds = domain;
         }
 
     diy::Master&                             master;
@@ -67,20 +61,18 @@ struct UpdateBlock
 // when using all-to-all, write the callback as if it is only called once at the beginning
 // round and once at the end; diy will take care of the intermediate rounds for you
 //
-void minmax(void* b_,                                  // local block
+void minmax(DBlock* b,                                 // local block
             const diy::ReduceProxy& rp)                // communication proxy
 {
-    dblock_t* b = static_cast<dblock_t*>(b_);
-
     // step 0: initialize global bounds
     if (!rp.in_link().size() && b->num_particles)      // this block read points
     {
-        b->data_bounds.min[0] = b->mins[0] - 0.0001;
-        b->data_bounds.min[1] = b->mins[1] - 0.0001;
-        b->data_bounds.min[2] = b->mins[2] - 0.0001;
-        b->data_bounds.max[0] = b->maxs[0] + 0.0001;
-        b->data_bounds.max[1] = b->maxs[1] + 0.0001;
-        b->data_bounds.max[2] = b->maxs[2] + 0.0001;
+        b->data_bounds.min[0] = b->bounds.min[0] - 0.0001;
+        b->data_bounds.min[1] = b->bounds.min[1] - 0.0001;
+        b->data_bounds.min[2] = b->bounds.min[2] - 0.0001;
+        b->data_bounds.max[0] = b->bounds.max[0] + 0.0001;
+        b->data_bounds.max[1] = b->bounds.max[1] + 0.0001;
+        b->data_bounds.max[2] = b->bounds.max[2] + 0.0001;
     }
     if (!rp.in_link().size() && !b->num_particles)     // this block did not read points
     {
@@ -99,7 +91,7 @@ void minmax(void* b_,                                  // local block
     // step 2: dequeue
     for (unsigned i = 0; i < rp.in_link().size(); ++i)
     {
-        bb_c_t data_bounds;
+        diy::ContinuousBounds data_bounds;
         rp.dequeue(rp.in_link().target(i).gid, data_bounds);
         if (data_bounds.min[0] < b->data_bounds.min[0])
             b->data_bounds.min[0] = data_bounds.min[0];
@@ -129,11 +121,12 @@ struct Aux
 
 // read mesh vertices
 void
-read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
+read_vertices(DBlock *b, 
+              const diy::Master::ProxyWithLink& cp,
+              Aux& aux)
 {
-    dblock_t* b             = static_cast<dblock_t*>(b_);
-    string* infile          = ((Aux*)aux)->filename;
-    diy::Assigner* assigner = ((Aux*)aux)->assigner;
+    string* infile          = aux.filename;
+    diy::Assigner* assigner = aux.assigner;
 
     ErrorCode rval; // moab return value
 
@@ -178,25 +171,25 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
             // global domain bounds
             if (it == pts.begin())
             {
-                b->mins[0] = b->maxs[0] = pt[0];
-                b->mins[1] = b->maxs[1] = pt[1];
-                b->mins[2] = b->maxs[2] = pt[2];
+                b->bounds.min[0] = b->bounds.max[0] = pt[0];
+                b->bounds.min[1] = b->bounds.max[1] = pt[1];
+                b->bounds.min[2] = b->bounds.max[2] = pt[2];
             }
             else
             {
-                if (pt[0] < b->mins[0]) b->mins[0] = pt[0];
-                if (pt[1] < b->mins[1]) b->mins[1] = pt[1];
-                if (pt[2] < b->mins[2]) b->mins[2] = pt[2];
-                if (pt[0] > b->maxs[0]) b->maxs[0] = pt[0];
-                if (pt[1] > b->maxs[1]) b->maxs[1] = pt[1];
-                if (pt[2] > b->maxs[2]) b->maxs[2] = pt[2];
+                if (pt[0] < b->bounds.min[0]) b->bounds.min[0] = pt[0];
+                if (pt[1] < b->bounds.min[1]) b->bounds.min[1] = pt[1];
+                if (pt[2] < b->bounds.min[2]) b->bounds.min[2] = pt[2];
+                if (pt[0] > b->bounds.max[0]) b->bounds.max[0] = pt[0];
+                if (pt[1] > b->bounds.max[1]) b->bounds.max[1] = pt[1];
+                if (pt[2] > b->bounds.max[2]) b->bounds.max[2] = pt[2];
             }
         }
 
         // debug
         // fprintf(stderr, "num_particles %d min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
         //         b->num_particles,
-        //         b->mins[0], b->mins[1], b->mins[2], b->maxs[0], b->maxs[1], b->maxs[2]);
+        //         b->bounds.min[0], b->bounds.min[1], b->bounds.min[2], b->bounds.max[0], b->bounds.max[1], b->bounds.max[2]);
 
         // cleanup
         delete mb;
@@ -214,15 +207,15 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
 // debug: print the block
 void verify_block(void* b_, const diy::Master::ProxyWithLink& cp, void*)
 {
-    dblock_t* b = static_cast<dblock_t*>(b_);
+    DBlock* b = static_cast<DBlock*>(b_);
 
     fprintf(stderr, "gid %d num_particles %d num_orig_particles %d num_tets %d complete %d\n"
             "bounds min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n"
             "domain min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n"
             "box min[%.3f %.3f %.3f] max[%.3f %.3f %.3f]\n",
             b->gid, b->num_particles, b->num_orig_particles, b->num_tets, b->complete,
-            b->mins[0], b->mins[1], b->mins[2],
-            b->maxs[0], b->maxs[1], b->maxs[2],
+            b->bounds.min[0], b->bounds.min[1], b->bounds.min[2],
+            b->bounds.max[0], b->bounds.max[1], b->bounds.max[2],
             b->data_bounds.min[0], b->data_bounds.min[1], b->data_bounds.min[2],
             b->data_bounds.max[0], b->data_bounds.max[1], b->data_bounds.max[2],
             b->box.min[0], b->box.min[1], b->box.min[2],
@@ -325,7 +318,8 @@ int main(int argc, char *argv[])
     Aux aux;
     aux.filename = &infile;
     aux.assigner = &assigner;
-    master.foreach(&read_vertices, &aux);
+    master.foreach([&](DBlock* b, const diy::Master::ProxyWithLink& cp)
+                   { read_vertices(b, cp, aux); });
 
     // get total number of particles
     master.exchange();			    // process collectives
@@ -336,7 +330,7 @@ int main(int argc, char *argv[])
     // debug: write points to bov file
     if (debug)
     {
-        size_t nparticles = ((dblock_t*)master.block(0))->num_particles;
+        size_t nparticles = ((DBlock*)master.block(0))->num_particles;
         size_t ofst = 0;
         MPI_Exscan(&nparticles, &ofst, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
         // fprintf(stderr, "ofst (in particles) = %ld\n", ofst);    // debug
@@ -349,7 +343,7 @@ int main(int argc, char *argv[])
         diy::DiscreteBounds box;
         box.min[0] = ofst * 3;                                  // in floats
         box.max[0] = (ofst + nparticles) * 3 - 1;               // in floats
-        writer.write(box, ((dblock_t*)master.block(0))->particles, true);
+        writer.write(box, ((DBlock*)master.block(0))->particles, true);
         if (rank == 0)
             fprintf(stderr, "BOV file written\n");
     }
@@ -358,13 +352,8 @@ int main(int argc, char *argv[])
     diy::all_to_all(master, assigner, &minmax);
 
     // get the domain from any block
-    dblock_t*b = (dblock_t*)(master.block(master.loaded_block()));
-    domain.min[0] = b->data_bounds.min[0];
-    domain.min[1] = b->data_bounds.min[1];
-    domain.min[2] = b->data_bounds.min[2];
-    domain.max[0] = b->data_bounds.max[0];
-    domain.max[1] = b->data_bounds.max[1];
-    domain.max[2] = b->data_bounds.max[2];
+    DBlock*b = (DBlock*)(master.block(master.loaded_block()));
+    domain = b->data_bounds;
 
     // debug
     if (rank == 0)

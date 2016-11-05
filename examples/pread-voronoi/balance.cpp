@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
             lids[local_gids[i]] = i;
         auto fill_block = [&add,&particles,&lids](int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain, const RCLink& link)
                           {
-                            dblock_t* b = add(gid, core, bounds, domain, link);
+                            DBlock* b = add(gid, core, bounds, domain, link);
 
                             int lid = lids[gid];
                             size_t nparticles = particles.size() / 3;
@@ -239,11 +239,11 @@ int main(int argc, char *argv[])
         tess_exchange(master, assigner, times);
 
         // figure out the maxs
-        master.foreach<dblock_t>([](dblock_t* b, const diy::Master::ProxyWithLink& cp, void*)
-                                 {
-                                    cp.collectives()->clear();
-                                    cp.all_reduce(b->num_particles, diy::mpi::maximum<int>());
-                                 });
+        master.foreach([](DBlock* b, const diy::Master::ProxyWithLink& cp)
+                       {
+                           cp.collectives()->clear();
+                           cp.all_reduce(b->num_particles, diy::mpi::maximum<int>());
+                       });
         master.exchange();
 
         int all_max_regular;
@@ -262,11 +262,11 @@ int main(int argc, char *argv[])
         tess_kdtree_exchange(master, assigner, times, false);
 
         // figure out the maxs
-        master.foreach<dblock_t>([](dblock_t* b, const diy::Master::ProxyWithLink& cp, void*)
-                                 {
-                                    cp.collectives()->clear();
-                                    cp.all_reduce(b->num_particles, diy::mpi::maximum<int>());
-                                 });
+        master.foreach([](DBlock* b, const diy::Master::ProxyWithLink& cp)
+                       {
+                           cp.collectives()->clear();
+                           cp.all_reduce(b->num_particles, diy::mpi::maximum<int>());
+                       });
         master.exchange();
 
         int all_max_kdtree_hist;
@@ -286,11 +286,11 @@ int main(int argc, char *argv[])
         tess_kdtree_exchange(master, assigner, times, false, true);
 
         // figure out the maxs
-        master.foreach<dblock_t>([](dblock_t* b, const diy::Master::ProxyWithLink& cp, void*)
-                                 {
-                                    cp.collectives()->clear();
-                                    cp.all_reduce(b->num_particles, diy::mpi::maximum<int>());
-                                 });
+        master.foreach([](DBlock* b, const diy::Master::ProxyWithLink& cp)
+                       {
+                           cp.collectives()->clear();
+                           cp.all_reduce(b->num_particles, diy::mpi::maximum<int>());
+                       });
         master.exchange();
 
         int all_max_kdtree_sample;

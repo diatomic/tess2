@@ -39,7 +39,7 @@ struct AddAndRead: public AddBlock
     void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
                      const RCLink& link) const
         {
-            dblock_t* b = AddBlock::operator()(gid, core, bounds, domain, link);
+            DBlock* b = AddBlock::operator()(gid, core, bounds, domain, link);
 
             // read points
             std::vector<float>	particles;
@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
     diy::decompose(3, rank, domain, assigner, create_and_read, share_face, wrap, ghosts);
 
     // get total number of particles
-    size_t nparticles = ((dblock_t*)master.block(0))->num_particles;
+    size_t nparticles = ((DBlock*)master.block(0))->num_particles;
     size_t tot_particles;
     diy::mpi::all_reduce (world, nparticles, tot_particles, std::plus<size_t>());
     if (rank == 0)
@@ -205,10 +205,10 @@ int main(int argc, char *argv[])
         box.min[0] = ofst * 3 / chunk;                          // in chunks
         box.max[0] = (ofst + nparticles) * 3 / chunk - 1;       // in chunks
         if (swap)                                               // swap bytes for writing bov file
-            swap_bytes(((dblock_t*)master.block(0))->particles, nparticles * 3, sizeof(float));
-        writer.write(box, ((dblock_t*)master.block(0))->particles, true, chunk);
+            swap_bytes(((DBlock*)master.block(0))->particles, nparticles * 3, sizeof(float));
+        writer.write(box, ((DBlock*)master.block(0))->particles, true, chunk);
         if (swap)                                               // swap back to continue with tess
-            swap_bytes(((dblock_t*)master.block(0))->particles, nparticles * 3, sizeof(float));
+            swap_bytes(((DBlock*)master.block(0))->particles, nparticles * 3, sizeof(float));
         if (rank == 0)
             fprintf(stderr, "BOV file written\n");
     }
@@ -222,7 +222,8 @@ int main(int argc, char *argv[])
         printf("particles exchanged\n");
 
     DuplicateCountMap count;
-    master.foreach(&deduplicate, &count);
+    master.foreach([&](DBlock* b, const diy::Master::ProxyWithLink& cp)
+                   { deduplicate(b, cp, count); });
 
     // debug purposes only: checks if the particles got into the right blocks
     // master.foreach(&verify_particles);

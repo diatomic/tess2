@@ -16,10 +16,10 @@ struct DedupPoint
     bool	    operator<(const DedupPoint& other) const	    { return std::lexicographical_compare(data, data + 3, other.data, other.data + 3); }
     bool	    operator==(const DedupPoint& other) const	    { return std::equal(data, data + 3, other.data); }
 };
-void deduplicate(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
+void deduplicate(DBlock* b,
+                 const diy::Master::ProxyWithLink& cp,
+                 DuplicateCountMap& count)
 {
-    dblock_t* b = static_cast<dblock_t*>(b_);
-
     if (!b->num_particles)
         return;
 
@@ -30,67 +30,63 @@ void deduplicate(void* b_, const diy::Master::ProxyWithLink& cp, void* aux)
     DedupPoint* end = (DedupPoint*) &b->particles[3*b->num_particles];
     std::sort(bg,end);
 
-    DuplicateCountMap* count = (DuplicateCountMap*) aux;
     DedupPoint* out = bg + 1;
     for (DedupPoint* it = bg + 1; it != end; ++it)
     {
         if (*it == *(it - 1))
-            (*count)[out - bg - 1]++;
+            count[out - bg - 1]++;
         else
         {
             *out = *it;
             ++out;
         }
+
     }
     b->num_orig_particles = b->num_particles = out - bg;
 
-    if (!count->empty())
+    if (!count.empty())
     {
         size_t total = 0;
-        for (DuplicateCountMap::const_iterator it = count->begin(); it != count->end(); ++it)
+        for (DuplicateCountMap::const_iterator it = count.begin(); it != count.end(); ++it)
             total += it->second;
-        std::cout << b->gid << ": Found " << count->size() << " particles that appear more than once, with " << total << " total extra copies\n";
+        std::cout << b->gid << ": Found " << count.size() << " particles that appear more than once, with " << total << " total extra copies\n";
     }
 }
 
 // check if the particles fall inside the block bounds
-void verify_particles(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+void verify_particles(DBlock* b, 
+                      const diy::Master::ProxyWithLink& cp)
 {
-    dblock_t* b = static_cast<dblock_t*>(b_);
-
-    // TP: testing 0-particle blocks by removing all the particles in block 0
-    /* if (!b->gid) */
-    /*     b->num_particles = b->num_orig_particles = 0; */
-
     /* fprintf(stderr, "gid %d has %d particles\n", b->gid, b->num_particles); */
 
     for (size_t i = 0; i < b->num_particles; ++i)
     {
         for (int j = 0; j < 3; ++j)
         {
-            if (b->particles[3*i + j] < b->mins[j] || b->particles[3*i + j] > b->maxs[j])
+            if (b->particles[3*i + j] < b->bounds.min[j] || 
+                b->particles[3*i + j] > b->bounds.max[j])
             {
                 fprintf(stderr, "Particle outside the block: %f %f %f\n",
                         b->particles[3*i],
                         b->particles[3*i + 1],
                         b->particles[3*i + 2]);
                 fprintf(stderr, "    block mins: %f %f %f\n",
-                        b->mins[0],
-                        b->mins[1],
-                        b->mins[2]);
+                        b->bounds.min[0],
+                        b->bounds.min[1],
+                        b->bounds.min[2]);
                 fprintf(stderr, "    block maxs: %f %f %f\n",
-                        b->maxs[0],
-                        b->maxs[1],
-                        b->maxs[2]);
+                        b->bounds.max[0],
+                        b->bounds.max[1],
+                        b->bounds.max[2]);
                 /* std::exit(1); */
             }
         }
     }
 }
 
-void enumerate_cells(void* b_, const diy::Master::ProxyWithLink& cp, void*)
+void enumerate_cells(DBlock* b,
+                     const diy::Master::ProxyWithLink& cp)
 {
-    dblock_t* b = static_cast<dblock_t*>(b_);
     cp.collectives()->clear();
 
     size_t infinite = 0;
