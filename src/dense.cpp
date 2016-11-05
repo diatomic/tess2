@@ -84,7 +84,7 @@ void dense(alg alg_type,              // algorithm DENSE_TESS, DENSE_CIC
   args.glo_num_idx[2]    = glo_num_idx[2];
 
   // allocate and initialize density field
-  master.foreach([&](dblock_t* b, const diy::Master::ProxyWithLink& cp)
+  master.foreach([&](DBlock* b, const diy::Master::ProxyWithLink& cp)
                  { init_dense(b, cp, &args); });
 
   // divisor for volume (3d density) or area (2d density)
@@ -93,19 +93,19 @@ void dense(alg alg_type,              // algorithm DENSE_TESS, DENSE_CIC
               grid_step_size[0] * grid_step_size[1] * grid_step_size[2]);
 
   // estimate density
-  master.foreach([&](dblock_t* b, const diy::Master::ProxyWithLink& cp)
+  master.foreach([&](DBlock* b, const diy::Master::ProxyWithLink& cp)
                  { est_dense(b, cp, &args); });
 
   // exchange grid points
   master.exchange();
 
   // process received points
-  master.foreach([&](dblock_t* b, const diy::Master::ProxyWithLink& cp)
+  master.foreach([&](DBlock* b, const diy::Master::ProxyWithLink& cp)
                  { recvd_pts(b, cp, &args); });
 }
 
 // foreach block function to initialize density
-void init_dense(dblock_t*                         b,
+void init_dense(DBlock*                         b,
                 const diy::Master::ProxyWithLink& cp,
                 args_t*                           a)
 {
@@ -129,7 +129,7 @@ void init_dense(dblock_t*                         b,
 }
 
 // foreach block function to estimate density
-void est_dense(dblock_t*                         b,
+void est_dense(DBlock*                         b,
                 const diy::Master::ProxyWithLink& cp,
                 args_t*                           a)
 {
@@ -165,7 +165,7 @@ void est_dense(dblock_t*                         b,
 }
 
 // foreach block function to receive points
-void recvd_pts(dblock_t*                         b,
+void recvd_pts(DBlock*                         b,
                const diy::Master::ProxyWithLink& cp,
                args_t*                           a)
 {
@@ -219,7 +219,7 @@ void recvd_pts(dblock_t*                         b,
 // cp: communication proxy
 //
 // side effects: writes density or sends to neighbors
-void IterateCells(dblock_t* block,
+void IterateCells(DBlock* block,
                   int *block_min_idx,
                   int *block_num_idx,
                   bool project,
@@ -278,12 +278,12 @@ void IterateCells(dblock_t* block,
       idx2phys(grid_pts[i].idx, grid_pos, grid_step_size, grid_phys_mins);
 
       // assign density to grid points in the block
-      if (grid_pos[0] >= block->mins[0] &&
-	  grid_pos[0] <= block->maxs[0] &&
-	  grid_pos[1] >= block->mins[1] &&
-	  grid_pos[1] <= block->maxs[1] &&
-	  grid_pos[2] >= block->mins[2] &&
-          grid_pos[2] <= block->maxs[2])
+      if (grid_pos[0] >= block->bounds.min[0] &&
+	  grid_pos[0] <= block->bounds.max[0] &&
+	  grid_pos[1] >= block->bounds.min[1] &&
+	  grid_pos[1] <= block->bounds.max[1] &&
+	  grid_pos[2] >= block->bounds.min[2] &&
+          grid_pos[2] <= block->bounds.max[2])
       {
 	// assign the density to the local block density array
 	int block_grid_idx[3]; // local block idx of grid point
@@ -332,7 +332,7 @@ void IterateCells(dblock_t* block,
 // cp: communication proxy
 //
 // side effects: writes density or sends to neighbors
-void IterateCellsOMP(dblock_t* block,
+void IterateCellsOMP(DBlock* block,
                      int *block_min_idx,
                      int *block_num_idx,
                      bool project,
@@ -408,12 +408,12 @@ void IterateCellsOMP(dblock_t* block,
 	idx2phys(grid_pts[i].idx, grid_pos, grid_step_size, grid_phys_mins);
 
         // assign density to grid points in the block
-        if (grid_pos[0] >= block->mins[0] &&
-            grid_pos[0] <= block->maxs[0] &&
-            grid_pos[1] >= block->mins[1] &&
-            grid_pos[1] <= block->maxs[1] &&
-            grid_pos[2] >= block->mins[2] &&
-            grid_pos[2] <= block->maxs[2])
+        if (grid_pos[0] >= block->bounds.min[0] &&
+            grid_pos[0] <= block->bounds.max[0] &&
+            grid_pos[1] >= block->bounds.min[1] &&
+            grid_pos[1] <= block->bounds.max[1] &&
+            grid_pos[2] >= block->bounds.min[2] &&
+            grid_pos[2] <= block->bounds.max[2])
         {
 	  // assign the density to the local block density array
 	  int block_grid_idx[3]; // local block idx of grid point
@@ -485,7 +485,7 @@ void IterateCellsOMP(dblock_t* block,
 // cp: communication proxy
 //
 // side effects: writes density or sends to neighbors
-void IterateCellsCic(dblock_t* block,
+void IterateCellsCic(DBlock* block,
                      int *block_min_idx,
                      int *block_num_idx,
                      bool project,
@@ -527,12 +527,12 @@ void IterateCellsCic(dblock_t* block,
       idx2phys(&(grid_idxs[3 * i]), grid_pos, grid_step_size, grid_phys_mins);
 
       // assign density to grid points in the block
-      if (grid_pos[0] >= block->mins[0] &&
-	  grid_pos[0] <= block->maxs[0] &&
-	  grid_pos[1] >= block->mins[1] &&
-	  grid_pos[1] <= block->maxs[1] &&
-	  grid_pos[2] >= block->mins[2] &&
-          grid_pos[2] <= block->maxs[2])
+      if (grid_pos[0] >= block->bounds.min[0] &&
+	  grid_pos[0] <= block->bounds.max[0] &&
+	  grid_pos[1] >= block->bounds.min[1] &&
+	  grid_pos[1] <= block->bounds.max[1] &&
+	  grid_pos[2] >= block->bounds.min[2] &&
+          grid_pos[2] <= block->bounds.max[2])
       {
 	// assign the density to the local block density array
 	int block_grid_idx[3]; // local block idx of grid point
@@ -574,7 +574,7 @@ void IterateCellsCic(dblock_t* block,
 // eps: floating point error tolerance
 // data_mins, data_maxs: physical global data extents (x,y,z)
 // glo_num_idx: global grid size
-void BlockGridParams(dblock_t *dblock,
+void BlockGridParams(DBlock *dblock,
                      int *block_min_idx,
                      int *block_max_idx,
                      int *block_num_idx,
@@ -588,59 +588,59 @@ void BlockGridParams(dblock_t *dblock,
   float pos[3]; // temporary position (x,y,z)
 
   // global grid index of block minimum grid point
-  phys2idx(dblock->mins, block_min_idx, grid_step_size, grid_phys_mins);
+  phys2idx(&(dblock->bounds.min[0]), block_min_idx, grid_step_size, grid_phys_mins);
   idx2phys(block_min_idx, pos, grid_step_size, grid_phys_mins);
-  if (pos[0] < dblock->mins[0])
+  if (pos[0] < dblock->bounds.min[0])
     block_min_idx[0]++;
-  if (pos[1] < dblock->mins[1])
+  if (pos[1] < dblock->bounds.min[1])
     block_min_idx[1]++;
-  if (pos[2] < dblock->mins[2])
+  if (pos[2] < dblock->bounds.min[2])
     block_min_idx[2]++;
   idx2phys(block_min_idx, pos, grid_step_size, grid_phys_mins); // double check adjusted position
-  assert(pos[0] >= dblock->mins[0] && pos[1] >= dblock->mins[1] &&
-	 pos[2] >= dblock->mins[2]);
+  assert(pos[0] >= dblock->bounds.min[0] && pos[1] >= dblock->bounds.min[1] &&
+	 pos[2] >= dblock->bounds.min[2]);
 
   // global grid index of block maximum grid point
-  phys2idx(dblock->maxs, block_max_idx, grid_step_size, grid_phys_mins);
+  phys2idx(&(dblock->bounds.max[0]), block_max_idx, grid_step_size, grid_phys_mins);
   idx2phys(block_max_idx, pos, grid_step_size, grid_phys_mins);
-  if (pos[0] + grid_step_size[0] <= dblock->maxs[0])
+  if (pos[0] + grid_step_size[0] <= dblock->bounds.max[0])
     block_max_idx[0]++;
-  if (pos[1] + grid_step_size[1] <= dblock->maxs[1])
+  if (pos[1] + grid_step_size[1] <= dblock->bounds.max[1])
     block_max_idx[1]++;
-  if (pos[2] + grid_step_size[2] <= dblock->maxs[2])
+  if (pos[2] + grid_step_size[2] <= dblock->bounds.max[2])
     block_max_idx[2]++;
   idx2phys(block_max_idx, pos, grid_step_size, grid_phys_mins); // double check adjusted position
-  assert(pos[0] <= dblock->maxs[0] && pos[1] <= dblock->maxs[1] &&
-	 pos[2] <= dblock->maxs[2]);
+  assert(pos[0] <= dblock->bounds.max[0] && pos[1] <= dblock->bounds.max[1] &&
+	 pos[2] <= dblock->bounds.max[2]);
 
   // eliminate duplication at the maximum block border
   if (fabs(data_mins[0] + block_max_idx[0] * grid_step_size[0] -
-	   dblock->maxs[0]) < eps &&
-      fabs(dblock->maxs[0] - data_maxs[0]) > grid_step_size[0])
+	   dblock->bounds.max[0]) < eps &&
+      fabs(dblock->bounds.max[0] - data_maxs[0]) > grid_step_size[0])
     block_max_idx[0]--;
   if (fabs(data_mins[1] + block_max_idx[1] * grid_step_size[1] -
-      dblock->maxs[1]) < eps &&
-      fabs(dblock->maxs[1] - data_maxs[1]) > grid_step_size[1])
+      dblock->bounds.max[1]) < eps &&
+      fabs(dblock->bounds.max[1] - data_maxs[1]) > grid_step_size[1])
     block_max_idx[1]--;
   if (fabs(data_mins[2] + block_max_idx[2] * grid_step_size[2] -
-      dblock->maxs[2]) < eps &&
-      fabs(dblock->maxs[2] - data_maxs[2]) > grid_step_size[2])
+      dblock->bounds.max[2]) < eps &&
+      fabs(dblock->bounds.max[2] - data_maxs[2]) > grid_step_size[2])
     block_max_idx[2]--;
 
   // possibly extend minimum end of blacks at the minimum end of the domain
-  if (fabs(dblock->mins[0] - data_mins[0]) < grid_step_size[0])
+  if (fabs(dblock->bounds.min[0] - data_mins[0]) < grid_step_size[0])
     block_min_idx[0] = 0;
-  if (fabs(dblock->mins[1] - data_mins[1]) < grid_step_size[1])
+  if (fabs(dblock->bounds.min[1] - data_mins[1]) < grid_step_size[1])
     block_min_idx[1] = 0;
-  if (fabs(dblock->mins[2] - data_mins[2]) < grid_step_size[2])
+  if (fabs(dblock->bounds.min[2] - data_mins[2]) < grid_step_size[2])
     block_min_idx[2] = 0;
 
   // possibly extend maximum end of blacks at the maximum end of the domain
-  if (fabs(dblock->maxs[0] - data_maxs[0]) < grid_step_size[0])
+  if (fabs(dblock->bounds.max[0] - data_maxs[0]) < grid_step_size[0])
     block_max_idx[0] = glo_num_idx[0] - 1;
-  if (fabs(dblock->maxs[1] - data_maxs[1]) < grid_step_size[1])
+  if (fabs(dblock->bounds.max[1] - data_maxs[1]) < grid_step_size[1])
     block_max_idx[1] = glo_num_idx[1] - 1;
-  if (fabs(dblock->maxs[2] - data_maxs[2]) < grid_step_size[2])
+  if (fabs(dblock->bounds.max[2] - data_maxs[2]) < grid_step_size[2])
     block_max_idx[2] = glo_num_idx[2] - 1;
 
   // compute number of grid points in local block
@@ -656,7 +656,7 @@ void BlockGridParams(dblock_t *dblock,
 // cell_min, cell_max: cell bounds (output)
 // normals: face normals (nx_0,ny_0,nz_0,nx_1,ny_1,nz_1, ...) (output)
 // face_verts: vertex positions for each face (output)
-void CellBounds(dblock_t *dblock,
+void CellBounds(DBlock *dblock,
                 int cell,
                 float *cell_min,
                 float *cell_max,
@@ -775,9 +775,9 @@ void WriteGrid(int mblocks,
 
   // array of pointers to all my local blocks
   int nblocks = master.size();
-  dblock_t** dblocks = new dblock_t*[nblocks];
+  DBlock** dblocks = new DBlock*[nblocks];
   for (int i = 0; i < nblocks; i++)
-    dblocks[i] = master.block<dblock_t>(i);
+    dblocks[i] = master.block<DBlock>(i);
 
   // open
   int retval = MPI_File_open(comm, (char *)outfile,
@@ -894,9 +894,9 @@ void ProjectGrid(int gnblocks,
 
   // array of pointers to all my local blocks
   int nblocks = master.size();
-  dblock_t** dblocks = new dblock_t*[nblocks];
+  DBlock** dblocks = new DBlock*[nblocks];
   for (int i = 0; i < nblocks; i++)
-    dblocks[i] = master.block<dblock_t>(i);
+    dblocks[i] = master.block<DBlock>(i);
 
   // ------ Blocks info -------
   struct blockgeometry
@@ -1116,7 +1116,7 @@ void idx2phys(int *grid_idx,
 // grid_step_size: physical size of one grid space (x,y,z)
 // grid_phys_mins: physical global grid min position (x,y,z)
 //
-void phys2idx(float *pos,
+void phys2idx(float* pos,
               int *grid_idx,
               float *grid_step_size,
 	      float *grid_phys_mins)
@@ -1233,35 +1233,35 @@ void DataBounds(float *data_mins,
 
   // array of pointers to all my local blocks
   int nblocks = master.size();
-  dblock_t** dblocks = new dblock_t*[nblocks];
+  DBlock** dblocks = new DBlock*[nblocks];
   for (int i = 0; i < nblocks; i++)
-    dblocks[i] = master.block<dblock_t>(i);
+    dblocks[i] = master.block<DBlock>(i);
 
   for (int i = 0; i < nblocks; i++)
   {
     if (i == 0)
     {
-      block_mins[0] = dblocks[i]->mins[0];
-      block_mins[1] = dblocks[i]->mins[1];
-      block_mins[2] = dblocks[i]->mins[2];
-      block_maxs[0] = dblocks[i]->maxs[0];
-      block_maxs[1] = dblocks[i]->maxs[1];
-      block_maxs[2] = dblocks[i]->maxs[2];
+      block_mins[0] = dblocks[i]->bounds.min[0];
+      block_mins[1] = dblocks[i]->bounds.min[1];
+      block_mins[2] = dblocks[i]->bounds.min[2];
+      block_maxs[0] = dblocks[i]->bounds.max[0];
+      block_maxs[1] = dblocks[i]->bounds.max[1];
+      block_maxs[2] = dblocks[i]->bounds.max[2];
     }
     else
     {
-      if (dblocks[i]->mins[0] < block_mins[0])
-	block_mins[0] = dblocks[i]->mins[0];
-      if (dblocks[i]->mins[1] < block_mins[1])
-	block_mins[1] = dblocks[i]->mins[1];
-      if (dblocks[i]->mins[2] < block_mins[2])
-	block_mins[2] = dblocks[i]->mins[2];
-      if (dblocks[i]->maxs[0] > block_maxs[0])
-	block_maxs[0] = dblocks[i]->maxs[0];
-      if (dblocks[i]->maxs[1] > block_maxs[1])
-	block_maxs[1] = dblocks[i]->maxs[1];
-      if (dblocks[i]->maxs[2] > block_maxs[2])
-	block_maxs[2] = dblocks[i]->maxs[2];
+      if (dblocks[i]->bounds.min[0] < block_mins[0])
+	block_mins[0] = dblocks[i]->bounds.min[0];
+      if (dblocks[i]->bounds.min[1] < block_mins[1])
+	block_mins[1] = dblocks[i]->bounds.min[1];
+      if (dblocks[i]->bounds.min[2] < block_mins[2])
+	block_mins[2] = dblocks[i]->bounds.min[2];
+      if (dblocks[i]->bounds.max[0] > block_maxs[0])
+	block_maxs[0] = dblocks[i]->bounds.max[0];
+      if (dblocks[i]->bounds.max[1] > block_maxs[1])
+	block_maxs[1] = dblocks[i]->bounds.max[1];
+      if (dblocks[i]->bounds.max[2] > block_maxs[2])
+	block_maxs[2] = dblocks[i]->bounds.max[2];
     }
   }
 

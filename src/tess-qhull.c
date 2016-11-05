@@ -1,5 +1,5 @@
-#include "tess/tess.h"
 #include "tess/tess-qhull.h"
+#include "tess/tess.h"
 #include <assert.h>
 
 /*--------------------------------------------------------------------------*/

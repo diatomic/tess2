@@ -35,20 +35,21 @@
 #endif
 
 #include "tess.h"
+#include "delaunay.hpp"
 
 using namespace std;
 
 // quantity stats per process
-struct quants_t {
+struct quants_t
+{
     int min_quants[MAX_QUANTS];       // min of quantities
     int max_quants[MAX_QUANTS];       // max of quantities
     int sum_quants[MAX_QUANTS];       // sum of quantities
 };
 
-typedef diy::ContinuousBounds       Bounds;
 typedef diy::RegularContinuousLink  RCLink;
-typedef vector<RCLink> LinkVector;
-typedef vector<size_t> LastNeighbors;
+typedef vector<RCLink>              LinkVector;
+typedef vector<size_t>              LastNeighbors;
 
 size_t tess(diy::Master& master);
 size_t tess(diy::Master& master,
@@ -96,33 +97,34 @@ void save_block_light(const void* b,
 void load_block_light(void* b,
                       diy::BinaryBuffer& bb);
 void create(int gid,
-            const Bounds& core,
-            const Bounds& bounds,
+            const diy::Bounds<float>& core,
+            const diy::Bounds<float>& bounds,
             const diy::Link& link);
-int gen_particles(dblock_t* b,
+int gen_particles(DBlock* b,
                   float jitter);
-void delaunay(dblock_t*                         b,
+void delaunay(DBlock*                           b,
               const diy::Master::ProxyWithLink& cp,
               const LinkVector&                 links,
               const LastNeighbors&              neighbors,
               bool                              first);
-void finalize(dblock_t*                         b,
+void finalize(DBlock*                           b,
               const diy::Master::ProxyWithLink& cp,
               quants_t&                         quants);
-void neighbor_particles(dblock_t* b,
+void neighbor_particles(DBlock* b,
                         const diy::Master::ProxyWithLink& cp);
-size_t incomplete_cells(struct dblock_t *dblock,
+size_t incomplete_cells(struct DBlock *dblock,
                         const diy::Master::ProxyWithLink& cp,
                         size_t last_neighbor);
-void reset_block(struct dblock_t* &dblock);
+void reset_block(struct DBlock* &dblock);
+void fill_vert_to_tet(DBlock* dblock);
 void fill_vert_to_tet(dblock_t* dblock);
-void wall_particles(struct dblock_t *dblock);
+void wall_particles(struct DBlock *dblock);
 void sample_particles(float *particles,
                       int &num_particles,
                       int sample_rate);
 void wrap_pt(point_t& rp,
              diy::Direction wrap_dir,
-             Bounds& domain);
+             diy::Bounds<float>& domain);
 int compare(const void *a,
             const void *b);
 
@@ -132,10 +134,13 @@ struct AddBlock
     AddBlock(diy::Master& master_):
         master(master_)           {}
 
-    dblock_t*	operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
-                           const RCLink& link) const
+    DBlock* operator()(int gid,
+                       const diy::Bounds<float>& core,
+                       const diy::Bounds<float>& bounds,
+                       const diy::Bounds<float>& domain,
+                       const RCLink& link) const
         {
-            dblock_t*      b = static_cast<dblock_t*>(create_block());
+            DBlock*      b = static_cast<DBlock*>(create_block());
             RCLink*        l = new RCLink(link);
             diy::Master&   m = const_cast<diy::Master&>(master);
 
@@ -143,8 +148,7 @@ struct AddBlock
 
             // init block fields
             b->gid = gid;
-            b->mins[0] = core.min[0]; b->mins[1] = core.min[1]; b->mins[2] = core.min[2];
-            b->maxs[0] = core.max[0]; b->maxs[1] = core.max[1]; b->maxs[2] = core.max[2];
+            b->bounds = core;
             b->data_bounds = domain;
             b->num_orig_particles = 0;
             b->num_particles = 0;
@@ -171,10 +175,13 @@ struct AddAndGenerate: public AddBlock
         AddBlock(master_),
         jitter(jitter_)           {}
 
-    void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
+    void  operator()(int gid,
+                     const diy::Bounds<float>& core,
+                     const diy::Bounds<float>& bounds,
+                     const diy::Bounds<float>& domain,
                      const RCLink& link) const
         {
-            dblock_t* b = AddBlock::operator()(gid, core, bounds, domain, link);
+            DBlock* b = AddBlock::operator()(gid, core, bounds, domain, link);
             b->num_particles = gen_particles(b, jitter);
             b->num_orig_particles = b->num_particles;
         }
@@ -186,15 +193,14 @@ struct AddAndGenerate: public AddBlock
 namespace diy
 {
     template<>
-    struct Serialization<dblock_t>
+    struct Serialization<DBlock>
     {
-        static void save(BinaryBuffer& bb, const dblock_t& d)
+        static void save(BinaryBuffer& bb, const DBlock& d)
             {
                 // debug
                 //       fprintf(stderr, "Saving block gid %d\n", d.gid);
                 diy::save(bb, d.gid);
-                diy::save(bb, d.mins);
-                diy::save(bb, d.maxs);
+                diy::save(bb, d.bounds);
                 diy::save(bb, d.box);
                 diy::save(bb, d.data_bounds);
                 diy::save(bb, d.num_orig_particles);
@@ -230,13 +236,12 @@ namespace diy
                 //       fprintf(stderr, "Done saving block gid %d\n", d.gid);
             }
 
-        static void load(BinaryBuffer& bb, dblock_t& d)
+        static void load(BinaryBuffer& bb, DBlock& d)
             {
                 diy::load(bb, d.gid);
                 // debug
                 //       fprintf(stderr, "Loading block gid %d\n", d.gid);
-                diy::load(bb, d.mins);
-                diy::load(bb, d.maxs);
+                diy::load(bb, d.bounds);
                 diy::load(bb, d.box);
                 diy::load(bb, d.data_bounds);
                 diy::load(bb, d.num_orig_particles);

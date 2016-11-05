@@ -28,7 +28,7 @@
 
 #include "tess/tess.h"
 #include "tess/tess.hpp"
-#include "tess/tet.h"
+#include "tess/tet.hpp"
 #include "tess/tet-neighbors.h"
 
 #ifdef BGQ
@@ -79,7 +79,7 @@ size_t tess(diy::Master& master,
         rounds++;
 
         double start = MPI_Wtime();
-        master.foreach([&](dblock_t* b, const diy::Master::ProxyWithLink& cp)
+        master.foreach([&](DBlock* b, const diy::Master::ProxyWithLink& cp)
                        { delaunay(b, cp, original_links, last_neighbors, first); });
         master.exchange();
 
@@ -101,7 +101,7 @@ size_t tess(diy::Master& master,
     quants.sum_quants[NUM_FINAL_PTS] = 0;
     quants.sum_quants[NUM_TETS] = 0;
     quants.sum_quants[NUM_LOC_BLOCKS] = master.size();
-    master.foreach([&](dblock_t* b, const diy::Master::ProxyWithLink& cp)
+    master.foreach([&](DBlock* b, const diy::Master::ProxyWithLink& cp)
                    { finalize(b, cp, quants); });
 
     // restore the original links
@@ -154,7 +154,7 @@ void tess_load(diy::Master& master,
 //
 void* create_block()
 {
-    dblock_t* b = new dblock_t;
+    DBlock* b = new DBlock;
     b->complete = 0;
     init_delaunay_data_structure(b);
     return b;
@@ -162,7 +162,7 @@ void* create_block()
 
 void destroy_block(void* b_)
 {
-    dblock_t* b = static_cast<dblock_t*>(b_);
+    DBlock* b = static_cast<DBlock*>(b_);
 
     // particles and tets
     if (b->particles)     free(b->particles);
@@ -184,23 +184,22 @@ void destroy_block(void* b_)
 void save_block(const void* b,
                 diy::BinaryBuffer& bb)
 {
-    diy::save(bb, *static_cast<const dblock_t*>(b));
+    diy::save(bb, *static_cast<const DBlock*>(b));
 }
 
 void load_block(void* b,
                 diy::BinaryBuffer& bb)
 {
-    diy::load(bb, *static_cast<dblock_t*>(b));
+    diy::load(bb, *static_cast<DBlock*>(b));
 }
 
 void save_block_light(const void* b_,
                       diy::BinaryBuffer& bb)
 {
-    const dblock_t& d = *static_cast<const dblock_t*>(b_);
+    const DBlock& d = *static_cast<const DBlock*>(b_);
 
     diy::save(bb, d.gid);
-    diy::save(bb, d.mins);
-    diy::save(bb, d.maxs);
+    diy::save(bb, d.bounds);
     diy::save(bb, d.box);
     diy::save(bb, d.data_bounds);
     diy::save(bb, d.num_orig_particles);
@@ -220,13 +219,12 @@ void save_block_light(const void* b_,
 void load_block_light(void* b_,
                       diy::BinaryBuffer& bb)
 {
-    dblock_t& d = *static_cast<dblock_t*>(b_);
+    DBlock& d = *static_cast<DBlock*>(b_);
 
     diy::load(bb, d.gid);
     // debug
     // fprintf(stderr, "Loading block gid %d\n", d.gid);
-    diy::load(bb, d.mins);
-    diy::load(bb, d.maxs);
+    diy::load(bb, d.bounds);
     diy::load(bb, d.box);
     diy::load(bb, d.data_bounds);
     diy::load(bb, d.num_orig_particles);
@@ -261,7 +259,7 @@ void load_block_light(void* b_,
 //
 // generate particles, return final number of particles generated
 //
-int gen_particles(dblock_t* b,
+int gen_particles(DBlock* b,
                   float jitter)
 {
     int sizes[3]; // number of grid points
@@ -270,9 +268,9 @@ int gen_particles(dblock_t* b,
     float jit; // random jitter amount, 0 - MAX_JITTER
 
     // allocate particles
-    sizes[0] = (int)(b->maxs[0] - b->mins[0] + 1);
-    sizes[1] = (int)(b->maxs[1] - b->mins[1] + 1);
-    sizes[2] = (int)(b->maxs[2] - b->mins[2] + 1);
+    sizes[0] = (int)(b->bounds.max[0] - b->bounds.min[0] + 1);
+    sizes[1] = (int)(b->bounds.max[1] - b->bounds.min[1] + 1);
+    sizes[2] = (int)(b->bounds.max[2] - b->bounds.min[2] + 1);
     num_particles = sizes[0] * sizes[1] * sizes[2];
     b->particles = (float *)malloc(num_particles * 3 * sizeof(float));
     float *p = b->particles;
@@ -287,7 +285,7 @@ int gen_particles(dblock_t* b,
         for (unsigned j = 0; j < 3; ++j)
         {
             float t = (float) rand() / RAND_MAX;
-            p[3 * i + j] = t * (b->maxs[j] - b->mins[j]) + b->mins[j];
+            p[3 * i + j] = t * (b->bounds.max[j] - b->bounds.min[j]) + b->bounds.min[j];
         }
         ++n;
     }
@@ -297,45 +295,45 @@ int gen_particles(dblock_t* b,
     n = 0;
     for (unsigned i = 0; i < sizes[0]; i++)
     {
-        if (b->mins[0] > 0 && i == 0) // dedup block doundary points
+        if (b->bounds.min[0] > 0 && i == 0) // dedup block doundary points
             continue;
         for (unsigned j = 0; j < sizes[1]; j++)
         {
-            if (b->mins[1] > 0 && j == 0) // dedup block doundary points
+            if (b->bounds.min[1] > 0 && j == 0) // dedup block doundary points
                 continue;
             for (unsigned k = 0; k < sizes[2]; k++)
             {
-                if (b->mins[2] > 0 && k == 0) // dedup block doundary points
+                if (b->bounds.min[2] > 0 && k == 0) // dedup block doundary points
                     continue;
 
                 // start with particles on a grid
-                p[3 * n] = b->mins[0] + i;
-                p[3 * n + 1] = b->mins[1] + j;
-                p[3 * n + 2] = b->mins[2] + k;
+                p[3 * n] = b->bounds.min[0] + i;
+                p[3 * n + 1] = b->bounds.min[1] + j;
+                p[3 * n + 2] = b->bounds.min[2] + k;
 
                 // and now jitter them
                 jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-                if (p[3 * n] - jit >= b->mins[0] &&
-                    p[3 * n] - jit <= b->maxs[0])
+                if (p[3 * n] - jit >= b->bounds.min[0] &&
+                    p[3 * n] - jit <= b->bounds.max[0])
                     p[3 * n] -= jit;
-                else if (p[3 * n] + jit >= b->mins[0] &&
-                         p[3 * n] + jit <= b->maxs[0])
+                else if (p[3 * n] + jit >= b->bounds.min[0] &&
+                         p[3 * n] + jit <= b->bounds.max[0])
                     p[3 * n] += jit;
 
                 jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-                if (p[3 * n + 1] - jit >= b->mins[1] &&
-                    p[3 * n + 1] - jit <= b->maxs[1])
+                if (p[3 * n + 1] - jit >= b->bounds.min[1] &&
+                    p[3 * n + 1] - jit <= b->bounds.max[1])
                     p[3 * n + 1] -= jit;
-                else if (p[3 * n + 1] + jit >= b->mins[1] &&
-                         p[3 * n + 1] + jit <= b->maxs[1])
+                else if (p[3 * n + 1] + jit >= b->bounds.min[1] &&
+                         p[3 * n + 1] + jit <= b->bounds.max[1])
                     p[3 * n + 1] += jit;
 
                 jit = rand() / (float)RAND_MAX * 2 * jitter - jitter;
-                if (p[3 * n + 2] - jit >= b->mins[2] &&
-                    p[3 * n + 2] - jit <= b->maxs[2])
+                if (p[3 * n + 2] - jit >= b->bounds.min[2] &&
+                    p[3 * n + 2] - jit <= b->bounds.max[2])
                     p[3 * n + 2] -= jit;
-                else if (p[3 * n + 2] + jit >= b->mins[2] &&
-                         p[3 * n + 2] + jit <= b->maxs[2])
+                else if (p[3 * n + 2] + jit >= b->bounds.min[2] &&
+                         p[3 * n + 2] + jit <= b->bounds.max[2])
                     p[3 * n + 2] += jit;
 
                 n++;
@@ -348,7 +346,7 @@ int gen_particles(dblock_t* b,
     return n;
 }
 
-void delaunay(dblock_t*                         b,
+void delaunay(DBlock*                           b,
               const diy::Master::ProxyWithLink& cp,
               const LinkVector&                 links,
               const LastNeighbors&              neighbors,
@@ -413,7 +411,8 @@ void delaunay(dblock_t*                         b,
                     wrap[k] += in_links[i].wrap(j)[k];
                     if (wrap[k] < -1 || wrap[k] > 1)
                     {
-                        fprintf(stderr, "Warning: something is odd with the wrap, the it exceeds a single wrap-around\n");
+                        fprintf(stderr, "Warning: something is odd with the wrap, "
+                                "it exceeds a single wrap-around\n");
                     }
                 }
                 //fprintf(stderr, "   -> wrap = (%d,%d,%d)\n",
@@ -455,7 +454,7 @@ void delaunay(dblock_t*                         b,
     cp.all_reduce(done, std::logical_and<int>());
 }
 
-void finalize(dblock_t*                         b,
+void finalize(DBlock*                         b,
               const diy::Master::ProxyWithLink& cp,
               quants_t&                         quants)
 {
@@ -488,7 +487,7 @@ void finalize(dblock_t*                         b,
     //           b->gid, b->num_tets, b->num_particles);
 }
 
-size_t incomplete_cells(struct dblock_t *dblock,
+size_t incomplete_cells(struct DBlock *dblock,
                         const diy::Master::ProxyWithLink& cp,
                         size_t last_neighbor)
 {
@@ -532,8 +531,7 @@ size_t incomplete_cells(struct dblock_t *dblock,
 
                 // test whether there is a point in neigh_bounds that lies
                 // on the opposite side of the convex hull than j
-                if (!side_of_plane(neigh_bounds.min,
-                                   neigh_bounds.max,
+                if (!side_of_plane(neigh_bounds,
                                    &dblock->tets[t],
                                    dblock->particles, j)) continue;
 
@@ -630,7 +628,7 @@ size_t incomplete_cells(struct dblock_t *dblock,
 //
 // parse received particles
 //
-void neighbor_particles(dblock_t* b,
+void neighbor_particles(DBlock* b,
                         const diy::Master::ProxyWithLink& cp)
 {
     diy::Link* l = cp.link();
@@ -681,7 +679,7 @@ void neighbor_particles(dblock_t* b,
 // cleans a block in between phases
 // (deletes tets but keeps delauany data structure and convex hull particles, sent particles)
 //
-void reset_block(struct dblock_t* &dblock)
+void reset_block(struct DBlock* &dblock)
 {
     // free old data
     if (dblock->tets)
@@ -702,7 +700,7 @@ void reset_block(struct dblock_t* &dblock)
 //
 void wrap_pt(point_t& rp,
              diy::Direction wrap_dir,
-             Bounds& domain)
+             diy::Bounds<float>& domain)
 {
     rp.x -= wrap_dir[0] * (domain.max[0] - domain.min[0]);
     rp.y -= wrap_dir[1] * (domain.max[1] - domain.min[1]);
@@ -754,6 +752,15 @@ void tess_stats(diy::Master& master,
 }
 //
 // for each vertex saves a tet that contains it
+// C++ version
+//
+void fill_vert_to_tet(DBlock* dblock)
+{
+    fill_vert_to_tet(static_cast<dblock_t*>(dblock));
+}
+//
+// for each vertex saves a tet that contains it
+// C version (for qhull)
 //
 void fill_vert_to_tet(dblock_t* dblock)
 {
@@ -912,7 +919,7 @@ void sample_particles(float *particles,
 //   dblock: current delaunay block
 //   gid: global block id
 //
-void print_block(struct dblock_t *dblock,
+void print_block(struct DBlock *dblock,
                  int gid)
 {
     fprintf(stderr, "block gid = %d has %d tets:\n",

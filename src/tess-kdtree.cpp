@@ -4,7 +4,7 @@
 #include <diy/algorithms.hpp>
 
 #include "tess/tess.h"
-#include "tess/delaunay.h"
+#include "tess/delaunay.hpp"
 
 struct KDTreeBlock
 {
@@ -23,7 +23,7 @@ struct WrapMaster
     bool         wrap;
 };
 
-void populate_kdtree_block(dblock_t*                         d,
+void populate_kdtree_block(DBlock*                         d,
                            const diy::Master::ProxyWithLink& cp,
                            diy::Master&                      kdtree_master,
                            bool                              wrap)
@@ -49,7 +49,7 @@ void extract_kdtree_block(KDTreeBlock*                      b,
                           diy::Master&                      tess_master)
 {
     int tess_lid = tess_master.lid(cp.gid());
-    dblock_t* d  = (dblock_t*) tess_master.block(tess_lid); // assumes all blocks in memory
+    DBlock* d  = (DBlock*) tess_master.block(tess_lid); // assumes all blocks in memory
 
     // copy out the particles
     d->num_particles = d->num_orig_particles = b->points.size();
@@ -73,8 +73,8 @@ void extract_kdtree_block(KDTreeBlock*                      b,
     d->box  = tess_link->bounds();
     for (int i = 0; i < 3; ++i)
     {
-        d->mins[i] = tess_link->bounds().min[i];
-        d->maxs[i] = tess_link->bounds().max[i];
+        d->bounds.min[i] = tess_link->bounds().min[i];
+        d->bounds.max[i] = tess_link->bounds().max[i];
     }
 
     delete b; // safe to do since kdtree_master doesn't own the blocks (no create/destroy supplied)
@@ -89,11 +89,11 @@ void tess_kdtree_exchange(diy::Master& master,
     timing(times, EXCH_TIME, -1, master.communicator());
 
     diy::Master kdtree_master(master.communicator(),  master.threads(), -1);
-    master.foreach([&](dblock_t* b, const diy::Master::ProxyWithLink& cp)
+    master.foreach([&](DBlock* b, const diy::Master::ProxyWithLink& cp)
                    { populate_kdtree_block(b, cp, kdtree_master, wrap); });
 
     int bins = 1024;      // histogram bins; TODO: make a function argument
-    diy::ContinuousBounds domain = master.block<dblock_t>(master.loaded_block())->data_bounds;
+    diy::ContinuousBounds domain = master.block<DBlock>(master.loaded_block())->data_bounds;
     if (sampling)
         diy::kdtree_sampling(kdtree_master, assigner, 3, domain, &KDTreeBlock::points, bins, wrap);
     else

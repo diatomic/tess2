@@ -22,9 +22,7 @@
 #include <vector>
 #include "delaunay.h"
 #include "mpi.h"
-// DEPRECATED
-// #include "tess/io.h"
-#include "tess/tet.h"
+#include "tess/tet.hpp"
 #include "tess/tet-neighbors.h"
 #include "tess/tess.h"
 #include "tess/tess.hpp"
@@ -89,16 +87,16 @@ void dense(alg alg_type,
            float eps,
            int *glo_num_idx,
            diy::Master& master);
-void init_dense(dblock_t*                         b,
+void init_dense(DBlock*                         b,
                 const diy::Master::ProxyWithLink& cp,
                 args_t*                           a);
-void est_dense(dblock_t*                         b,
+void est_dense(DBlock*                         b,
                const diy::Master::ProxyWithLink& cp,
                args_t*                           a);
-void recvd_pts(dblock_t*                         b,
+void recvd_pts(DBlock*                         b,
                const diy::Master::ProxyWithLink& cp,
                args_t*                           a);
-void BlockGridParams(dblock_t *dblock,
+void BlockGridParams(DBlock *dblock,
                      int *block_min_idx,
                      int *block_max_idx,
                      int *block_num_idx,
@@ -108,7 +106,7 @@ void BlockGridParams(dblock_t *dblock,
                      float *data_mins,
                      float *data_maxs,
                      int *glo_num_idx);
-void IterateCells(dblock_t *dblock,
+void IterateCells(DBlock *dblock,
                   int *block_min_idx,
                   int *block_num_idx,
                   bool project,
@@ -121,7 +119,7 @@ void IterateCells(dblock_t *dblock,
                   float mass,
                   const diy::Master::ProxyWithLink& cp);
 #ifndef TESS_NO_OPENMP
-void IterateCellsOMP(dblock_t *dblock,
+void IterateCellsOMP(DBlock *dblock,
                      int *block_min_idx,
                      int *block_num_idx,
                      bool project,
@@ -134,7 +132,7 @@ void IterateCellsOMP(dblock_t *dblock,
                      float mass,
                      const diy::Master::ProxyWithLink& cp);
 #endif
-void IterateCellsCic(dblock_t *dblock,
+void IterateCellsCic(DBlock *dblock,
                      int *block_min_idx,
                      int *block_num_idx,
                      bool project,
@@ -145,7 +143,7 @@ void IterateCellsCic(dblock_t *dblock,
                      float eps,
                      float mass,
                      const diy::Master::ProxyWithLink& cp);
-void CellBounds(dblock_t *dblock,
+void CellBounds(DBlock *dblock,
                 int cell,
                 float *cell_min,
                 float *cell_max,
@@ -227,7 +225,7 @@ void idx2phys(int *grid_idx,
               float *pos,
               float *grid_step_size,
               float *grid_phys_mins);
-void phys2idx(float *pos,
+void phys2idx(float* pos,
               int *grid_idx,
               float *grid_step_size,
               float *grid_phys_mins);
