@@ -17,9 +17,9 @@
 
 struct DBlock : dblock_t
 {
-    diy::Bounds<float> bounds;                    // local block extents
-    diy::Bounds<float> data_bounds;               // global data extents
-    diy::Bounds<float> box;                       // box in current round of point redistribution
+    diy::ContinuousBounds bounds;                    // local block extents
+    diy::ContinuousBounds data_bounds;               // global data extents
+    diy::ContinuousBounds box;                       // box in current round of point redistribution
 };
 
 #endif

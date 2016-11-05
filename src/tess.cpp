@@ -700,7 +700,7 @@ void reset_block(struct DBlock* &dblock)
 //
 void wrap_pt(point_t& rp,
              diy::Direction wrap_dir,
-             diy::Bounds<float>& domain)
+             diy::ContinuousBounds& domain)
 {
     rp.x -= wrap_dir[0] * (domain.max[0] - domain.min[0]);
     rp.y -= wrap_dir[1] * (domain.max[1] - domain.min[1]);

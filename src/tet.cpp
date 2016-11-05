@@ -67,7 +67,7 @@ void circumcenter(float* center, tet_t* tet, float* particles)
 
 // determine if any point in the box [min, max] lies on the opposite side of the
 // facet opposite to vertex j
-int side_of_plane(diy::Bounds<float> box,
+int side_of_plane(diy::ContinuousBounds box,
                   struct tet_t* tet,
                   float* particles,
                   int j)

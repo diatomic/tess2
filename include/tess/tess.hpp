@@ -97,8 +97,8 @@ void save_block_light(const void* b,
 void load_block_light(void* b,
                       diy::BinaryBuffer& bb);
 void create(int gid,
-            const diy::Bounds<float>& core,
-            const diy::Bounds<float>& bounds,
+            const diy::ContinuousBounds& core,
+            const diy::ContinuousBounds& bounds,
             const diy::Link& link);
 int gen_particles(DBlock* b,
                   float jitter);
@@ -124,20 +124,21 @@ void sample_particles(float *particles,
                       int sample_rate);
 void wrap_pt(point_t& rp,
              diy::Direction wrap_dir,
-             diy::Bounds<float>& domain);
+             diy::ContinuousBounds& domain);
 int compare(const void *a,
             const void *b);
 
 // add block to a master
+// user should not instantiate AddBlock; use AddAndGenerafet or AddEmpty (see below)
 struct AddBlock
 {
     AddBlock(diy::Master& master_):
         master(master_)           {}
 
     DBlock* operator()(int gid,
-                       const diy::Bounds<float>& core,
-                       const diy::Bounds<float>& bounds,
-                       const diy::Bounds<float>& domain,
+                       const diy::ContinuousBounds& core,
+                       const diy::ContinuousBounds& bounds,
+                       const diy::ContinuousBounds& domain,
                        const RCLink& link) const
         {
             DBlock*      b = static_cast<DBlock*>(create_block());
@@ -176,9 +177,9 @@ struct AddAndGenerate: public AddBlock
         jitter(jitter_)           {}
 
     void  operator()(int gid,
-                     const diy::Bounds<float>& core,
-                     const diy::Bounds<float>& bounds,
-                     const diy::Bounds<float>& domain,
+                     const diy::ContinuousBounds& core,
+                     const diy::ContinuousBounds& bounds,
+                     const diy::ContinuousBounds& domain,
                      const RCLink& link) const
         {
             DBlock* b = AddBlock::operator()(gid, core, bounds, domain, link);
@@ -187,6 +188,24 @@ struct AddAndGenerate: public AddBlock
         }
 
     float jitter;
+};
+
+// add empty block to master
+struct AddEmpty: public AddBlock
+{
+    AddEmpty(diy::Master& master_) :
+        AddBlock(master_)         {}
+
+    void  operator()(int gid,
+                     const diy::ContinuousBounds& core,
+                     const diy::ContinuousBounds& bounds,
+                     const diy::ContinuousBounds& domain,
+                     const RCLink& link) const
+        {
+            DBlock* b = AddBlock::operator()(gid, core, bounds, domain, link);
+            b->num_particles      = 0;
+            b->num_orig_particles = 0;
+        }
 };
 
 // serialize a block

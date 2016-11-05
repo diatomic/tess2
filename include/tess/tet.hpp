@@ -12,7 +12,7 @@ float dot(float* u,
 void circumcenter(float* c,
                   struct tet_t* tet,
                   float* particles);
-int side_of_plane(diy::Bounds<float> box,
+int side_of_plane(diy::ContinuousBounds box,
                   struct tet_t* tet,
                   float* particles,
                   int j);

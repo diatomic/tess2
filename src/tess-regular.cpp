@@ -102,7 +102,7 @@ void tess_exchange(diy::Master& master,
 
     diy::ContinuousBounds                       domain =
         master.block<DBlock>(master.loaded_block())->data_bounds;
-    diy::RegularDecomposer<diy::Bounds<float> > decomposer(3, domain, assigner.nblocks());
+    diy::RegularDecomposer<diy::ContinuousBounds> decomposer(3, domain, assigner.nblocks());
     diy::RegularSwapPartners                    partners(decomposer, k, false);
 
     diy::reduce(master, assigner, partners, &redistribute);
