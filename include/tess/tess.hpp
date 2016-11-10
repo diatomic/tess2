@@ -105,7 +105,7 @@ int gen_particles(DBlock* b,
 void delaunay(DBlock*                           b,
               const diy::Master::ProxyWithLink& cp,
               const LinkVector&                 links,
-              const LastNeighbors&              neighbors,
+              LastNeighbors&                    neighbors,
               bool                              first);
 void finalize(DBlock*                           b,
               const diy::Master::ProxyWithLink& cp,

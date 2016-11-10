@@ -349,12 +349,12 @@ int gen_particles(DBlock* b,
 void delaunay(DBlock*                           b,
               const diy::Master::ProxyWithLink& cp,
               const LinkVector&                 links,
-              const LastNeighbors&              neighbors,
+              LastNeighbors&                    neighbors,
               bool                              first)
 {
     int               lid           = cp.master()->lid(cp.gid());
     const RCLink&     original_link = links[lid];
-    size_t            last_neighbor = neighbors[lid];
+    size_t&           last_neighbor = neighbors[lid];
     RCLink*           link          = dynamic_cast<RCLink*>(cp.link());
 
     // cleanup block
