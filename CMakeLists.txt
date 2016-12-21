@@ -1,30 +1,37 @@
 project                     (tess)
 cmake_minimum_required      (VERSION 2.8)
 
-option			    (BUILD_SHARED_LIBS "Build shared libraries"                        OFF)
-option                      (timing	       "Build tess with timing"			       ON)
-option                      (memory	       "Build tess with memory profiling"	       OFF)
-option			    (draw	       "Build draw"				       ON)
-option			    (bgq	       "Build on BG/Q"				       OFF)
-option			    (pread             "Build pread-voronoi example (requires HDF5)"   OFF)
+option                      (BUILD_SHARED_LIBS "Build shared libraries"                        OFF)
+option                      (timing            "Build tess with timing"                        ON)
+option                      (memory            "Build tess with memory profiling"              OFF)
+option                      (draw              "Build draw"                                    ON)
+option                      (bgq               "Build on BG/Q"                                 OFF)
+option                      (pread             "Build pread-voronoi example (requires HDF5)"   OFF)
 option                      (diy_thread        "Enable diy threading"                          OFF)
 option                      (build_examples    "Build examples"                                ON)
 option                      (build_tools       "Build tools"                                   ON)
 
-set			    (serial	       "QHull" CACHE STRING "serial Delaunay library to use")
-set_property		    (CACHE serial PROPERTY STRINGS CGAL QHull)
+set                         (serial            "QHull" CACHE STRING "serial Delaunay library to use")
+set_property                (CACHE serial PROPERTY STRINGS CGAL QHull)
 
-if			    (timing)
-    add_definitions	    (-DTIMING)
-endif			    (timing)
+# CMAKE_BUILD_TYPE defaults to Release
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to 'Release' as none was specified.")
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
 
-if			    (memory)
-  add_definitions	    (-DMEMORY)
-endif			    (memory)
+if                          (timing)
+    add_definitions         (-DTIMING)
+endif                       (timing)
 
-if			    (bgq)
-  add_definitions	    (-DBGQ)
-endif			    (bgq)
+if                          (memory)
+  add_definitions           (-DMEMORY)
+endif                       (memory)
+
+if                          (bgq)
+  add_definitions           (-DBGQ)
+endif                       (bgq)
 
 if                          (${CMAKE_BUILD_TYPE} MATCHES DEBUG)
   add_definitions           (-DDEBUG)
@@ -35,13 +42,13 @@ set                         (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 # OSX flags
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    add_definitions	    (-DMAC_OSX)
-    set			    (CMAKE_MACOSX_RPATH	    on)
+    add_definitions         (-DMAC_OSX)
+    set                     (CMAKE_MACOSX_RPATH     on)
 ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 # QHull vs. CGAL
-if			    (${serial} MATCHES "CGAL")
-  message		    ("Using CGAL")
+if                          (${serial} MATCHES "CGAL")
+  message                   ("Using CGAL")
   find_package              (CGAL)
   find_package              (Boost)
   include                   (${CGAL_USE_FILE})
@@ -53,29 +60,29 @@ if			    (${serial} MATCHES "CGAL")
   add_definitions           (-DTESS_CGAL_ALLOW_SPATIAL_SORT)
   add_definitions           (-DTESS_USE_CGAL)
 elseif                      (${serial} MATCHES "QHull")
-  message		    ("Using QHull")
-  find_path                 (QHull_INCLUDE_DIRS		libqhull.h)
-  find_library              (QHull_LIBRARY NAMES	qhullstatic)
-  include_directories	    (${QHull_INCLUDE_DIRS})
-  set			    (libraries ${libraries} ${QHull_LIBRARY})
-  add_definitions	    (-DTESS_USE_QHull)
-else			    ()
-  message		    ("Uknown serial library: ${serial}")
-endif			    ()
+  message                   ("Using QHull")
+  find_path                 (QHull_INCLUDE_DIRS         libqhull.h)
+  find_library              (QHull_LIBRARY NAMES        qhullstatic)
+  include_directories       (${QHull_INCLUDE_DIRS})
+  set                       (libraries ${libraries} ${QHull_LIBRARY})
+  add_definitions           (-DTESS_USE_QHull)
+else                        ()
+  message                   ("Uknown serial library: ${serial}")
+endif                       ()
 
 # MPI
 find_package                (MPI REQUIRED)
 set                         (libraries ${libraries}    ${MPI_C_LIBRARIES} ${MPI_CXX_LIBRARIES})
 
 # Threads
-find_package		    (Threads)
-find_package		    (OpenMP)
-if 			    (OPENMP_FOUND)
+find_package                (Threads)
+find_package                (OpenMP)
+if                          (OPENMP_FOUND)
   set                       (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   set                       (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-else			    ()
-  message		    ("OpenMP not found")
-  add_definitions	    (-DTESS_NO_OPENMP)
+else                        ()
+  message                   ("OpenMP not found")
+  add_definitions           (-DTESS_NO_OPENMP)
 endif                       ()
 if                          (NOT diy_thread)
     message                 ("Diy threading is disabled; setting diy threads will have no effect")
@@ -83,26 +90,26 @@ if                          (NOT diy_thread)
 endif                       (NOT diy_thread)
 
 # OpenGL
-if			    (draw)
-find_package		    (GLUT)
-find_package		    (OpenGL)
-endif			    (draw)
+if                          (draw)
+find_package                (GLUT)
+find_package                (OpenGL)
+endif                       (draw)
 
 # DIY
-find_path                   (DIY_INCLUDE_DIRS		diy/types.h)
+find_path                   (DIY_INCLUDE_DIRS           diy/types.h)
 
 # Include path
 set                         (CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-isystem")
 include_directories         (${CMAKE_CURRENT_SOURCE_DIR}/include
-			     ${DIY_INCLUDE_DIRS}
+                             ${DIY_INCLUDE_DIRS}
                              SYSTEM ${MPI_INCLUDE_PATH}
                             )
 
 # Libraries
-set			    (libraries
-			     ${libraries}
-			     ${CMAKE_THREAD_LIBS_INIT}
-			    )
+set                         (libraries
+                             ${libraries}
+                             ${CMAKE_THREAD_LIBS_INIT}
+                            )
 if                          (debug)
     find_library            (LIBDW_LIBRARY NAMES dw)
     if                      (LIBDW_LIBRARY)
@@ -115,12 +122,12 @@ if                          (debug)
 endif                       (debug)
 
 # Subdirectories
-add_subdirectory	    (src)
+add_subdirectory            (src)
 if                          (build_examples)
-add_subdirectory	    (examples)
+add_subdirectory            (examples)
 endif                       ()
 if                          (build_tools)
-add_subdirectory	    (tools)
+add_subdirectory            (tools)
 endif                       ()
 
 # Install the headers
