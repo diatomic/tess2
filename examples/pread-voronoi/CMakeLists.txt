@@ -4,7 +4,7 @@ option                      (moab               "MOAB IO support"        off)
 
 # gadget
 if                          (gadget)
-  find_package              (Boost COMPONENTS filesystem)
+  find_package              (Boost COMPONENTS filesystem system)
   include_directories       (SYSTEM ${Boost_INCLUDE_DIR})
   set                       (io_sources ${io_sources} io/gadget/particles.cpp)
   add_definitions           (-DTESS_GADGET_IO)
@@ -49,7 +49,7 @@ set                         (io_sources ${io_sources} io/hdf5/pread-hdf5.cpp)
 add_executable              (pread-voronoi pread-voronoi.cpp ${io_sources})
 target_link_libraries       (pread-voronoi tess ${libraries} ${HDF5_libraries})
 if                          (gadget)
-  target_link_libraries     (pread-voronoi ${Boost_FILESYSTEM_LIBRARY})
+    target_link_libraries     (pread-voronoi ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY})
 endif                       (gadget)
 
 # balance

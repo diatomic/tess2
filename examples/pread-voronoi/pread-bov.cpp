@@ -24,20 +24,20 @@
 
 #include "common.h"
 
+typedef     diy::ContinuousBounds         Bounds;
+
 struct UpdateBlock
 {
-    UpdateBlock(diy::Master&			m) :
+    UpdateBlock(diy::Master&                    m) :
         master(m)                               {}
 
     void operator()(int gid, int lid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
                      const RCLink& link) const
         {
-            dblock_t* b = (dblock_t*)master.block(lid);
+            DBlock* b = (DBlock*)master.block(lid);
 
             for (int i = 0; i < 3; ++i)
             {
-                b->mins[i] = core.min[i];
-                b->maxs[i] = core.max[i];
                 b->box.min[i] = domain.min[i];
                 b->box.max[i] = domain.max[i];
                 b->data_bounds.min[i] = domain.min[i];
@@ -50,11 +50,8 @@ struct UpdateBlock
 
 // read mesh vertices
 void
-read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
+read_vertices(DBlock* b, const diy::Master::ProxyWithLink& cp, const std::vector<float>& values)
 {
-    dblock_t* b				= static_cast<dblock_t*>(b_);
-    const std::vector<float>& values	= *(std::vector<float>*) aux;
-
     int size = cp.master()->size();
     int lid  = cp.master()->lid(cp.gid());
     size_t npoints = values.size() / 3;
@@ -75,12 +72,12 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
     for (size_t i = 0; i < (to - from + 1)/3; ++i)
       for (size_t j = 0; j < 3; ++j)
       {
-	float x = values[from + i*3 + j];
-	if (x < min[j])
-	  min[j] = x;
-	if (x > max[j])
-	  max[j] = x;
-	b->particles[i*3 + j] = x;
+        float x = values[from + i*3 + j];
+        if (x < min[j])
+          min[j] = x;
+        if (x > max[j])
+          max[j] = x;
+        b->particles[i*3 + j] = x;
       }
 
     cp.all_reduce(min[0], diy::mpi::minimum<float>());
@@ -92,9 +89,8 @@ read_vertices(void *b_, const diy::Master::ProxyWithLink& cp, void *aux)
 }
 
 void
-fill_bounds(void *b_, const diy::Master::ProxyWithLink& cp, void*)
+fill_bounds(DBlock *b, const diy::Master::ProxyWithLink& cp)
 {
-    dblock_t* b = static_cast<dblock_t*>(b_);
     b->data_bounds.min[0] = cp.get<float>() - .0001;
     b->data_bounds.min[1] = cp.get<float>() - .0001;
     b->data_bounds.min[2] = cp.get<float>() - .0001;
@@ -104,24 +100,23 @@ fill_bounds(void *b_, const diy::Master::ProxyWithLink& cp, void*)
 }
 
 void
-bounds_neighbors(void *b_, const diy::Master::ProxyWithLink& cp, void*)
+bounds_neighbors(DBlock *b, const diy::Master::ProxyWithLink& cp)
 {
-    dblock_t* b = static_cast<dblock_t*>(b_);
     RCLink* link = dynamic_cast<RCLink*>(cp.link());
 
     fprintf(stderr, "[%d]: %f %f %f - %f %f %f\n",
-		    cp.gid(),
-		    b->box.min[0], b->box.min[1], b->box.min[2],
-		    b->box.max[0], b->box.max[1], b->box.max[2]);
+                    cp.gid(),
+                    b->box.min[0], b->box.min[1], b->box.min[2],
+                    b->box.max[0], b->box.max[1], b->box.max[2]);
 
     for (size_t i = 0; i < link->size(); ++i)
     {
       fprintf(stderr, "   %d: %f %f %f - %f %f %f (dir = %d %d %d, wrap = %d %d %d)\n",
-		      link->target(i).gid,
-		      link->bounds(i).min[0], link->bounds(i).min[1], link->bounds(i).min[2],
-		      link->bounds(i).max[0], link->bounds(i).max[1], link->bounds(i).max[2],
-		      link->direction(i)[0],  link->direction(i)[1],  link->direction(i)[2],
-		      link->wrap(i)[0],	      link->wrap(i)[1],	      link->wrap(i)[2]);
+                      link->target(i).gid,
+                      link->bounds(i).min[0], link->bounds(i).min[1], link->bounds(i).min[2],
+                      link->bounds(i).max[0], link->bounds(i).max[1], link->bounds(i).max[2],
+                      link->direction(i)[0],  link->direction(i)[1],  link->direction(i)[2],
+                      link->wrap(i)[0],       link->wrap(i)[1],       link->wrap(i)[2]);
     }
 }
 
@@ -190,8 +185,8 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-	if (wrap_ && tot_blocks < 64 && rank == 0)
-	    fprintf(stderr, "Warning: using k-d tree with wrap on and fewer than 64 blocks is likely to fail\n");
+        if (wrap_ && tot_blocks < 64 && rank == 0)
+            fprintf(stderr, "Warning: using k-d tree with wrap on and fewer than 64 blocks is likely to fail\n");
     }
 
     timing(times, -1, -1, world);
@@ -247,17 +242,17 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Values read\n");
 
     // split points into blocks
-    master.foreach(&read_vertices, &values);
+    master.foreach([&values](DBlock* b, const diy::Master::ProxyWithLink& cp) { read_vertices(b, cp, values); });
     if (rank == 0)
       fprintf(stderr, "Values distributed to blocks\n");
-    std::vector<float>().swap(values);	    // empty values and free the memory
-    master.exchange();			    // process collectives
+    std::vector<float>().swap(values);      // empty values and free the memory
+    master.exchange();                      // process collectives
     master.foreach(&fill_bounds);
     if (rank == 0)
       fprintf(stderr, "Bounds filled\n");
 
     // get the domain from any block
-    dblock_t* b = (dblock_t*)(master.block(master.loaded_block()));
+    DBlock* b = (DBlock*)(master.block(master.loaded_block()));
     domain.min[0] = b->data_bounds.min[0];
     domain.min[1] = b->data_bounds.min[1];
     domain.min[2] = b->data_bounds.min[2];
@@ -283,7 +278,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, "particles exchanged\n");
 
     DuplicateCountMap count;
-    master.foreach(&deduplicate, &count);
+    master.foreach([&count](DBlock* b, const diy::Master::ProxyWithLink& cp) { deduplicate(b,cp,count); });
 
     if (debug)
     {
@@ -303,7 +298,7 @@ int main(int argc, char *argv[])
 
     timing(times, -1, TOT_TIME, world);
     tess_stats(master, quants, times);
-    
+
     if (rank == 0)
       fprintf(stderr, "Enumerating cells\n");
     master.foreach(&enumerate_cells);

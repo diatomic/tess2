@@ -26,24 +26,26 @@
 
 #include "common.h"
 
+typedef     diy::ContinuousBounds         Bounds;
+
 struct AddAndRead: public AddBlock
 {
-    AddAndRead(diy::Master&			m,
-               int				nblocks_,
-               const char*			infile_,
+    AddAndRead(diy::Master&                     m,
+               int                              nblocks_,
+               const char*                      infile_,
                const std::vector<std::string>&  coordinates_):
         AddBlock(m),
         nblocks(nblocks_),
         infile(infile_),
-        coordinates(coordinates_)	{}
+        coordinates(coordinates_)       {}
 
     void  operator()(int gid, const Bounds& core, const Bounds& bounds, const Bounds& domain,
                      const RCLink& link) const
         {
-            dblock_t* b = AddBlock::operator()(gid, core, bounds, domain, link);
+            DBlock* b = AddBlock::operator()(gid, core, bounds, domain, link);
 
             // read points
-            std::vector<float>	particles;
+            std::vector<float>  particles;
 
 #if defined TESS_GADGET_IO
             std::string infn(infile);
@@ -56,7 +58,7 @@ struct AddAndRead: public AddBlock
                                            nblocks,
                                            particles,
                                            coordinates);
-            } else	// assume HDF5
+            } else      // assume HDF5
 #endif
                 io::hdf5::read_particles(master.communicator(),
                                          infile,
@@ -78,9 +80,9 @@ struct AddAndRead: public AddBlock
             }
         }
 
-    int					nblocks;
-    const char*				infile;
-    const std::vector<std::string>&	coordinates;
+    int                                 nblocks;
+    const char*                         infile;
+    const std::vector<std::string>&     coordinates;
     Bounds*                             data_bounds; // global data bounds (for hacc only)
 };
 
@@ -156,9 +158,9 @@ int main(int argc, char *argv[])
                 std::cout << "kdtree doesn't yet support the out-of-core mode\n";
             return 1;
         }
-	
-	if (wrap_ && tot_blocks < 64 && rank == 0)
-	    fprintf(stderr, "Warning: using k-d tree with wrap on and fewer than 64 blocks is likely to fail\n");
+
+        if (wrap_ && tot_blocks < 64 && rank == 0)
+            fprintf(stderr, "Warning: using k-d tree with wrap on and fewer than 64 blocks is likely to fail\n");
     }
 
     if (outfile == "!")
@@ -180,7 +182,7 @@ int main(int argc, char *argv[])
     // NB: AddAndRead for hacc assumes contiguous; don't switch to round robin
     diy::ContiguousAssigner   assigner(world.size(), tot_blocks);
 
-    AddAndRead		      create_and_read(master,
+    AddAndRead                create_and_read(master,
                                               tot_blocks,
                                               infile.c_str(),
                                               coordinates);
@@ -204,7 +206,7 @@ int main(int argc, char *argv[])
         printf("particles exchanged\n");
 
     DuplicateCountMap count;
-    master.foreach(&deduplicate, &count);
+    master.foreach([&count](DBlock* b, const diy::Master::ProxyWithLink& cp) { deduplicate(b,cp,count); });
 
     // debug purposes only: checks if the particles got into the right blocks
     // master.foreach(&verify_particles);
