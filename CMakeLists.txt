@@ -41,10 +41,29 @@ endif                       ()
 set                         (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 # OSX flags
-IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if                          (${CMAKE_SYSTEM_NAME} MATCHES      "Darwin")
     add_definitions         (-DMAC_OSX)
-    set                     (CMAKE_MACOSX_RPATH     on)
-ENDIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set                     (CMAKE_MACOSX_RPATH                on)
+
+    # --- following RPATH settings are for Sierra w/ Clang, hopefully they don't hurt other versions
+    # ref: https://cmake.org/Wiki/CMake_RPATH_handling
+    # use, i.e. don't skip, the full RPATH for the build tree
+    set                     (CMAKE_SKIP_BUILD_RPATH            false)
+    # when building, don't use the install RPATH already (but later on when installing)
+    set                     (CMAKE_BUILD_WITH_INSTALL_RPATH    false)
+    # set RPATH to install path
+    set                     (CMAKE_INSTALL_RPATH               "${CMAKE_INSTALL_PREFIX}/lib")
+    # add the automatically determined parts of the RPATH
+    # which point to directories outside the build tree to the install RPATH
+    set                     (CMAKE_INSTALL_RPATH_USE_LINK_PATH true)
+    # the RPATH to be used when installing, but only if it's not a system directory
+    list                    (FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES
+                                                               "${CMAKE_INSTALL_PREFIX}/lib"
+                                                               isSystemDir)
+    if                      ("${isSystemDir}" STREQUAL         "-1")
+      set                   (CMAKE_INSTALL_RPATH               "${CMAKE_INSTALL_PREFIX}/lib")
+    endif()
+endif                       (${CMAKE_SYSTEM_NAME} MATCHES      "Darwin")
 
 # QHull vs. CGAL
 if                          (${serial} MATCHES "CGAL")
