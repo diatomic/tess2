@@ -37,9 +37,6 @@ if                          (${CMAKE_BUILD_TYPE} MATCHES DEBUG)
   add_definitions           (-DDEBUG)
 endif                       ()
 
-# C++11
-set                         (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-
 # OSX flags
 if                          (${CMAKE_SYSTEM_NAME} MATCHES      "Darwin")
     add_definitions         (-DMAC_OSX)
@@ -88,6 +85,9 @@ elseif                      (${serial} MATCHES "QHull")
 else                        ()
   message                   ("Uknown serial library: ${serial}")
 endif                       ()
+
+# C++11
+set                         (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 # MPI
 find_package                (MPI REQUIRED)
