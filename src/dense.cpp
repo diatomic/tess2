@@ -18,9 +18,6 @@
 #include <omp.h>
 #endif
 
-// use multithreaded version of IterateCells
-// #define DENSE_OMP
-
 using namespace std;
 
 // debug: consistency checks and output stats
@@ -144,7 +141,7 @@ void est_dense(DBlock*                         b,
   switch (a->alg_type)
   {
   case DENSE_TESS:
-#ifdef DENSE_OMP
+#if 0
     // tess-based multithread estimator
     IterateCellsOMP(b, block_min_idx, block_num_idx, a->project, a->proj_plane, a->grid_phys_mins,
                     a->grid_step_size, a->data_mins, a->data_maxs, a->eps, a->mass, cp);
