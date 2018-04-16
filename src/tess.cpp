@@ -135,14 +135,14 @@ void tess_save(diy::Master& master,
 }
 
 void tess_load(diy::Master& master,
-               diy::Assigner& assigner,
+               diy::StaticAssigner& assigner,
                const char* infile)
 {
     diy::io::read_blocks(infile, master.communicator(), assigner, master, &load_block_light);
 }
 
 void tess_load(diy::Master& master,
-               diy::Assigner& assigner,
+               diy::StaticAssigner& assigner,
                const char* infile,
                diy::MemoryBuffer& extra)
 {
