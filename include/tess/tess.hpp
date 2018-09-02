@@ -77,10 +77,10 @@ void tess_save(diy::Master& master,
                double* times,
                const diy::MemoryBuffer& extra = diy::MemoryBuffer());
 void tess_load(diy::Master& master,
-               diy::Assigner& assigner,
+               diy::StaticAssigner& assigner,
                const char* infile);
 void tess_load(diy::Master& master,
-               diy::Assigner& assigner,
+               diy::StaticAssigner& assigner,
                const char* infile,
                diy::MemoryBuffer& extra);
 void tess_stats(diy::Master& master,
