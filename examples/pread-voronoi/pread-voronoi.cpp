@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
     size = world.size();
 
     typedef     diy::ContinuousBounds         Bounds;
-    Bounds domain;
+    Bounds domain {3};
 
     using namespace opts;
 

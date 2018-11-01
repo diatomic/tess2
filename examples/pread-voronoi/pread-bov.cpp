@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
     size = world.size();
 
     typedef     diy::ContinuousBounds         Bounds;
-    Bounds domain;                           // initialize to [0,1] at first, will get reset
+    Bounds domain {3};                           // initialize to [0,1] at first, will get reset
     domain.min[0] = domain.min[1] = domain.min[2] = 0.0;
     domain.max[0] = domain.max[1] = domain.max[2] = 1.0;
 
@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
     std::vector<size_t> shape(1, sz / chunk);
     diy::io::BOV reader(in, shape);
     std::vector<float> values;
-    diy::DiscreteBounds box;
+    diy::DiscreteBounds box {3};
     size_t npoints = sz / 3;
     box.min[0] = rank * npoints / size * 3 / chunk;
     if (rank == size - 1)
