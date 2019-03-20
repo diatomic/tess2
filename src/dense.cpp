@@ -14,6 +14,7 @@
 // --------------------------------------------------------------------------
 
 #include "tess/dense.hpp"
+#include <diy/point.hpp>
 #ifndef TESS_NO_OPENMP
 #include <omp.h>
 #endif
@@ -298,7 +299,7 @@ void IterateCells(DBlock* block,
       else
       {
         set<int> dests; // destination neighbor edges for this point
-        in(*l, grid_pos, std::inserter(dests, dests.end()), block->data_bounds);
+        in(*l, diy::Point<float,3> { grid_pos }, std::inserter(dests, dests.end()), block->data_bounds);
         for (set<int>::iterator it = dests.begin(); it != dests.end(); it++)
           cp.enqueue(l->target(*it), grid_pts[i]);
       }
@@ -552,7 +553,7 @@ void IterateCellsCic(DBlock* block,
 	grid_pt.idx[2] = grid_idxs[3 * i + 2];
 	grid_pt.mass = grid_masses[i];
         set<int> dests; // destination neighbor edges for this point
-        in(*l, grid_pos, std::inserter(dests, dests.end()), block->data_bounds);
+        in(*l, diy::Point<float,3> { grid_pos }, std::inserter(dests, dests.end()), block->data_bounds);
         for (set<int>::iterator it = dests.begin(); it != dests.end(); it++)
           cp.enqueue(l->target(*it), grid_pt);
       }

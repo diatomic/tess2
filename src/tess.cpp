@@ -31,6 +31,8 @@
 #include "tess/tet.hpp"
 #include "tess/tet-neighbors.h"
 
+#include <diy/point.hpp>
+
 #ifdef BGQ
 #include <spi/include/kernel/memory.h>
 // #include "builtins.h"
@@ -527,7 +529,7 @@ size_t incomplete_cells(struct DBlock *dblock,
             for (int i = last_neighbor; i < l->size(); ++i)
             {
                 diy::ContinuousBounds neigh_bounds = l->bounds(i);
-                diy::wrap_bounds(neigh_bounds, l->wrap(i), dblock->data_bounds, l->dimension());
+                diy::wrap_bounds(neigh_bounds, l->wrap(i), dblock->data_bounds);
 
                 // test whether there is a point in neigh_bounds that lies
                 // on the opposite side of the convex hull than j
@@ -561,9 +563,9 @@ size_t incomplete_cells(struct DBlock *dblock,
         for (int i = last_neighbor; i < l->size(); ++i)
         {
             diy::ContinuousBounds neigh_bounds = l->bounds(i);
-            diy::wrap_bounds(neigh_bounds, l->wrap(i), dblock->data_bounds, l->dimension());
+            diy::wrap_bounds(neigh_bounds, l->wrap(i), dblock->data_bounds);
 
-            if (diy::distance(3, neigh_bounds, center) <= rad)
+            if (diy::distance(neigh_bounds, diy::Point<float,3> { center }) <= rad)
             {
                 // all 4 verts go these dests, if they are among the original particles
                 for (int v = 0; v < 4; v++)
