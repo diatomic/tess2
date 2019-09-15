@@ -1,0 +1,25 @@
+image: archlinux
+triggers:
+  - action: email
+    condition: failure
+    to: Dmitriy Morozov <dmitriy@mrzv.org>
+packages:
+  - cmake
+  - cgal
+  - boost
+  - openmpi
+sources:
+  - https://github.com/diatomic/tess2
+  - https://github.com/diatomic/diy
+tasks:
+  - checkout-diy: |
+      cd diy
+      git checkout $DIY_REV
+  - configure: |
+      cd tess2
+      mkdir build
+      cd build
+      cmake .. -DDIY_INCLUDE_DIRS=~/diy/include -Dserial=CGAL -Ddraw=off
+  - build: |
+      cd tess2/build
+      make
