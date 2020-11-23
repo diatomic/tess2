@@ -10,7 +10,7 @@ option                      (pread             "Build pread-voronoi example (req
 option                      (diy_thread        "Enable diy threading"                          OFF)
 option                      (omp_thread        "Enable openmp threading"                       OFF)
 option                      (build_examples    "Build examples"                                ON)
-option                      (build_tools       "Build tools"                                   ON)
+option                      (build_tools       "Build tools"                                   OFF)
 
 set                         (serial            "QHull" CACHE STRING "serial Delaunay library to use")
 set_property                (CACHE serial PROPERTY STRINGS CGAL QHull)

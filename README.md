@@ -25,9 +25,9 @@ git clone https://github.com/diatomic/diy2
 b. [Qhull](http://qhull.org/)
 
 ```
-wget http://www.qhull.org/download/qhull-2012.1-src.tgz
-tar -xvf qhull-2012.1-src.tgz
-cd qhull-2012.1-src
+wget http://www.qhull.org/download/qhull-2020-src-8.0.2.tgz
+tar -xvf qhull-2020-src-8.0.2.tgz
+cd qhull-2020.2/
 make
 ```
 
@@ -42,8 +42,8 @@ cmake /path/to/tess \
 -DCMAKE_INSTALL_PREFIX=/path/to/tess2/install \
 -Dserial=QHull \
 -DDIY_INCLUDE_DIRS=/path/to/diy/include \
--DQHull_INCLUDE_DIRS=/path/to/qhull/include \
--DQHull_LIBRARY=/path/to/qhull/lib
+-DQHull_INCLUDE_DIRS=/path/to/qhull-2020.2/src/libqhull \
+-DQHull_LIBRARY=/path/to/qhull-2020.2/lib/libqhullstatic.a
 
 make
 make install
