@@ -1,5 +1,5 @@
 project                     (tess)
-cmake_minimum_required      (VERSION 2.8)
+cmake_minimum_required      (VERSION 3.9)
 
 option                      (BUILD_SHARED_LIBS "Build shared libraries"                        OFF)
 option                      (timing            "Build tess with timing"                        ON)
@@ -86,8 +86,8 @@ else                        ()
   message                   ("Uknown serial library: ${serial}")
 endif                       ()
 
-# C++11
-set                         (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+# C++14
+set                         (CMAKE_CXX_STANDARD 14)
 
 # MPI
 find_package                (MPI REQUIRED)
